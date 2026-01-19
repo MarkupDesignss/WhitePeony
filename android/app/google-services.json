@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "904156768249",
+    "project_id": "whitepeaony",
+    "storage_bucket": "whitepeaony.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:904156768249:android:2cc590e447a26566e8bf28",
+        "android_client_info": {
+          "package_name": "com.whitepeaony"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALkbP5wZxDQM2RZ-dl-TopkkgLIW_HVoA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

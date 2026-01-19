@@ -1,0 +1,10 @@
+{
+  "welcome": "Bienvenue",
+  "login": "Connexion",
+  "logout": "Déconnexion",
+  "home": "Accueil",
+  "profile": "Mon profil",
+  "Preferred_language": "Choisissez votre langue préférée",
+  "language_changed": "Langue changée avec succès !",
+  "Next": "Suivant"
+}
