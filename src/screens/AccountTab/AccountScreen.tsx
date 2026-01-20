@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   StatusBar,
+
 } from 'react-native';
 
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -24,7 +25,7 @@ import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { HttpStatusCode } from 'axios';
 import { LocalStorage } from '../../helpers/localstorage';
 import { Colors } from '../../constant';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 type AccountScreenProps = {
   navigation: StackNavigationProp<any>;
 };
@@ -105,7 +106,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Account</Text>
         {isLoggedIn ? (<TouchableOpacity onPress={() => signout()} style={styles.logoutIcon}>
@@ -513,7 +514,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
         onClose={() => setModalAddress(false)}
         onAddNew={() => { setModalAddress(false), setmodalAddressADD(true) }}
       />
-    </View>
+    </SafeAreaView>
 
   );
 };
