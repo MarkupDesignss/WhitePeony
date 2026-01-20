@@ -1,11 +1,11 @@
 require 'json'
 
+ENV['RCT_NEW_ARCH_ENABLED'] = '1'
+
 require Pod::Executable.execute_command(
   'node', ['-p',
-    "require.resolve(
-      'react-native/scripts/react_native_pods.rb',
-      { paths: [process.argv[1]] }
-    )", __dir__
+    "require.resolve('react-native/scripts/react_native_pods.rb', { paths: [process.argv[1]] })",
+    __dir__
   ]
 ).strip
 
@@ -13,13 +13,18 @@ platform :ios, '15.1'
 
 prepare_react_native_project!
 
-target 'WhitePeony' do
+use_frameworks! :linkage => :static   # Required for Firebase
+$RNFirebaseAsStaticFramework = true   # If Firebase exists
+
+target 'WhitePeaony' do
   config = use_native_modules!
 
   use_react_native!(
     :path => config[:reactNativePath],
     :app_path => "#{Pod::Config.instance.installation_root}/..",
-    :fabric_enabled => false
+    :new_arch_enabled => true,
+    :fabric_enabled => true,
+    :hermes_enabled => true
   )
 
   post_install do |installer|
@@ -30,8 +35,10 @@ target 'WhitePeony' do
     )
 
     installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        build_config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++20'
       end
     end
   end

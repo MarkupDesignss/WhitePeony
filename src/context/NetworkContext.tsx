@@ -9,7 +9,7 @@ type NetworkContextType = {
 
 const NetworkContext = createContext<NetworkContextType>({
   isOffline: false,
-  retryCheck: () => {},
+  retryCheck: () => { },
 });
 
 const CHECK_URL = 'https://www.google.com/generate_204';
@@ -22,28 +22,54 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isOffline, setIsOffline] = useState(false);
   const lastToastTime = useRef(0);
 
-  const checkNetwork = async (state?: NetInfoState) => {
-    const netState = state ?? (await NetInfo.fetch());
+  // Measure latency safely
+  const measureLatency = async (url: string, timeout = 6000) => {
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
 
-    // OFFLINE: SIM + WIFI both off
-    const noNetwork =
-      netState.type === 'none' || netState.isConnected === false;
+      const start = Date.now();
+      await fetch(url, { method: 'GET', signal: controller.signal });
+      clearTimeout(id);
 
-    if (noNetwork) {
-      setIsOffline(true);
-      return;
+      return Date.now() - start;
+    } catch {
+      return Infinity; // timeout or error → treat as very slow
     }
+  };
 
-    setIsOffline(false);
+  // Show slow internet toast max once every 10s
+  const showSlowInternetToast = (lastTimeRef: React.MutableRefObject<number>) => {
+    const now = Date.now();
+    if (now - lastTimeRef.current > 10000) {
+      Toast.show({
+        type: 'info',
+        text1: 'Slow Internet Connection',
+      });
+      lastTimeRef.current = now;
+    }
+  };
 
-    // SLOW INTERNET → TOAST
-    const latency = await measureLatency(
-      CHECK_URL,
-      FETCH_TIMEOUT_MS
-    );
+  const checkNetwork = async (state?: NetInfoState) => {
+    try {
+      const netState = state ?? (await NetInfo.fetch());
 
-    if (latency > LATENCY_THRESHOLD_MS) {
-      showSlowInternetToast(lastToastTime);
+      const noNetwork = netState.type === 'none' || netState.isConnected === false;
+
+      if (noNetwork) {
+        setIsOffline(true);
+        return;
+      }
+
+      setIsOffline(false);
+
+      const latency = await measureLatency(CHECK_URL, FETCH_TIMEOUT_MS);
+      if (latency > LATENCY_THRESHOLD_MS) {
+        showSlowInternetToast(lastToastTime);
+      }
+    } catch (err) {
+      console.log('Network check error:', err);
+      setIsOffline(true);
     }
   };
 
