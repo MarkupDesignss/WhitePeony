@@ -1,3 +1,5 @@
+/* ================== FINAL LoginModal.tsx ================== */
+
 import React, {
   useCallback,
   useContext,
@@ -18,25 +20,27 @@ import {
   Pressable,
   KeyboardAvoidingView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { CommonLoader } from './CommonLoader/commonLoader';
 import { UserService } from '../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import Toast from 'react-native-toast-message';
-import { useNavigation } from '@react-navigation/native';
 import { UserData, UserDataContext } from '../context/userDataContext';
 import { useCart } from '../context/CartContext';
 import { Colors } from '../constant';
 import { heightPercentageToDP } from '../constant/dimentions';
+import { LocalStorage } from '../helpers/localstorage';
 
 interface AuthModalProps {
   visible: boolean;
   onClose: () => void;
   onGoogleLogin?: () => void;
   onFacebookLogin?: () => void;
-  phoneNumber?: string;
-  onVerify?: (otp: string) => void;
 }
+
+const EMPTY_OTP = ['', '', '', '', '', ''];
+const RESEND_TIMER = 60;
 
 const LoginModal: React.FC<AuthModalProps> = ({
   visible,
@@ -44,18 +48,36 @@ const LoginModal: React.FC<AuthModalProps> = ({
   onGoogleLogin,
   onFacebookLogin,
 }) => {
-  const navigation = useNavigation();
   const [emailOrPhone, setEmailOrPhone] = useState('');
-  const { showLoader, hideLoader } = CommonLoader();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(60);
+  const [otp, setOtp] = useState<string[]>(EMPTY_OTP);
+  const [timer, setTimer] = useState(RESEND_TIMER);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'login' | 'otp'>('login');
+  const [loading, setLoading] = useState(false);
+
+  const { showLoader, hideLoader } = CommonLoader();
   const { setUserData, setIsLoggedIn } = useContext<UserData>(UserDataContext);
   const { syncCartAfterLogin } = useCart();
 
+  const inputRefs = useRef<Array<TextInput | null>>([]);
+
+  /* ================= RESET STATE WHEN MODAL OPENS ================= */
+  useEffect(() => {
+    if (visible) {
+      setEmailOrPhone('');
+      setOtp([...EMPTY_OTP]);
+      setTimer(RESEND_TIMER);
+      setError('');
+      setStep('login');
+      setLoading(false);
+      inputRefs.current = [];
+    }
+  }, [visible]);
+
+  /* ================= BACK BUTTON ================= */
   const handleBackPress = useCallback(() => {
     if (step === 'otp') {
+      resetOtpState();
       setStep('login');
       return true;
     }
@@ -73,147 +95,181 @@ const LoginModal: React.FC<AuthModalProps> = ({
     }
   }, [visible, handleBackPress]);
 
+  /* ================= TIMER ================= */
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (step === 'otp' && timer > 0) {
+      interval = setInterval(() => setTimer(t => t - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [step, timer]);
+
+  /* ================= HELPERS ================= */
   const validateEmailOrPhone = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9]{10}$/;
-    if (emailRegex.test(emailOrPhone)) return { valid: true, type: 'email' };
-    if (phoneRegex.test(emailOrPhone)) return { valid: true, type: 'phone' };
-    return { valid: false };
+    return emailRegex.test(emailOrPhone) || phoneRegex.test(emailOrPhone);
   };
 
-  useEffect(() => {
-    if (visible && step === 'otp') {
-      setOtp(['', '', '', '', '', '']);
-      setTimer(60);
-    }
-  }, [visible, step]);
-
-  useEffect(() => {
-    if (step === 'otp' && timer > 0) {
-      const countdown = setInterval(() => setTimer(t => t - 1), 1000);
-      return () => clearInterval(countdown);
-    }
-  }, [step, timer]);
-
-  const inputRefs = useRef<Array<TextInput | null>>([]);
-
-  const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && otp[index] === '' && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
+  const resetOtpState = () => {
+    setOtp([...EMPTY_OTP]);
+    setTimer(RESEND_TIMER);
+    inputRefs.current = [];
   };
 
+  /* ================= OTP INPUT ================= */
   const handleChangeOtp = (text: string, index: number) => {
+    if (!/^[0-9]?$/.test(text)) return;
+
     const newOtp = [...otp];
     newOtp[index] = text;
     setOtp(newOtp);
-    if (text && index < otp.length - 1) {
+
+    if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
+  /* ================= REQUEST OTP ================= */
   const requestOTP = async () => {
-    setError(''); // reset error
+    setError('');
 
-    // ✅ Empty check first
-    if (!emailOrPhone.trim()) {
-      setError('Please enter a valid email or 10-digit phone number');
-      return;
-    }
-
-    // Validate format
-    const result = validateEmailOrPhone();
-    if (!result.valid) {
+    if (!emailOrPhone.trim() || !validateEmailOrPhone()) {
       setError('Please enter a valid email or 10-digit phone number');
       return;
     }
 
     try {
-      const payload = { email_or_phone: emailOrPhone };
+      setLoading(true);
       showLoader();
-      const res = await UserService.requestotp(payload);
+      const res = await UserService.requestOtp({
+        email_or_phone: emailOrPhone.trim(),
+      });
       hideLoader();
 
-      if (res?.status === HttpStatusCode.Ok) {
+      if (res?.data?.success) {
         Toast.show({ type: 'success', text1: res?.data?.message });
-        setStep('otp'); // move to OTP step
+        setStep('otp');
+        resetOtpState();
+        setTimeout(() => inputRefs.current[0]?.focus(), 300);
       } else {
-        Toast.show({ type: 'error', text1: 'Something went wrong!' });
+        setError(res?.data?.message || 'Unable to send OTP');
       }
     } catch (err: any) {
       hideLoader();
-      Toast.show({
-        type: 'error',
-        text1: err.response?.data?.message || 'Something went wrong!',
-      });
+      setError(err?.response?.data?.message || 'Unable to send OTP');
+    } finally {
+      setLoading(false);
     }
   };
 
+  /* ================= VERIFY OTP ================= */
+  const verifyOtp = async () => {
+    const enteredOtp = otp.join('');
+    if (enteredOtp.length !== 6) {
+      setError('Please enter complete 6-digit OTP');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      showLoader();
+      const res = await UserService.verifyOtp({
+        email_or_phone: emailOrPhone.trim(),
+        otp: enteredOtp,
+      });
+      hideLoader();
+
+      if (res?.data?.success && res?.data?.user) {
+        const user = res.data.user;
+        const token = res.data.access_token;
+
+        await LocalStorage.save('@login', true);
+        await LocalStorage.save('@user', user);
+        await LocalStorage.save('@token', token);
+
+        setUserData(user);
+        setIsLoggedIn(true);
+        syncCartAfterLogin?.();
+
+        Toast.show({ type: 'success', text1: res.data.message });
+        onClose();
+      } else {
+        setError(
+          res?.data?.message || 'Invalid or expired OTP. Please try again.',
+        );
+      }
+    } catch (err: any) {
+      hideLoader();
+      setError(
+        err?.response?.data?.message ||
+        'Invalid or expired OTP. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= UI ================= */
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleBackPress}
-    >
+    <Modal style={{}} visible={visible} transparent animationType="slide">
       <View style={styles.overlay}>
         <Pressable style={styles.flexFill} onPress={onClose} />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
         >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView keyboardShouldPersistTaps="handled">
             <View style={styles.modalContainer}>
-              <Text style={styles.title}>Log in to white Peony! 👋</Text>
+              <Text style={styles.title}>Log in to White Peony! 👋</Text>
 
-              {step === 'login' && (
+              {step === 'login' ? (
                 <Text style={styles.subtitle}>
                   Hello again, you’ve been missed!
                 </Text>
-              )}
-
-              {step === 'otp' && (
+              ) : (
                 <Text style={styles.subtitle}>
                   Enter the OTP sent to{' '}
                   <Text style={styles.bold}>{emailOrPhone}</Text>
                 </Text>
               )}
 
-              {/* LOGIN VIEW */}
               {step === 'login' && (
                 <>
                   <Text style={styles.label}>Email/Phone Number *</Text>
                   <View style={styles.inputWrapper}>
                     <TextInput
+                      autoCapitalize="none"
+                      keyboardType="email-address"
                       style={styles.input}
-                      placeholder="+420 605 476 490"
-                      placeholderTextColor={Colors.text[200]}
                       value={emailOrPhone}
                       onChangeText={setEmailOrPhone}
-                      keyboardType="name-phone-pad"
+                      placeholder="+420 605 476 490"
+                      placeholderTextColor={Colors.text[200]}
+                      editable={!loading}
                     />
                   </View>
 
                   <TouchableOpacity
-                    style={styles.loginButton}
-                    onPress={requestOTP} // 🔥 now triggers properly on both platforms
+                    style={[styles.loginButton, loading && { opacity: 0.7 }]}
+                    onPress={requestOTP}
+                    disabled={loading}
                   >
-                    <Text style={styles.loginText}>Login</Text>
+                    {loading ? (
+                      <ActivityIndicator color="#000" />
+                    ) : (
+                      <Text style={styles.loginText}>Login</Text>
+                    )}
                   </TouchableOpacity>
 
-                  {error ? (
-                    <Text style={{ color: 'red', marginTop: 5 }}>{error}</Text>
-                  ) : null}
+                  {!!error && <Text style={{ color: 'red' }}>{error}</Text>}
 
                   <Text style={styles.orText}>Or</Text>
                   <View style={styles.socialRow}>
                     <TouchableOpacity
                       style={styles.socialButton}
                       onPress={onGoogleLogin}
+                      disabled={loading}
                     >
                       <Image
                         source={require('../assets/Png/google.png')}
@@ -223,6 +279,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     <TouchableOpacity
                       style={styles.socialButton}
                       onPress={onFacebookLogin}
+                      disabled={loading}
                     >
                       <Image
                         source={require('../assets/Png/facebook.png')}
@@ -233,52 +290,69 @@ const LoginModal: React.FC<AuthModalProps> = ({
                 </>
               )}
 
-              {/* OTP VIEW */}
               {step === 'otp' && (
                 <>
                   <View style={styles.otpRow}>
                     {otp.map((digit, index) => (
                       <TextInput
                         key={index}
+                        ref={ref => (inputRefs.current[index] = ref)}
                         style={styles.otpInput}
                         keyboardType="number-pad"
                         maxLength={1}
                         value={digit}
-                        placeholderTextColor={Colors.text[200]}
                         onChangeText={text => handleChangeOtp(text, index)}
-                        onKeyPress={e => handleKeyPress(e, index)}
-                        ref={ref => (inputRefs.current[index] = ref)}
-                        autoFocus={index === 0}
+                        editable={!loading}
                       />
                     ))}
                   </View>
 
-                  {error ? (
-                    <Text style={{ color: 'red', marginTop: -10, bottom: 10 }}>
+                  {!!error && (
+                    <Text style={{ color: 'red', marginBottom: 10 }}>
                       {error}
                     </Text>
-                  ) : null}
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.changeEmailButton}
+                    onPress={() => {
+                      resetOtpState();
+                      setStep('login');
+                    }}
+                    disabled={loading}
+                  >
+                    <Text style={styles.changeEmailText}>
+                      Change Email/Phone
+                    </Text>
+                  </TouchableOpacity>
 
                   <Text style={styles.resendText}>
                     Didn’t receive the code?{' '}
                     {timer > 0 ? (
                       <Text style={styles.disabled}>Resend in {timer}s</Text>
                     ) : (
-                      <Text
-                        style={styles.resendLink}
-                        onPress={() => setTimer(60)}
-                      >
+                      <Text style={styles.resendLink} onPress={requestOTP}>
                         Resend
                       </Text>
                     )}
                   </Text>
 
                   <TouchableOpacity
-                    style={styles.loginButton}
-                    onPress={requestOTP}
+                    style={[
+                      styles.loginButton,
+                      loading && { opacity: 0.7 },
+                      { marginBottom: 30 }, // <-- extra space below
+                    ]}
+                    onPress={verifyOtp}
+                    disabled={loading}
                   >
-                    <Text style={styles.loginText}>Login</Text>
+                    {loading ? (
+                      <ActivityIndicator color="#000" />
+                    ) : (
+                      <Text style={styles.loginText}>Verify</Text>
+                    )}
                   </TouchableOpacity>
+
                 </>
               )}
             </View>
@@ -291,9 +365,9 @@ const LoginModal: React.FC<AuthModalProps> = ({
 
 export default LoginModal;
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   flexFill: { flex: 1 },
-
   title: { fontSize: 18, fontWeight: '700' },
   subtitle: {
     fontSize: 14,
@@ -355,7 +429,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#000',
   },
-
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -370,11 +443,14 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
-
   resendText: { textAlign: 'center', color: '#666', marginBottom: 15 },
   disabled: { color: '#aaa' },
   resendLink: { color: '#007AFF', fontWeight: '600' },
-  createAccount: { marginTop: 10, alignItems: 'center' },
-  createText: { fontSize: 14, color: '#666' },
-  link: { color: '#007AFF', fontWeight: '600' },
+  changeEmailButton: { marginBottom: 10, alignSelf: 'center' },
+  changeEmailText: {
+    color: '#007AFF',
+    fontWeight: '600',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
 });
