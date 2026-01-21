@@ -18,12 +18,19 @@ import { Colors } from '../../constant';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 
 const CategoryScreen = ({ navigation }) => {
-
   const { showLoader, hideLoader } = CommonLoader();
 
-
   const renderItem = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.tile} activeOpacity={0.9} onPress={() => navigation.navigate('CategoryDetailsList', { categoryId: item.id, categoryTitle: item.name })}>
+    <TouchableOpacity
+      style={styles.tile}
+      activeOpacity={0.9}
+      onPress={() =>
+        navigation.navigate('CategoryDetailsList', {
+          categoryId: item.id,
+          categoryTitle: item.name,
+        })
+      }
+    >
       <ImageBackground
         source={{ uri: Image_url + item?.image }}
         style={styles.tileImage}
@@ -38,8 +45,7 @@ const CategoryScreen = ({ navigation }) => {
 
   const [category, setApiCateProducts] = useState([]);
   useEffect(() => {
-
-    GetCategoryProducts()
+    GetCategoryProducts();
   }, []);
 
   const GetCategoryProducts = async () => {
@@ -54,21 +60,29 @@ const CategoryScreen = ({ navigation }) => {
       }
     } catch (err) {
       // handle network/error
-
     } finally {
       hideLoader();
     }
   };
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'} />
+      <StatusBar
+        barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'}
+      />
       <View style={{ backgroundColor: '#FFFFF', height: 160 }}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Categories</Text>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('Searchpage')}>
           <View style={styles.searchRow}>
-            <Text style={[styles.searchInput, { color: Colors.text[200], textAlignVertical:"center" }]}>Search Products....</Text>
+            <Text
+              style={[
+                styles.searchInput,
+                { color: Colors.text[200], textAlignVertical: 'center' },
+              ]}
+            >
+              Search Products....
+            </Text>
             <TouchableOpacity style={styles.microphone}>
               <Image
                 source={require('../../assets/Png/search.png')}
@@ -95,13 +109,16 @@ const CategoryScreen = ({ navigation }) => {
 export default CategoryScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', marginTop: StatusBar.currentHeight },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    marginTop: StatusBar.currentHeight,
+  },
   header: {
     height: 80,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-
   },
   headerTitle: { fontSize: 18, fontWeight: '600' },
   logoutIcon: { position: 'absolute', right: 16, top: 28 },
@@ -113,12 +130,13 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 40,
+    // height: 40,
     borderRadius: 20,
     backgroundColor: '#fff',
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#EAEAEA',
+    paddingVertical: 12,
   },
   searchBtn: {
     marginLeft: 8,
@@ -130,7 +148,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tile: { width: '100%', height: 72, borderRadius: 10, overflow: 'hidden' },
-  tileImage: { flex: 1, justifyContent: 'center', resizeMode: 'stretch', width: '100%', height: 72 },
+  tileImage: {
+    flex: 1,
+    justifyContent: 'center',
+    resizeMode: 'stretch',
+    width: '100%',
+    height: 72,
+  },
   tileOverlay: {
     backgroundColor: 'rgba(0,0,0,0.25)',
     alignItems: 'center',

@@ -4,6 +4,7 @@ import { UserService } from '../../service/ApiService';
 import Toast from 'react-native-toast-message';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import RenderHTML from 'react-native-render-html';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 const Slugs = ({ navigation, route }) => {
@@ -42,33 +43,34 @@ const Slugs = ({ navigation, route }) => {
 
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-            <View style={{
-                backgroundColor: '#FFF',
-                justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center',
-            }}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} >
-                    <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{name}</Text>
-                <View></View>
-            </View>
+        <SafeAreaView style={{flex:1,backgroundColor:'#fff'}}>
+            <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+                <View style={{
+                    backgroundColor: '#FFF',
+                    justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center',
+                }}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} >
+                        <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>{name}</Text>
+                    <View></View>
+                </View>
 
-            <View style={{ marginTop: 20 }}>
-                <RenderHTML
-                    contentWidth={width - 32} // account for padding
-                    source={{ html }}
-                    enableExperimentalMarginCollapsing={true}
-                    tagsStyles={{
-                        p: { marginBottom: 12, lineHeight: 20, color: '#222', fontSize: 14 },
-                        strong: { fontWeight: '700' },
-                        a: { color: '#1e88e5' },
-                    }}
-                    defaultTextProps={{ selectable: true }} // allow text selection/copy
-                />
-            </View>
-        </ScrollView>
-
+                <View style={{ marginTop: 20 }}>
+                    <RenderHTML
+                        contentWidth={width - 32} // account for padding
+                        source={{ html }}
+                        enableExperimentalMarginCollapsing={true}
+                        tagsStyles={{
+                            p: { marginBottom: 12, lineHeight: 20, color: '#222', fontSize: 14 },
+                            strong: { fontWeight: '700' },
+                            a: { color: '#1e88e5' },
+                        }}
+                        defaultTextProps={{ selectable: true }} // allow text selection/copy
+                    />
+                </View>
+            </ScrollView>
+        </SafeAreaView>
     )
 }
 

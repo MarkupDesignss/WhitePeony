@@ -2,7 +2,6 @@ import React, { useContext, useEffect, useState } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   FlatList,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import LoginModal from '../../components/LoginModal';
 import { Image_url, UserService } from '../../service/ApiService';
@@ -23,13 +23,15 @@ import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import Toast from 'react-native-toast-message';
 import AddressModal from '../../components/AddressModal';
 import { useFocusEffect } from '@react-navigation/native';
-import { heightPercentageToDP, widthPercentageToDP } from '../../constant/dimentions';
+import {
+  heightPercentageToDP,
+  widthPercentageToDP,
+} from '../../constant/dimentions';
 import { useCart } from '../../context/CartContext';
 import { WebView } from 'react-native-webview';
 import { Colors, Images } from '../../constant';
 import { Swipeable } from 'react-native-gesture-handler';
-
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -51,6 +53,9 @@ type CartItem = {
   total_price?: number;
   quantity: number;
   variants?: { variant_id?: number | string }[];
+  variant_id?: number | string;
+  name?: string;
+  unit?: string;
 };
 
 type Address = {
@@ -65,7 +70,8 @@ type Address = {
 };
 
 const CheckoutScreen = ({ navigation }: { navigation: any }) => {
-  const { addToCart, removeFromCart, getCartDetails, syncCartAfterLogin } = useCart();
+  const { addToCart, removeFromCart, getCartDetails, syncCartAfterLogin, cart } =
+    useCart();
   const [modalVisible, setModalVisible] = useState(false);
   const [modalAddress, setModalAddress] = useState(false);
   const [modalAddressADD, setmodalAddressADD] = useState(false);
@@ -73,52 +79,72 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const [showWebView, setShowWebView] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState('');
   const { showLoader, hideLoader } = CommonLoader();
-  const [cartData, setApiCartData] = useState<CartItem[]>([]);
+  const [cartData, setApiCartData] = useState<any>({
+    items: [],
+    total_amount: 0,
+    id: null
+  });
   const [cartid, setcartid] = useState<any>(null);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingCart, setLoadingCart] = useState(false);
 
   // Shipping state
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [shippingModalVisible, setShippingModalVisible] = useState(false);
-  const [selectedShippingId, setSelectedShippingId] = useState<number | null>(null);
+  const [selectedShippingId, setSelectedShippingId] = useState<number | null>(
+    null,
+  );
   const [isFetchingShipping, setIsFetchingShipping] = useState(false);
 
   const [promoOptions, setPromoOptions] = useState<any[]>([]);
   const [promoModalVisible, setPromoModalVisible] = useState(false);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
-  const [selectedPromoCode, setSelectedPromoCode] = useState({ code: '', type: '', discount: '' });
+  const [selectedPromoCode, setSelectedPromoCode] = useState({
+    code: '',
+    type: '',
+    discount: '',
+  });
   const [isFetchingPromo, setIsFetchingPromo] = useState(false);
 
-  ///coupans code 
+  ///coupans code
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
+
+  // Add useEffect to sync when cart context changes
+  useEffect(() => {
+    const syncCart = async () => {
+      console.log('Cart context changed, syncing checkout...');
+      await GetCartDetails();
+    };
+    syncCart();
+  }, [cart.length]); // Trigger when cart items count changes
 
   useEffect(() => {
     const fetchWishlist = async () => {
       try {
-        showLoader();
         const res = await UserService.wishlist();
         const apiWishlist = res?.data?.data || [];
-        hideLoader();
-
         setItems(apiWishlist);
-        //console.log('Wishlist fetched:', apiWishlist[0]?.variants);
       } catch (e) {
-        hideLoader();
         const error = e as any;
         if (error.status === 401) {
           console.log('Unauthorized access - perhaps token expired');
-        }
-        else {
-          console.log("error", error)
-          // Toast.show({ type: 'error', text1: 'Failed to load wishlist' });
+        } else {
+          console.log('error fetching wishlist', error);
         }
       }
     };
-    fetchWishlist();
-    // initial fetch shipping (optional)
-    Getshiping();
-    //GetPromo()
+
+    const fetchInitialData = async () => {
+      await Promise.all([
+        fetchWishlist(),
+        Getshiping(),
+        GetCartDetails() // Fetch cart on initial load
+      ]);
+    };
+
+    fetchInitialData();
   }, []);
 
   const moveToWishlist = (itemId: string | number | undefined) => {
@@ -132,24 +158,30 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       const currentQty = Number(item.quantity);
       const newQty = currentQty + change;
 
-      if (newQty < 1) return Toast.show({ type: 'info', text1: 'Minimum quantity is 1' });
-      if (newQty > 99) return Toast.show({ type: 'info', text1: 'Maximum quantity is 99' });
+      if (newQty < 1)
+        return Toast.show({ type: 'info', text1: 'Minimum quantity is 1' });
+      if (newQty > 99)
+        return Toast.show({ type: 'info', text1: 'Maximum quantity is 99' });
 
+      // The payload should match what your backend expects
       const payload = {
         product_id: item.product_id,
         quantity: newQty,
-        variant_id: item.variant_id ?? null,
+        variant_id: item.variant_id || item.variants?.[0]?.variant_id || null,
       };
+
+      console.log('UpdateCart payload:', payload);
 
       const res = await UserService.UpdateCart(payload);
       hideLoader();
+
       if (res?.data?.success === true) {
         Toast.show({
           type: 'success',
           text1: res.data?.message || 'Cart updated!',
         });
         console.log('UpdateCart response:', res?.data);
-        GetCartDetails();
+        await GetCartDetails(); // Refresh cart after update
       } else {
         console.log('errcheckout', res?.data);
         Toast.show({ type: 'error', text1: 'Failed to update cart' });
@@ -173,7 +205,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           try {
             showLoader();
             await removeFromCart(Number(item.product_id));
-            await GetCartDetails();
+            await GetCartDetails(); // Refresh after removal
           } catch (err) {
             Toast.show({ type: 'error', text1: 'Failed to remove item' });
           } finally {
@@ -190,71 +222,94 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     );
   };
 
-  const renderShipmentItem = ({ item }: { item: CartItem }) => (
-    <Swipeable
-      renderRightActions={() => renderRightActions(item)}
-      overshootRight={false}
-    >
-      <View style={styles.shipmentItemCard}>
-        <Image
-          source={{ uri: Image_url + item.front_image }}
-          style={styles.shipmentImage}
-        />
+ const renderShipmentItem = ({ item }: { item: CartItem }) => (
+  <Swipeable
+    renderRightActions={() => renderRightActions(item)}
+    overshootRight={false}
+  >
+    <View style={styles.shipmentItemCard}>
+      <Image
+        source={{ uri: Image_url + item.front_image }}
+        style={styles.shipmentImage}
+      />
 
-        <View style={{ width: widthPercentageToDP(65), left: widthPercentageToDP(5) }}>
-          <Text style={styles.shipmentName}>{item.name}</Text>
-          <Text style={styles.shipmentWeight}>{item?.unit || null}</Text>
+      <View
+        style={{
+          width: widthPercentageToDP(65),
+          left: widthPercentageToDP(5),
+        }}
+      >
+        <Text style={styles.shipmentName}>{item.product_name || item.name}</Text>
+        <Text style={styles.shipmentWeight}>{item?.unit || null}</Text>
 
+        <TouchableOpacity
+          onPress={() => moveToWishlist(item.id)}
+          style={styles.moveToWishlistBtn}
+        >
+          <Text style={styles.moveToWishlistText}>Move to wishlist</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.shipmentPrice}>{item?.total_price} €</Text>
+
+        <View style={styles.qtyControlContainer}>
           <TouchableOpacity
-            onPress={() => moveToWishlist(item.id)}
-            style={styles.moveToWishlistBtn}
+            onPress={() => UpdateCart(item, -1)}
+            disabled={item.quantity <= 1}
+            style={styles.qtyBtn}
           >
-            <Text style={styles.moveToWishlistText}>Move to wishlist</Text>
+            <Image
+              source={require('../../assets/Png/minus.png')}
+              style={{ width: 20, height: 20 }}
+            />
           </TouchableOpacity>
 
-          <Text style={styles.shipmentPrice}>{item?.total_price} €</Text>
+          <Text style={styles.qtyText}>{item.quantity}</Text>
 
-          <View style={styles.qtyControlContainer}>
-            <TouchableOpacity
-              onPress={() => UpdateCart(item, -1)}
-              disabled={item.quantity <= 1}
-              style={styles.qtyBtn}
-            >
-              <Image source={require('../../assets/Png/minus.png')} style={{ width: 20, height: 20 }} />
-            </TouchableOpacity>
-
-            <Text style={styles.qtyText}>{item.quantity}</Text>
-
-            <TouchableOpacity
-              onPress={() => UpdateCart(item, +1)}
-              style={styles.qtyBtn}
-            >
-              <Image source={require('../../assets/Png/add.png')} style={{ width: 20, height: 20 }} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => UpdateCart(item, +1)}
+            style={styles.qtyBtn}
+          >
+            <Image
+              source={require('../../assets/Png/add.png')}
+              style={{ width: 20, height: 20 }}
+            />
+          </TouchableOpacity>
         </View>
       </View>
-    </Swipeable>
-  );
+    </View>
+  </Swipeable>
+);
+
   const renderSuggestionItem = ({ item }: { item: any }) => (
-    <TouchableOpacity onPress={() =>
-      navigation.navigate('ProductDetails', { productId: item.product_id })
-    }
-      activeOpacity={0.8}>
-      <View style={styles.suggestionCard} >
-        <Image source={require('../../assets/Png/product.png')} style={styles.suggestionImage} />
+    <TouchableOpacity
+      onPress={() =>
+        navigation.navigate('ProductDetails', { productId: item.product_id || item.id })
+      }
+      activeOpacity={0.8}
+    >
+      <View style={styles.suggestionCard}>
+        <Image
+          source={item.image ? { uri: Image_url + item.image } : require('../../assets/Png/product.png')}
+          style={styles.suggestionImage}
+        />
         <Text style={styles.suggestionName} numberOfLines={1}>
           {item.name}
         </Text>
         <View style={{ flexDirection: 'row', marginTop: 0 }}>
-          {[1, 2, 3, 4, 5].map((r) => {
+          {[1, 2, 3, 4, 5].map(r => {
             const isFull = item?.average_rating >= r;
-            const isHalf = item?.average_rating >= r - 0.5 && item?.average_rating < r;
+            const isHalf =
+              item?.average_rating >= r - 0.5 && item?.average_rating < r;
             return (
-              <View key={r} style={{ width: 18, height: 18, position: 'relative' }}>
-                {/* base gray star */}
-                <Text style={{ color: '#ccc', fontSize: 18, position: 'absolute' }}>★</Text>
-                {/* overlay half or full star */}
+              <View
+                key={r}
+                style={{ width: 18, height: 18, position: 'relative' }}
+              >
+                <Text
+                  style={{ color: '#ccc', fontSize: 18, position: 'absolute' }}
+                >
+                  ★
+                </Text>
                 <View
                   style={{
                     width: isFull ? '100%' : isHalf ? '50%' : '0%',
@@ -265,11 +320,13 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   <Text style={{ color: '#F0C419', fontSize: 18 }}>★</Text>
                 </View>
               </View>
-            )
+            );
           })}
         </View>
-        <Text style={styles.suggestionPrice}>{item?.variants[0]?.unit}</Text>
-        <Text style={[styles.suggestionPrice, { color: '#000' }]}>{item?.variants[0]?.price} €</Text>
+        <Text style={styles.suggestionPrice}>{item?.variants?.[0]?.unit || item?.unit}</Text>
+        <Text style={[styles.suggestionPrice, { color: '#000' }]}>
+          {item?.variants?.[0]?.price || item?.price} €
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -282,12 +339,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
     try {
       setIsApplyingPromo(true);
-
-      // ✅ Find promo by code
       const selectedPromo = promoOptions.find(
-        (p) =>
+        p =>
           String(p.code ?? p.promo_code ?? p.promo ?? p.title) ===
-          String(selectedPromoCode.code)
+          String(selectedPromoCode.code),
       );
 
       if (!selectedPromo) {
@@ -297,10 +352,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
       const total = Number(cartData?.total_amount ?? 0);
       const discountType = selectedPromo.discount_type?.toLowerCase();
-      const discountValue = parseFloat(selectedPromoCode.code.replace(/[^\d.]/g, '')) || 0;
+      const discountValue =
+        parseFloat(selectedPromoCode.code.replace(/[^\d.]/g, '')) || 0;
       const maxDiscount = Number(selectedPromo.max_discount ?? 0);
 
-      // console.log('Applying promo:', total, discountType, discountValue, maxDiscount);
       let calculatedDiscount = 0;
 
       if (discountType === 'percentage') {
@@ -336,44 +391,92 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     Toast.show({ type: 'info', text1: 'Coupon removed.' });
   };
 
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await GetCartDetails();
+    setRefreshing(false);
+  }, []);
+
   useFocusEffect(
     React.useCallback(() => {
       GetCartDetails();
-      return () => {
-        //console.log('Screen is unfocused!');
-      };
-    }, [])
+      return () => { };
+    }, []),
   );
 
   const GetCartDetails = async () => {
     try {
-      showLoader();
+      setLoadingCart(true);
+      console.log('Fetching cart details...');
       const res = await UserService.viewCart();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res.data?.cart || [];
-        setcartid(res.data?.cart?.id);
-        setApiCartData(fetchedProducts);
-        //console.log('cart detaillss', fetchedProducts);
+      console.log('Cart API response:', res?.status, res?.data);
+
+      if (res && res.data) {
+        // The API returns: { success: true, cart: { items: [], total_amount: 0, id: ... } }
+        const cartDataFromResponse = res.data.cart || res.data;
+
+        // Ensure we have a proper structure
+        const processedCartData = {
+          items: cartDataFromResponse?.items || [],
+          total_amount: cartDataFromResponse?.total_amount || 0,
+          id: cartDataFromResponse?.id || null,
+          // Include other cart properties if needed
+          ...cartDataFromResponse
+        };
+
+        setApiCartData(processedCartData);
+        setcartid(processedCartData?.id);
+
+        console.log('Cart details set successfully:', {
+          itemCount: processedCartData.items?.length || 0,
+          totalAmount: processedCartData.total_amount || 0,
+          cartId: processedCartData.id
+        });
+
+      } else {
+        console.log('No cart data in response');
+        setApiCartData({ items: [], total_amount: 0, id: null });
       }
-    } catch (err) {
-      console.log("carterror", JSON.stringify(err))
-      // handle network/error
+    } catch (err: any) {
+      console.log('Cart error details:', {
+        message: err?.message,
+        response: err?.response?.data,
+        status: err?.response?.status
+      });
+
+      if (err?.response?.status === 401) {
+        Toast.show({
+          type: 'error',
+          text1: 'Session expired',
+          text2: 'Please login again'
+        });
+      } else if (err?.response?.status === 404) {
+        // Cart might be empty
+        setApiCartData({ items: [], total_amount: 0, id: null });
+        console.log('Cart is empty or not found');
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to load cart',
+          text2: 'Please try again'
+        });
+      }
     } finally {
+      setLoadingCart(false);
       hideLoader();
     }
   };
-
   const GetPromo = async () => {
     try {
       setIsFetchingPromo(true);
       showLoader();
       const res = await UserService.GetPromo_Code();
-      const data = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? res?.data);
+      const data = Array.isArray(res?.data)
+        ? res.data
+        : res?.data?.data ?? res?.data;
       const list = Array.isArray(data) ? data : [];
       setPromoOptions(list);
-      setSelectedPromoCode(null);
       setPromoModalVisible(true);
-      //console.log('GetPromo', res?.data);
 
       return list;
     } catch (err) {
@@ -389,14 +492,16 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const Getshiping = async () => {
     try {
       setIsFetchingShipping(true);
-      showLoader();
       const res = await UserService.Shiping();
       if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
-
-        const data = Array.isArray(res.data) ? res.data : (res.data?.data ?? res.data?.error ?? res.data);
+        const data = Array.isArray(res.data)
+          ? res.data
+          : res.data?.data ?? res.data?.error ?? res.data;
         const options = Array.isArray(data) ? data : [];
         setShippingOptions(options);
-        const firstActive = options.find((o: any) => o.is_active === '1' || o.is_active === 1) || options[0];
+        const firstActive =
+          options.find((o: any) => o.is_active === '1' || o.is_active === 1) ||
+          options[0];
         if (firstActive) setSelectedShippingId(Number(firstActive.id));
         return options;
       } else {
@@ -408,7 +513,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return [];
     } finally {
       setIsFetchingShipping(false);
-      hideLoader();
     }
   };
 
@@ -417,32 +521,53 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       Alert.alert('', 'Please, select Address');
       return;
     }
+
+    if (!cartid) {
+      Toast.show({ type: 'error', text1: 'Cart is empty' });
+      return;
+    }
+
     const payload = {
       cart_id: cartid,
       address_id: selectedAddress?.id,
       shipping_id: selectedShippingId || 1,
     };
+
     try {
       showLoader();
       const res = await UserService.Placeorder(payload);
-      if (res && res.data && (res.status === HttpStatusCode.Ok || res.status === 200)) {
+      if (
+        res &&
+        res.data &&
+        (res.status === HttpStatusCode.Ok || res.status === 200)
+      ) {
         setShippingModalVisible(false);
-        // navigation.navigate('PaymentSuccess');
-        console.log('PlaceOrder', res?.data);
-        setPaymentUrl(res.data.payment_url);
-        setShowWebView(true);
+        console.log('PlaceOrder success', res?.data);
+
+        if (res.data.payment_url) {
+          setPaymentUrl(res.data.payment_url);
+          setShowWebView(true);
+        } else {
+          Toast.show({ type: 'success', text1: 'Order placed successfully!' });
+          navigation.goBack();
+        }
       } else {
-        console.log('error', res?.data);
+        console.log('PlaceOrder error', res?.data);
+        Toast.show({ type: 'error', text1: 'Failed to place order' });
       }
-    } catch (err) {
-      console.log('error', JSON.stringify(err));
+    } catch (err: any) {
+      console.log('PlaceOrder error', JSON.stringify(err));
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || 'Failed to place order'
+      });
     } finally {
       hideLoader();
     }
   };
 
   return (
-    <View style={styles.safe}>
+    <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -452,371 +577,606 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               style={{ width: 20, height: 20 }}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Checkout</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.headerTitle}>Checkout</Text>
+            {cartData?.items?.length > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartData.items.length}</Text>
+              </View>
+            )}
+          </View>
           <View style={{ width: 24 }} />
         </View>
 
-        {cartData?.items?.length !== 0 && cartData?.length !== 0 ? <ScrollView
-          contentContainerStyle={{ paddingBottom: 0 }}
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1 }}
-        >
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: Colors.text[400],
-              borderRadius: 10,
-              margin: 5,
-              marginTop: 10,
-            }}
-          >
-            {/* Shipment of items */}
-            <Text style={styles.sectionTitle}>
-              Shipment of {cartData?.items?.length} items
-            </Text>
-
-            <FlatList
-              data={cartData?.items || []}
-              keyExtractor={(item, index) => (item.id ?? `${item.product_id}-${index}`).toString()}
-              renderItem={renderShipmentItem}
-              scrollEnabled={false}
-              style={{ marginBottom: 20 }}
-            />
+        {loadingCart ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#AEB254" />
+            <Text style={styles.loadingText}>Loading cart...</Text>
           </View>
-
-          {/* You Might Also Like */}
-          {items.length !== 0 ? <View
-            style={{
-              borderWidth: 1,
-              borderColor: Colors.text[400],
-              borderRadius: 10,
-              margin: 5,
-              marginTop: 10,
-            }}
-          >
-            <Text style={styles.sectionTitle}>You Might Also Like</Text>
-            <FlatList
-              data={items}
-              horizontal
-              keyExtractor={item => item.id}
-              renderItem={renderSuggestionItem}
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 10 }}
-              contentContainerStyle={{ paddingHorizontal: 10 }}
-              ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
-            />
-
-            {items.length >= 3 ?
-              <TouchableOpacity onPress={() => navigation.navigate('WishlistScreen')} >
-                <View
-                  style={{
-                    backgroundColor: '#F3F3F3',
-                    borderRadius: 6,
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    paddingVertical: 7,
-                    margin: 20,
-                  }}
-                >
-                  <Image
-                    source={require('../../assets/Png/Ellipse.png')}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      alignSelf: 'center',
-                      right: 10,
-                    }}
-                  />
-                  <Text
-                    style={[
-                      styles.moveToWishlistText,
-                      { alignSelf: 'center', color: '#000' },
-                    ]}
-                  >
-                    See all products
-                  </Text>
-                  <Image
-                    source={require('../../assets/Png/next.png')}
-                    style={{ width: 12, height: 12, alignSelf: 'center', left: 10 }}
-                  />
-                </View>
-              </TouchableOpacity> : null}
-          </View> : null}
-
-          {/* Use Coupons */}
-          <TouchableOpacity style={styles.couponBtn} activeOpacity={0.8} onPress={async () => { await GetPromo(); }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Image
-                source={require('../../assets/Png/discount.png')}
-                style={{
-                  width: 25,
-                  height: 25,
-                  marginLeft: 10,
-                  alignSelf: 'center',
-                }}
+        ) : cartData?.items?.length > 0 ? (
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+            style={{ flex: 1 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={['#AEB254']}
+                tintColor={'#AEB254'}
               />
-              <Text style={styles.couponText}>
-                {selectedPromoCode?.code?.trim()
-                  ? selectedPromoCode.code
-                  : 'Use Coupons'}
-              </Text>
-            </View>
-            <Image
-              source={require('../../assets/Png/next.png')}
-              style={{
-                width: 10,
-                height: 10,
-                marginRight: 10,
-                alignSelf: 'center',
-              }}
-            />
-          </TouchableOpacity>
-
-          <Modal visible={promoModalVisible} transparent animationType="slide" onRequestClose={() => setPromoModalVisible(false)}>
-            <TouchableWithoutFeedback onPress={() => setPromoModalVisible(false)}>
-              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-                <TouchableWithoutFeedback>
-                  <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '70%' }}>
-                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                      <View style={{ width: 40, height: 5, backgroundColor: '#ccc', borderRadius: 3 }} />
-                    </View>
-                    <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}>Available Coupons</Text>
-                    {isFetchingPromo ? (
-                      <ActivityIndicator size="small" color="#5DA53B" />
-                    ) : promoOptions.length === 0 ? (
-                      <Text style={{ textAlign: 'center', color: '#666' }}>No coupons available</Text>
-                    ) : (
-                      <FlatList
-                        data={promoOptions}
-                        keyExtractor={(it, idx) =>
-                          (it.id ?? it.code ?? it.promo_code ?? idx).toString()
-                        }
-                        renderItem={({ item }) => {
-                          const code =
-                            item?.code ??
-                            item?.promo_code ??
-                            item?.promo ??
-                            item?.title ??
-                            'N/A';
-
-                          const desc = item?.description ?? '';
-                          const discountType = item?.discount_type ?? '';
-                          const discountValue = item?.discount ?? item?.value ?? '';
-
-                          // ✅ check if this is the selected coupon
-                          const isSelected = selectedPromoCode?.code === String(code);
-
-                          return (
-                            <TouchableOpacity
-                              onPress={() =>
-                                setSelectedPromoCode({
-                                  code: String(code),
-                                  type: discountType,
-                                  discount: discountValue,
-                                })
-                              }
-                              style={{
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                borderWidth: 1,
-                                borderColor: isSelected ? '#AEB254' : '#EAEAEA',
-                                backgroundColor: isSelected ? '#F7F9E5' : '#fff',
-                                padding: 12,
-                                borderRadius: 8,
-                                marginBottom: 10,
-                              }}
-                            >
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontWeight: '700' }}>{code}</Text>
-                                {desc ? (
-                                  <Text style={{ color: '#666', marginTop: 4 }}>{desc}</Text>
-                                ) : null}
-                              </View>
-                              <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={{ fontSize: 12, color: '#888' }}>
-                                  {discountValue}
-                                </Text>
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        }}
-                        contentContainerStyle={{ paddingBottom: 10 }}
-                      />
-                    )}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-                      <TouchableOpacity onPress={() => { setPromoModalVisible(false), setSelectedPromoCode({ code: '' }) }} style={{ backgroundColor: '#eee', paddingVertical: 12, borderRadius: 28, alignItems: 'center', flex: 1, marginRight: 8 }}>
-                        <Text style={{ color: '#333' }}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => SetPromo()} disabled={isApplyingPromo} style={{ backgroundColor: Colors.button[100], paddingVertical: 12, borderRadius: 28, alignItems: 'center', flex: 1 }}>
-                        <Text style={{ color: '#000', fontWeight: '700' }}>{isApplyingPromo ? 'Applying...' : 'Apply Coupon'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            </TouchableWithoutFeedback>
-          </Modal>
-
-          {/* Bill details */}
-          {cartData.length !== 0 ? (
+            }
+          >
             <View
               style={{
                 borderWidth: 1,
                 borderColor: Colors.text[400],
-                borderRadius: 12,
-                margin: 10,
-                padding: 10,
+                borderRadius: 10,
+                margin: 5,
+                marginTop: 10,
               }}
             >
-              <Text style={styles.billTitle}>Bill details</Text>
+              <Text style={styles.sectionTitle}>
+                Shipment of {cartData?.items?.length} items
+              </Text>
 
-              <View style={styles.billRow}>
-                <Text style={styles.billLabel}>Total</Text>
-                <Text style={styles.billValue}>{cartData?.total_amount ?? 0} €</Text>
+              <FlatList
+                data={cartData?.items || []}
+                keyExtractor={(item, index) =>
+                  (item.id ?? `${item.product_id}-${index}`).toString()
+                }
+                renderItem={renderShipmentItem}
+                scrollEnabled={false}
+                style={{ marginBottom: 20 }}
+              />
+            </View>
+
+            {/* You Might Also Like */}
+            {items.length > 0 && (
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: Colors.text[400],
+                  borderRadius: 10,
+                  margin: 5,
+                  marginTop: 10,
+                }}
+              >
+                <Text style={styles.sectionTitle}>You Might Also Like</Text>
+                <FlatList
+                  data={items}
+                  horizontal
+                  keyExtractor={item => item.id}
+                  renderItem={renderSuggestionItem}
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 10 }}
+                  contentContainerStyle={{ paddingHorizontal: 10 }}
+                  ItemSeparatorComponent={() => <View style={{ width: 14 }} />}
+                />
+
+                {items.length >= 3 && (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('WishlistScreen')}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: '#F3F3F3',
+                        borderRadius: 6,
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        paddingVertical: 7,
+                        margin: 20,
+                      }}
+                    >
+                      <Image
+                        source={require('../../assets/Png/Ellipse.png')}
+                        style={{
+                          width: 14,
+                          height: 14,
+                          alignSelf: 'center',
+                          right: 10,
+                        }}
+                      />
+                      <Text
+                        style={[
+                          styles.moveToWishlistText,
+                          { alignSelf: 'center', color: '#000' },
+                        ]}
+                      >
+                        See all products
+                      </Text>
+                      <Image
+                        source={require('../../assets/Png/next.png')}
+                        style={{
+                          width: 12,
+                          height: 12,
+                          alignSelf: 'center',
+                          left: 10,
+                        }}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                )}
               </View>
+            )}
 
-              {appliedPromo && (
+            {/* Use Coupons */}
+            <TouchableOpacity
+              style={styles.couponBtn}
+              activeOpacity={0.8}
+              onPress={async () => {
+                await GetPromo();
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Image
+                  source={require('../../assets/Png/discount.png')}
+                  style={{
+                    width: 25,
+                    height: 25,
+                    marginLeft: 10,
+                    alignSelf: 'center',
+                  }}
+                />
+                <Text style={styles.couponText}>
+                  {selectedPromoCode?.code?.trim()
+                    ? selectedPromoCode.code
+                    : 'Use Coupons'}
+                </Text>
+              </View>
+              <Image
+                source={require('../../assets/Png/next.png')}
+                style={{
+                  width: 10,
+                  height: 10,
+                  marginRight: 10,
+                  alignSelf: 'center',
+                }}
+              />
+            </TouchableOpacity>
+
+            <Modal
+              visible={promoModalVisible}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setPromoModalVisible(false)}
+            >
+              <TouchableWithoutFeedback
+                onPress={() => setPromoModalVisible(false)}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  <TouchableWithoutFeedback>
+                    <View
+                      style={{
+                        backgroundColor: '#fff',
+                        borderTopLeftRadius: 16,
+                        borderTopRightRadius: 16,
+                        padding: 16,
+                        maxHeight: '70%',
+                      }}
+                    >
+                      <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                        <View
+                          style={{
+                            width: 40,
+                            height: 5,
+                            backgroundColor: '#ccc',
+                            borderRadius: 3,
+                          }}
+                        />
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 18,
+                          fontWeight: '600',
+                          marginBottom: 12,
+                        }}
+                      >
+                        Available Coupons
+                      </Text>
+                      {isFetchingPromo ? (
+                        <ActivityIndicator size="small" color="#5DA53B" />
+                      ) : promoOptions.length === 0 ? (
+                        <Text style={{ textAlign: 'center', color: '#666' }}>
+                          No coupons available
+                        </Text>
+                      ) : (
+                        <FlatList
+                          data={promoOptions}
+                          keyExtractor={(it, idx) =>
+                            (
+                              it.id ??
+                              it.code ??
+                              it.promo_code ??
+                              idx
+                            ).toString()
+                          }
+                          renderItem={({ item }) => {
+                            const code =
+                              item?.code ??
+                              item?.promo_code ??
+                              item?.promo ??
+                              item?.title ??
+                              'N/A';
+
+                            const desc = item?.description ?? '';
+                            const discountType = item?.discount_type ?? '';
+                            const discountValue =
+                              item?.discount ?? item?.value ?? '';
+
+                            const isSelected =
+                              selectedPromoCode?.code === String(code);
+
+                            return (
+                              <TouchableOpacity
+                                onPress={() =>
+                                  setSelectedPromoCode({
+                                    code: String(code),
+                                    type: discountType,
+                                    discount: discountValue,
+                                  })
+                                }
+                                style={{
+                                  flexDirection: 'row',
+                                  justifyContent: 'space-between',
+                                  borderWidth: 1,
+                                  borderColor: isSelected
+                                    ? '#AEB254'
+                                    : '#EAEAEA',
+                                  backgroundColor: isSelected
+                                    ? '#F7F9E5'
+                                    : '#fff',
+                                  padding: 12,
+                                  borderRadius: 8,
+                                  marginBottom: 10,
+                                }}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontWeight: '700' }}>
+                                    {code}
+                                  </Text>
+                                  {desc ? (
+                                    <Text
+                                      style={{ color: '#666', marginTop: 4 }}
+                                    >
+                                      {desc}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                  <Text style={{ fontSize: 12, color: '#888' }}>
+                                    {discountValue}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          }}
+                          contentContainerStyle={{ paddingBottom: 10 }}
+                        />
+                      )}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          marginTop: 8,
+                        }}
+                      >
+                        <TouchableOpacity
+                          onPress={() => {
+                            setPromoModalVisible(false),
+                              setSelectedPromoCode({ code: '' });
+                          }}
+                          style={{
+                            backgroundColor: '#eee',
+                            paddingVertical: 12,
+                            borderRadius: 28,
+                            alignItems: 'center',
+                            flex: 1,
+                            marginRight: 8,
+                          }}
+                        >
+                          <Text style={{ color: '#333' }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => SetPromo()}
+                          disabled={isApplyingPromo}
+                          style={{
+                            backgroundColor: Colors.button[100],
+                            paddingVertical: 12,
+                            borderRadius: 28,
+                            alignItems: 'center',
+                            flex: 1,
+                          }}
+                        >
+                          <Text style={{ color: '#000', fontWeight: '700' }}>
+                            {isApplyingPromo ? 'Applying...' : 'Apply Coupon'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </TouchableWithoutFeedback>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
+
+            {/* Bill details */}
+            {cartData && (
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: Colors.text[400],
+                  borderRadius: 12,
+                  margin: 10,
+                  padding: 10,
+                }}
+              >
+                <Text style={styles.billTitle}>Bill details</Text>
+
                 <View style={styles.billRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[styles.billLabel, { color: Colors.button[100] }]}>
-                      Coupon ({appliedPromo.code ?? appliedPromo.promo_code})
+                  <Text style={styles.billLabel}>Total</Text>
+                  <Text style={styles.billValue}>
+                    {cartData?.total_amount ?? 0} €
+                  </Text>
+                </View>
+
+                {appliedPromo && (
+                  <View style={styles.billRow}>
+                    <View
+                      style={{ flexDirection: 'row', alignItems: 'center' }}
+                    >
+                      <Text
+                        style={[
+                          styles.billLabel,
+                          { color: Colors.button[100] },
+                        ]}
+                      >
+                        Coupon ({appliedPromo.code ?? appliedPromo.promo_code})
+                      </Text>
+                      <TouchableOpacity
+                        onPress={removeCoupon}
+                        style={{ marginLeft: 6 }}
+                      >
+                        <Text style={{ color: '#FF0000', fontSize: 12 }}>
+                          Remove
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text
+                      style={[
+                        styles.billValue,
+                        { color: Colors.button[100], fontWeight: '700' },
+                      ]}
+                    >
+                      -{discountAmount.toFixed(2)} €
                     </Text>
-                    <TouchableOpacity onPress={removeCoupon} style={{ marginLeft: 6 }}>
-                      <Text style={{ color: '#FF0000', fontSize: 12 }}>Remove</Text>
-                    </TouchableOpacity>
                   </View>
+                )}
+
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabel, { fontWeight: '500' }]}>
+                    Delivery Charges
+                  </Text>
                   <Text
                     style={[
                       styles.billValue,
-                      { color: Colors.button[100], fontWeight: '700' },
+                      { color: '#878B2F', fontWeight: '600' },
                     ]}
                   >
-                    -{discountAmount.toFixed(2)} €
+                    Free
                   </Text>
                 </View>
-              )}
 
-              <View style={styles.billRow}>
-                <Text style={[styles.billLabel, { fontWeight: '500' }]}>
-                  Delivery Charges
-                </Text>
-                <Text
-                  style={[
-                    styles.billValue,
-                    { color: '#878B2F', fontWeight: '600' },
-                  ]}
-                >
-                  Free
-                </Text>
+                <View
+                  style={{
+                    borderWidth: 0.6,
+                    width: '100%',
+                    borderColor: Colors.text[400],
+                    marginVertical: 10,
+                  }}
+                ></View>
+
+                <View style={styles.billRow}>
+                  <Text
+                    style={[
+                      styles.billLabel,
+                      { fontWeight: '700', fontSize: 14 },
+                    ]}
+                  >
+                    Grand total
+                  </Text>
+                  <Text
+                    style={[
+                      styles.billValue,
+                      { fontWeight: '700', fontSize: 14 },
+                    ]}
+                  >
+                    {(
+                      Number(cartData?.total_amount ?? 0) - discountAmount
+                    ).toFixed(2)}{' '}
+                    €
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Delivery address */}
+            <View style={styles.deliveryAddressCard}>
+              <View style={{ alignSelf: 'center', flexDirection: 'row' }}>
+                <Image
+                  source={Images.home}
+                  style={{
+                    width: 25,
+                    height: 25,
+                    alignSelf: 'center',
+                    resizeMode: 'cover',
+                    tintColor: '#878B2F',
+                  }}
+                />
+                <View style={{ alignSelf: 'center', marginLeft: 20 }}>
+                  <Text style={styles.deliveryAddressTitle}>
+                    {selectedAddress?.address_type
+                      ? `Delivering to ${selectedAddress.address_type
+                        ?.toString()
+                        .charAt(0)
+                        .toUpperCase()}${selectedAddress.address_type
+                          ?.toString()
+                          .slice(1)}`
+                      : 'Delivering to Home'}
+                  </Text>
+                  <Text style={styles.deliveryAddress}>
+                    {selectedAddress
+                      ? `${selectedAddress.name}, ${selectedAddress.full_address
+                      }${selectedAddress.city
+                        ? `, ${selectedAddress.city}`
+                        : ''
+                      }${selectedAddress.postal_code
+                        ? `, ${selectedAddress.postal_code}`
+                        : ''
+                      }${selectedAddress.phone
+                        ? ` • ${selectedAddress.phone}`
+                        : ''
+                      }`
+                      : 'Please Select Delivery Address'}
+                  </Text>
+                </View>
               </View>
 
-              <View style={{ borderWidth: 0.6, width: '100%', borderColor: Colors.text[400], marginVertical: 10 }}></View>
-
-              <View style={styles.billRow}>
-                <Text
-                  style={[
-                    styles.billLabel,
-                    { fontWeight: '700', fontSize: 14 },
-                  ]}
-                >
-                  Grand total
+              <TouchableOpacity
+                style={{ alignSelf: 'center' }}
+                activeOpacity={0.7}
+                onPress={async () => {
+                  const opts = await Getshiping();
+                  if (opts && opts.length) {
+                    setShippingModalVisible(true);
+                  }
+                }}
+              >
+                <Text style={styles.changeAddress}>
+                  {selectedAddress ? 'Change' : 'Select'}
                 </Text>
-                <Text
-                  style={[
-                    styles.billValue,
-                    { fontWeight: '700', fontSize: 14 },
-                  ]}>
-                  {(Number(cartData?.total_amount ?? 0) - discountAmount).toFixed(2)} €
-                </Text>
-              </View>
+              </TouchableOpacity>
             </View>
-          ) : null}
 
-          {/* Delivery address */}
-          <View style={styles.deliveryAddressCard}>
-            <View style={{ alignSelf: 'center', flexDirection: 'row' }}>
-
-              <Image
-                source={Images.home}
-                style={{ width: 25, height: 25, alignSelf: 'center', resizeMode: 'cover', tintColor: '#878B2F' }}
-              />
-              <View style={{ alignSelf: 'center', marginLeft: 20 }}>
-                <Text style={styles.deliveryAddressTitle}>
-                  {selectedAddress?.address_type ? `Delivering to ${selectedAddress.address_type?.toString().charAt(0).toUpperCase()}${selectedAddress.address_type?.toString().slice(1)}` : 'Delivering to Home'}
-                </Text>
-                <Text style={styles.deliveryAddress}>
-                  {selectedAddress ? `${selectedAddress.name}, ${selectedAddress.full_address}${selectedAddress.city ? `, ${selectedAddress.city}` : ''}${selectedAddress.postal_code ? `, ${selectedAddress.postal_code}` : ''}${selectedAddress.phone ? ` • ${selectedAddress.phone}` : ''}` : 'Please Select Delivery Address'}
-                </Text>
-              </View>
-            </View>
-
-
-            <TouchableOpacity style={{ alignSelf: 'center', }} activeOpacity={0.7} onPress={async () => {
-              const opts = await Getshiping();
-              if (opts && opts.length) {
-                setShippingModalVisible(true);
-              }
-            }}
+            {/* Checkout Button */}
+            <TouchableOpacity
+              style={styles.checkoutButton}
+              activeOpacity={0.8}
+              onPress={async () => {
+                if (!selectedAddress) {
+                  Alert.alert('', 'Please, select Address');
+                  return;
+                }
+                await PlaceOrder();
+              }}
             >
-              <Text style={styles.changeAddress}>{selectedAddress ? 'Change' : 'Select'}</Text>
+              <Image
+                source={require('../../assets/Png/shopping-cart.png')}
+                tintColor={'#000'}
+                style={{
+                  width: 20,
+                  height: 20,
+                  right: 10,
+                }}
+              />
+              <Text style={styles.checkoutBtnText}>Check Out</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        ) : (
+          <View
+            style={{ justifyContent: 'center', alignSelf: 'center', flex: 1 }}
+          >
+            <Text
+              style={[
+                styles.headerTitle,
+                { alignSelf: 'center', marginBottom: 10 },
+              ]}
+            >
+              Your cart is empty
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('BottomTabScreen')}
+            >
+              <View
+                style={{
+                  width: widthPercentageToDP(70),
+                  borderRadius: 12,
+                  backgroundColor: Colors.button[100],
+                  paddingVertical: 12,
+                  alignSelf: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 14, alignSelf: 'center' }}>
+                  Continue For shopping
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
-
-          {/* Checkout Button */}
-          <TouchableOpacity
-            style={styles.checkoutButton}
-            activeOpacity={0.8}
-            onPress={async () => {
-              if (!selectedAddress) {
-                Alert.alert('', 'Please, select Address');
-                return;
-              }
-              await PlaceOrder();
-            }}
-          >
-            <Image
-              source={require('../../assets/Png/shopping-cart.png')} tintColor={'#000'}
-              style={{
-                width: 20,
-                height: 20,
-                right: 10
-              }}
-            />
-            <Text style={styles.checkoutBtnText}>Check Out</Text>
-          </TouchableOpacity>
-
-        </ScrollView> :
-          <View style={{ justifyContent: "center", alignSelf: "center", flex: 1, }}>
-            <Text style={[styles.headerTitle, { alignSelf: "center", marginBottom: 10 }]}>No Item Found</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('BottomTabScreen')}>
-              <View style={{ width: widthPercentageToDP(70), borderRadius: 12, backgroundColor: Colors.button[100], paddingVertical: 12, alignSelf: "center" }}>
-                <Text style={{ fontSize: 14, alignSelf: "center" }}>Continue For shopping</Text>
-              </View>
-            </TouchableOpacity>
-          </View>}
-      </View >
+        )}
+      </View>
 
       {/* Shipping selection modal */}
-      <Modal visible={shippingModalVisible} transparent animationType="slide" onRequestClose={() => setShippingModalVisible(false)}>
-        <TouchableWithoutFeedback onPress={() => setShippingModalVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+      <Modal
+        visible={shippingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShippingModalVisible(false)}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => setShippingModalVisible(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'flex-end',
+            }}
+          >
             <TouchableWithoutFeedback>
-              <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '70%' }}>
+              <View
+                style={{
+                  backgroundColor: '#fff',
+                  borderTopLeftRadius: 16,
+                  borderTopRightRadius: 16,
+                  padding: 16,
+                  maxHeight: '70%',
+                }}
+              >
                 <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                  <View style={{ width: 40, height: 5, backgroundColor: '#ccc', borderRadius: 3 }} />
+                  <View
+                    style={{
+                      width: 40,
+                      height: 5,
+                      backgroundColor: '#ccc',
+                      borderRadius: 3,
+                    }}
+                  />
                 </View>
-                <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}>Delivery Method</Text>
+                <Text
+                  style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}
+                >
+                  Delivery Method
+                </Text>
                 {isFetchingShipping ? (
                   <ActivityIndicator size="small" color="#E2E689" />
                 ) : (
                   <FlatList
                     data={shippingOptions}
-                    keyExtractor={(it) => String(it.id)}
+                    keyExtractor={it => String(it.id)}
                     renderItem={({ item }) => {
-                      const isSelected = Number(item.id) === Number(selectedShippingId);
+                      const isSelected =
+                        Number(item.id) === Number(selectedShippingId);
                       return (
                         <TouchableOpacity
-                          onPress={() => { setSelectedShippingId(Number(item.id)), GetCartDetails() }}
+                          onPress={() => {
+                            setSelectedShippingId(Number(item.id)),
+                              GetCartDetails();
+                          }}
                           style={{
                             flexDirection: 'row',
                             justifyContent: 'space-between',
@@ -829,12 +1189,32 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                           }}
                         >
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontWeight: '600', fontSize: 14 }}>{item.type}</Text>
-                            <Text style={{ color: '#666', marginTop: 4, fontSize: 12 }}>Estimated Time: {item.estimated_time}</Text>
+                            <Text style={{ fontWeight: '600', fontSize: 14 }}>
+                              {item.type}
+                            </Text>
+                            <Text
+                              style={{
+                                color: '#666',
+                                marginTop: 4,
+                                fontSize: 12,
+                              }}
+                            >
+                              Estimated Time: {item.estimated_time}
+                            </Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={{ color: '#888', fontSize: 14, fontWeight: '600', }}>Cost</Text>
-                            <Text style={{ color: '#AEB254', fontSize: 12 }}>{item.cost} €</Text>
+                            <Text
+                              style={{
+                                color: '#888',
+                                fontSize: 14,
+                                fontWeight: '600',
+                              }}
+                            >
+                              Cost
+                            </Text>
+                            <Text style={{ color: '#AEB254', fontSize: 12 }}>
+                              {item.cost} €
+                            </Text>
                           </View>
                         </TouchableOpacity>
                       );
@@ -843,11 +1223,21 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   />
                 )}
 
-                <TouchableOpacity onPress={() => { setShippingModalVisible(false), setModalAddress(true) }}
-
-                  style={{ backgroundColor: '#AEB254', paddingVertical: 14, borderRadius: 28, alignItems: 'center', marginTop: 8 }}
+                <TouchableOpacity
+                  onPress={() => {
+                    setShippingModalVisible(false), setModalAddress(true);
+                  }}
+                  style={{
+                    backgroundColor: '#AEB254',
+                    paddingVertical: 14,
+                    borderRadius: 28,
+                    alignItems: 'center',
+                    marginTop: 8,
+                  }}
                 >
-                  <Text style={{ color: '#000', fontWeight: '700' }}>Continue to Address</Text>
+                  <Text style={{ color: '#000', fontWeight: '700' }}>
+                    Continue to Address
+                  </Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
@@ -866,7 +1256,17 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
       {/* Payment WebView */}
       {showWebView && (
-        <View style={{ flex: 1, position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 999 }}>
+        <View
+          style={{
+            flex: 1,
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 999,
+          }}
+        >
           {/* Header */}
           <View
             style={{
@@ -878,27 +1278,27 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               paddingHorizontal: 15,
               borderBottomWidth: 1,
               borderBottomColor: '#ddd',
-            }}>
+            }}
+          >
             <Text style={{ fontSize: 18, fontWeight: '600' }}>Payment</Text>
             <TouchableOpacity onPress={() => setShowWebView(false)}>
               <Text style={{ fontSize: 18, color: '#000' }}>✕</Text>
             </TouchableOpacity>
           </View>
           <WebView
-            style={{ flex: 1, }}
+            style={{ flex: 1 }}
             source={{ uri: paymentUrl }}
             onNavigationStateChange={navState => {
-              console.log("thankyuu", navState.url)
+              console.log('thankyuu', navState.url);
               if (navState.url.includes('payment-success')) {
                 setTimeout(() => {
                   setShowWebView(false);
-                  // Toast.show({ type: 'success', text1: 'Payment complete!' });
                   GetCartDetails();
-                  // navigation.navigate('YourBooking');
+                  Toast.show({ type: 'success', text1: 'Payment successful!' });
                 }, 2000);
-              } else if (navState.url.includes('cancel')) { // Replace with your actual cancel URL
+              } else if (navState.url.includes('cancel')) {
                 setShowWebView(false);
-                // Toast.show({ type: 'error', text1: 'Payment cancelled.' });
+                Toast.show({ type: 'info', text1: 'Payment cancelled' });
               }
             }}
           />
@@ -908,14 +1308,16 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       <AddressModal
         visible={modalAddress}
         onClose={() => setModalAddress(false)}
-        onAddNew={() => { setModalAddress(false); setmodalAddressADD(true); }}
+        onAddNew={() => {
+          setModalAddress(false);
+          setmodalAddressADD(true);
+        }}
         onSelect={(addr: any) => {
           setSelectedAddress(addr);
-          //console.log('selectadres', addr);
           setModalAddress(false);
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -927,6 +1329,16 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
   header: {
     padding: 20,
@@ -940,6 +1352,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#111',
+  },
+  cartBadge: {
+    backgroundColor: '#AEB254',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  cartBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   sectionTitle: {
     fontSize: 14,
@@ -966,8 +1392,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 14,
     color: '#444',
-    textTransform: 'capitalize'
-
+    textTransform: 'capitalize',
   },
   shipmentWeight: {
     fontSize: 12,
@@ -998,7 +1423,7 @@ const styles = StyleSheet.create({
     width: widthPercentageToDP(27),
     justifyContent: 'center',
     marginTop: 4,
-    height: heightPercentageToDP(3.5)
+    height: heightPercentageToDP(3.5),
   },
   qtyBtn: {
     paddingHorizontal: 0,
@@ -1053,7 +1478,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: 120,
     padding: 10,
-    borderWidth: 1, borderColor: Colors.text[400],
+    borderWidth: 1,
+    borderColor: Colors.text[400],
   },
   suggestionImage: {
     width: 84,
@@ -1156,7 +1582,6 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   checkoutButton: {
-    top: -30,
     marginVertical: 20,
     alignSelf: 'center',
     backgroundColor: Colors.button[100],

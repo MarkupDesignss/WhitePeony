@@ -14,6 +14,7 @@ import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { widthPercentageToDP } from '../../constant/dimentions';
 import { Colors } from '../../constant';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 
@@ -258,110 +259,111 @@ const EditProfile = ({ navigation, route }) => {
   };
 
   return (
-    <LinearGradient
-      colors={['#F3F3F3', '#FFFFFF',]}
-      locations={[0, 0.5, 0.5, 1]} // split half-half
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }} // horizontal gradient // split exactly half-half
-      style={{ flex: 1 }}>
+    <SafeAreaView style={{flex:1,backgroundColor:'#fff'}}>
+      <LinearGradient
+        colors={['#F3F3F3', '#FFFFFF',]}
+        locations={[0, 0.5, 0.5, 1]} // split half-half
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }} // horizontal gradient // split exactly half-half
+        style={{ flex: 1 }}>
 
-      <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={styles.container}>
 
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
-            <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
+              <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>My Profile</Text>
+            <Text onPress={() => navigation.navigate('BottomTabScreen')} style={[styles.headerTitle, { fontSize: 14, textDecorationLine: 'underline', color: '#999' }]}>Skip</Text>
+          </View>
+
+          <Image
+            source={{
+              uri:
+                userData?.profile_image
+                  ? Image_url + userData?.profile_image
+                  : profileImage
+                    ? profileImage
+                    : 'https://i.postimg.cc/mZXFdw63/person.png',
+            }}
+            style={styles.avatar}
+          />
+          <TouchableOpacity style={styles.cameraButton} onPress={() => pickImageFromCameraOrGallery()}>
+            <Image source={require('../../assets/Png/camera.png')} style={styles.cameraIcon} />
+            {/* <Text style={styles.cameraIcon}>📷</Text> */}
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Profile</Text>
-          <Text onPress={() => navigation.navigate('BottomTabScreen')} style={[styles.headerTitle, { fontSize: 14, textDecorationLine: 'underline', color: '#999' }]}>Skip</Text>
-        </View>
-
-        <Image
-          source={{
-            uri:
-              userData?.profile_image
-                ? Image_url + userData?.profile_image
-                : profileImage
-                  ? profileImage
-                  : 'https://i.postimg.cc/mZXFdw63/person.png',
-          }}
-          style={styles.avatar}
-        />
-        <TouchableOpacity style={styles.cameraButton} onPress={() => pickImageFromCameraOrGallery()}>
-          <Image source={require('../../assets/Png/camera.png')} style={styles.cameraIcon} />
-          {/* <Text style={styles.cameraIcon}>📷</Text> */}
-        </TouchableOpacity>
-        <Formik
-          initialValues={initialValues}
-          validationSchema={profileSchema}
-          onSubmit={values => {
-            updateProfile(values);
-            console.log(values);
-          }}
-        >
-          {({ handleChange, handleBlur, handleSubmit, setFieldValue, values, errors, touched }) => (
-            <>
-              <ProfileField
-                label="Full Name"
-                required
-                value={values.fullName}
-                onChangeText={handleChange('fullName')}
-                onBlur={handleBlur('fullName')}
-                error={touched.fullName && errors.fullName}
-              />
-              <ProfileField
-                label="Email ID"
-                required
-                value={values.email}
-                onChangeText={handleChange('email')}
-                onBlur={handleBlur('email')}
-                error={touched.email && errors.email}
-                keyboardType="email-address"
-              />
-              <ProfileField
-                label="Contact Number"
-                required
-                value={values.phone}
-                onChangeText={handleChange('phone')}
-                onBlur={handleBlur('phone')}
-                error={touched.phone && errors.phone}
-                keyboardType="phone-pad"
-              />
-              {userData?.type !== 'b2c' ? <>
+          <Formik
+            initialValues={initialValues}
+            validationSchema={profileSchema}
+            onSubmit={values => {
+              updateProfile(values);
+              console.log(values);
+            }}
+          >
+            {({ handleChange, handleBlur, handleSubmit, setFieldValue, values, errors, touched }) => (
+              <>
                 <ProfileField
-                  label="Full Address"
+                  label="Full Name"
                   required
-                  value={values.address}
-                  onChangeText={handleChange('address')}
-                  onBlur={handleBlur('address')}
-                  error={touched.address && errors.address}
-                  multiline
+                  value={values.fullName}
+                  onChangeText={handleChange('fullName')}
+                  onBlur={handleBlur('fullName')}
+                  error={touched.fullName && errors.fullName}
                 />
                 <ProfileField
-                  label="Zip Code"
+                  label="Email ID"
                   required
-                  value={values.zip}
-                  onChangeText={handleChange('zip')}
-                  onBlur={handleBlur('zip')}
-                  error={touched.zip && errors.zip}
-                  keyboardType="number-pad"
+                  value={values.email}
+                  onChangeText={handleChange('email')}
+                  onBlur={handleBlur('email')}
+                  error={touched.email && errors.email}
+                  keyboardType="email-address"
                 />
                 <ProfileField
-                  label="Business Name"
+                  label="Contact Number"
                   required
-                  value={values.businessName}
-                  onChangeText={handleChange('businessName')}
-                  onBlur={handleBlur('businessName')}
-                  error={touched.businessName && errors.businessName}
+                  value={values.phone}
+                  onChangeText={handleChange('phone')}
+                  onBlur={handleBlur('phone')}
+                  error={touched.phone && errors.phone}
+                  keyboardType="phone-pad"
                 />
-                <ProfileField
-                  label="VAT ID"
-                  required
-                  value={values.vatId}
-                  onChangeText={handleChange('vatId')}
-                  onBlur={handleBlur('vatId')}
-                  error={touched.vatId && errors.vatId}
-                />
-                {/* <View style={styles.fieldContainer}>
+                {userData?.type !== 'b2c' ? <>
+                  <ProfileField
+                    label="Full Address"
+                    required
+                    value={values.address}
+                    onChangeText={handleChange('address')}
+                    onBlur={handleBlur('address')}
+                    error={touched.address && errors.address}
+                    multiline
+                  />
+                  <ProfileField
+                    label="Zip Code"
+                    required
+                    value={values.zip}
+                    onChangeText={handleChange('zip')}
+                    onBlur={handleBlur('zip')}
+                    error={touched.zip && errors.zip}
+                    keyboardType="number-pad"
+                  />
+                  <ProfileField
+                    label="Business Name"
+                    required
+                    value={values.businessName}
+                    onChangeText={handleChange('businessName')}
+                    onBlur={handleBlur('businessName')}
+                    error={touched.businessName && errors.businessName}
+                  />
+                  <ProfileField
+                    label="VAT ID"
+                    required
+                    value={values.vatId}
+                    onChangeText={handleChange('vatId')}
+                    onBlur={handleBlur('vatId')}
+                    error={touched.vatId && errors.vatId}
+                  />
+                  {/* <View style={styles.fieldContainer}>
                   <Text style={styles.fieldLabel}>
                     Status <Text style={{ color: 'red' }}>*</Text>
                   </Text>
@@ -384,15 +386,16 @@ const EditProfile = ({ navigation, route }) => {
                     <Text style={styles.errorText}>{errors.status}</Text>
                   )}
                 </View> */}
-              </> : null}
-              <TouchableOpacity style={styles.saveButton} onPress={handleSubmit}>
-                <Text style={styles.saveButtonText}>Save Changes</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </Formik>
-      </ScrollView>
-    </LinearGradient >
+                </> : null}
+                <TouchableOpacity style={styles.saveButton} onPress={handleSubmit}>
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Formik>
+        </ScrollView>
+      </LinearGradient >
+    </SafeAreaView>
   );
 };
 

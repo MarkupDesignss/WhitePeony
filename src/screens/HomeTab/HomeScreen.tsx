@@ -1,5 +1,10 @@
-import { HttpStatusCode } from 'axios';
-import React, { useRef, useEffect, useState, useContext, useCallback } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useContext,
+  useCallback,
+} from 'react';
 import {
   StyleSheet,
   Text,
@@ -21,7 +26,10 @@ import { Colors } from '../../constant';
 
 const { width } = Dimensions.get('window');
 
-/* ---------------- PRODUCT IMAGE CAROUSEL ---------------- */
+/* ---------------- PRODUCT TYPE ---------------- */
+type ProductFilterType = 'b2c' | 'b2b' | 'both';
+
+/* ---------------- IMAGE CAROUSEL ---------------- */
 const ProductImageCarousel = ({ images }: { images: any[] }) => {
   const [index, setIndex] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
@@ -48,36 +56,15 @@ const ProductImageCarousel = ({ images }: { images: any[] }) => {
     return () => clearInterval(timer);
   }, [index, images.length]);
 
-  const source = typeof images[index] === 'string' ? { uri: images[index] } : images[index];
+  const source =
+    typeof images[index] === 'string'
+      ? { uri: images[index] }
+      : images[index];
 
   return (
     <Animated.View style={{ opacity }}>
       <Image source={source} style={styles.cardImage} />
     </Animated.View>
-  );
-};
-
-/* ---------------- PROMOTIONAL BANNER ---------------- */
-const PromotionalBanner = ({ promotional }: { promotional: any[] }) => {
-  if (!promotional?.length) return null;
-
-  return (
-    <View style={{ marginVertical: 12 }}>
-      {promotional.map((item: any) => (
-        <View key={String(item.id)} style={styles.page}>
-          <ImageBackground
-            source={{ uri: item.image_url }}
-            style={styles.imageBackground}
-            resizeMode="cover"
-          >
-            <View style={styles.bannerTextWrap}>
-              <Text style={styles.title}>WHITE PEONY TEA CO</Text>
-              <Text style={styles.subtitle}>Best Organic Tea Delivered Worldwide</Text>
-            </View>
-          </ImageBackground>
-        </View>
-      ))}
-    </View>
   );
 };
 
@@ -87,14 +74,17 @@ const HomeScreen = ({ navigation }: any) => {
   const { setUserData } = useContext<UserData>(UserDataContext);
   const { toggleWishlist, isWishlisted } = useContext(WishlistContext);
 
-  const [sellingProducts, setSellingProducts] = useState<any[]>([]);
+  /* 🔥 CHANGE THIS VALUE BASED ON REQUIREMENT */
+  const [productType, setProductType] =
+    useState<ProductFilterType>('b2c'); // 'b2c' | 'b2b' | 'both'
+
+  const [products, setProducts] = useState<any[]>([]);
   const [promotional, setPromotional] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
 
   /* ---------------- SEARCH ---------------- */
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const searchDebounceRef = useRef<any>(null);
 
   useEffect(() => {
@@ -102,12 +92,23 @@ const HomeScreen = ({ navigation }: any) => {
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
-  }, []);
+  }, [productType]);
+
+  /* ---------------- COMMON FILTER ---------------- */
+  const filterByProductType = (
+    list: any[],
+    type: ProductFilterType,
+  ) => {
+    if (type === 'both') return list;
+    return list.filter(
+      item => item.product_type?.toLowerCase() === type,
+    );
+  };
 
   const loadAll = async () => {
     Profile();
-    sellingproduct();
-    GetHeader();
+    getSellingProducts();
+    getHeader();
   };
 
   /* ---------------- API CALLS ---------------- */
@@ -116,55 +117,68 @@ const HomeScreen = ({ navigation }: any) => {
       showLoader();
       const res = await UserService.profile();
       setUserData(res?.data?.user || {});
-    } catch (e) {
-      console.log('Profile error', e);
     } finally {
       hideLoader();
     }
   };
 
-  const sellingproduct = async () => {
+  const getSellingProducts = async () => {
     try {
       showLoader();
       const res = await UserService.mostsellingproduct();
-      setSellingProducts(res?.data?.data || []);
+      const allProducts = res?.data?.data || [];
+
+      const filtered = filterByProductType(
+        allProducts,
+        productType,
+      );
+
+      setProducts(filtered);
     } finally {
       hideLoader();
     }
   };
 
-  const GetHeader = async () => {
+  const getHeader = async () => {
     try {
-      showLoader();
       const res = await UserService.header();
       const banners = res?.data?.banners || [];
 
       setPromotional(
         banners
           .filter((b: any) => b.type === 'promotional')
-          .map((b: any) => ({ ...b, image_url: Image_url + b.image_url }))
+          .map((b: any) => ({
+            ...b,
+            image_url: Image_url + b.image_url,
+          })),
       );
-    } finally {
-      hideLoader();
-    }
+    } catch { }
   };
 
   /* ---------------- SEARCH ---------------- */
-  const GetSearch = useCallback(async (word: string) => {
-    try {
-      setIsSearching(true);
-      const res = await UserService.search(word);
-      setSearchResults(res?.data?.data?.products || []);
-    } catch {
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+  const GetSearch = useCallback(
+    async (word: string) => {
+      try {
+        const res = await UserService.search(word);
+        const searchData = res?.data?.data?.products || [];
+
+        const filtered = filterByProductType(
+          searchData,
+          productType,
+        );
+
+        setSearchResults(filtered);
+      } catch {
+        setSearchResults([]);
+      }
+    },
+    [productType],
+  );
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (searchDebounceRef.current)
+      clearTimeout(searchDebounceRef.current);
 
     if (!text.trim()) {
       setSearchResults([]);
@@ -183,13 +197,20 @@ const HomeScreen = ({ navigation }: any) => {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
+        onPress={() =>
+          navigation.navigate('ProductDetails', {
+            productId: item.id,
+          })
+        }
       >
         <ProductImageCarousel
           images={item.images || [require('../../assets/Png/product.png')]}
         />
 
-        <TouchableOpacity style={styles.wishlistBtn} onPress={() => toggleWishlist(item.id)}>
+        <TouchableOpacity
+          style={styles.wishlistBtn}
+          onPress={() => toggleWishlist(item.id)}
+        >
           <Image
             source={
               wished
@@ -204,7 +225,9 @@ const HomeScreen = ({ navigation }: any) => {
           <Text numberOfLines={1} style={styles.cardTitle}>
             {item.name}
           </Text>
-          <Text style={styles.cardPrice}>{item?.variants?.[0]?.price} €</Text>
+          <Text style={styles.cardPrice}>
+            {item?.variants?.[0]?.price} €
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -215,17 +238,39 @@ const HomeScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
+      {/* 🔥 Example Toggle Buttons */}
+      <View style={styles.filterRow}>
+        {['b2c', 'b2b', 'both'].map(type => (
+          <TouchableOpacity
+            key={type}
+            onPress={() =>
+              setProductType(type as ProductFilterType)
+            }
+          >
+            <Text
+              style={[
+                styles.filterBtn,
+                productType === type && styles.activeBtn,
+              ]}
+            >
+              {type.toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <FlatList
-        data={searchQuery ? searchResults : sellingProducts}
-        keyExtractor={(item) => String(item.id)}
+        data={searchQuery ? searchResults : products}
+        keyExtractor={item => String(item.id)}
         renderItem={renderProduct}
         horizontal
         showsHorizontalScrollIndicator={false}
       />
 
-      <PromotionalBanner promotional={promotional} />
-
-      <LoginModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+      <LoginModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+      />
     </View>
   );
 };
@@ -252,9 +297,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heart: { width: 15, height: 15 },
-  imageBackground: { width: '100%', height: 520 },
-  page: { alignItems: 'center' },
-  bannerTextWrap: { position: 'absolute', top: '10%', left: 20, right: 20 },
-  title: { fontSize: 18, color: '#338AB1', fontWeight: '600', textAlign: 'center' },
-  subtitle: { fontSize: 22, color: '#000', textAlign: 'center', marginTop: 10 },
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 10,
+  },
+  filterBtn: {
+    padding: 8,
+    color: '#555',
+    fontWeight: '600',
+  },
+  activeBtn: {
+    color: '#338AB1',
+    textDecorationLine: 'underline',
+  },
 });

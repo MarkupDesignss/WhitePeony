@@ -73,7 +73,10 @@ const EventScreen = ({ navigation }: any) => {
                 text: 'Retry',
                 onPress: async () => {
                   const retryStatus = await request(permissionType);
-                  if (retryStatus === RESULTS.GRANTED || retryStatus === RESULTS.LIMITED) {
+                  if (
+                    retryStatus === RESULTS.GRANTED ||
+                    retryStatus === RESULTS.LIMITED
+                  ) {
                     getCurrentLocation();
                   } else {
                     Alert.alert('Still Denied', 'Permission not granted.');
@@ -82,14 +85,14 @@ const EventScreen = ({ navigation }: any) => {
               },
               { text: 'Cancel', style: 'cancel' },
             ],
-            { cancelable: true }
+            { cancelable: true },
           );
         }
       } else if (status === RESULTS.BLOCKED) {
         // Don’t open settings — just show message
         Alert.alert(
           'Permission Blocked',
-          'You have permanently denied location permission. Please enable it later in settings if you change your mind.'
+          'You have permanently denied location permission. Please enable it later in settings if you change your mind.',
         );
       }
     } catch (error) {
@@ -117,7 +120,7 @@ const EventScreen = ({ navigation }: any) => {
         enableHighAccuracy: true,
         timeout: 15000,
         maximumAge: 10000,
-      }
+      },
     );
   };
 
@@ -170,8 +173,7 @@ const EventScreen = ({ navigation }: any) => {
         //   text1: res?.data?.message || 'Something went wrong!',
         // });
       }
-    }
-    catch (e) {
+    } catch (e) {
       hideLoader();
       const error = e as any;
       if (error.status === 401) {
@@ -183,30 +185,59 @@ const EventScreen = ({ navigation }: any) => {
   };
 
   const renderUpcoming = ({ item }: { item: any }) => (
-    <TouchableOpacity style={{ borderWidth: 1, borderRadius: 12, borderColor: Colors.text[400], padding: 10, marginLeft: 5 }} onPress={() => { navigation.navigate('EventDetails', { event: item.id }), setUpcomingModalVisible(false) }} activeOpacity={0.8}>
-      <Image
-        source={{ uri: Image_url + item.image }}
-        style={[styles.upCard,]}
-      />
-      <TouchableOpacity style={styles.bookmarkBtn}>
+    <TouchableOpacity
+      style={{
+        borderWidth: 1,
+        borderRadius: 12,
+        borderColor: Colors.text[400],
+        padding: 10,
+        marginLeft: 5,
+      }}
+      onPress={() => {
+        navigation.navigate('EventDetails', { event: item.id }),
+          setUpcomingModalVisible(false);
+      }}
+      activeOpacity={0.8}
+    >
+      <Image source={{ uri: Image_url + item.image }} style={[styles.upCard]} />
+      {/* <TouchableOpacity style={styles.bookmarkBtn}>
         <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 16, height: 16, alignItems: 'center', alignSelf: 'center' }} />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       <View style={styles.upBadgeRow}>
         <View style={styles.readBadge}>
           <Text numberOfLines={2} style={styles.upTitleWhite}>
             {item.title}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
-            <Image source={Images.location} style={{ width: 15, height: 15, marginRight: 10, }} />
-            <Text numberOfLines={1} style={styles.upMetaWhite}>{item.address} • {item.remaining_seats} Seats Left</Text>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}
+          >
+            <Image
+              source={Images.location}
+              style={{ width: 15, height: 15, marginRight: 10 }}
+            />
+            <Text numberOfLines={1} style={styles.upMetaWhite}>
+              {item.address} • {item.remaining_seats} Seats Left
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
-            <Image source={Images.clock_3} style={{ width: 15, height: 15, marginRight: 10, }} />
-            <Text style={styles.readBadgeText}>{formatDate(item.event_date)}</Text>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}
+          >
+            <Image
+              source={Images.clock_3}
+              style={{ width: 15, height: 15, marginRight: 10 }}
+            />
+            <Text style={styles.readBadgeText}>
+              {formatDate(item.event_date)}
+            </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
-            <Image source={Images.officechair2} style={{ width: 15, height: 15, marginRight: 10, }} />
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}
+          >
+            <Image
+              source={Images.officechair2}
+              style={{ width: 15, height: 15, marginRight: 10 }}
+            />
             <Text style={styles.readBadgeText}>{'15 Seats Left'}</Text>
           </View>
         </View>
@@ -215,34 +246,77 @@ const EventScreen = ({ navigation }: any) => {
   );
 
   const renderNear = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.nearCard} onPress={() => { navigation.navigate('EventDetails', { event: item.id }), setNearbyModalVisible(false) }} activeOpacity={0.8}>
-      <Image source={{ uri: Image_url + item.image }} style={styles.nearImage} />
+    <TouchableOpacity
+      style={styles.nearCard}
+      onPress={() => {
+        navigation.navigate('EventDetails', { event: item.id }),
+          setNearbyModalVisible(false);
+      }}
+      activeOpacity={0.8}
+    >
+      <Image
+        source={{ uri: Image_url + item.image }}
+        style={styles.nearImage}
+      />
       <View style={styles.nearBody}>
         <Text numberOfLines={2} style={styles.nearTitle}>
           {item.title}
         </Text>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-
-          <View style={{ flexDirection: 'row', alignItems: "center" }}>
-            <Image source={Images.location} style={{ width: 14, height: 14, marginRight: 6 }} />
-            <Text numberOfLines={1} style={styles.nearMeta}> {item.address?.split(' ')[0]}</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 6,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image
+              source={Images.location}
+              style={{ width: 14, height: 14, marginRight: 6 }}
+            />
+            <Text numberOfLines={1} style={styles.nearMeta}>
+              {' '}
+              {item.address?.split(' ')[0]}
+            </Text>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: "center" }}>
-            <Image source={Images.officechair2} style={{ width: 14, height: 14, marginRight: 6 }} />
-            <Text numberOfLines={1} style={styles.nearMeta}>{item.remaining_seats} Seats Left</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Image
+              source={Images.officechair2}
+              style={{ width: 14, height: 14, marginRight: 6 }}
+            />
+            <Text numberOfLines={1} style={styles.nearMeta}>
+              {item.remaining_seats} Seats Left
+            </Text>
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-          <Image source={Images.clock_3} style={{ width: 14, height: 14, marginRight: 6 }} />
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}
+        >
+          <Image
+            source={Images.clock_3}
+            style={{ width: 14, height: 14, marginRight: 6 }}
+          />
           <Text style={styles.nearDate}>{formatDate(item.event_date)}</Text>
         </View>
       </View>
 
-      <TouchableOpacity style={{ backgroundColor: Colors.button[100], borderRadius: 12, width: 25, height: 25, alignItems: "center", justifyContent: 'center' }}>
-        <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 15, height: 15, alignSelf: 'center' }} />
+      <TouchableOpacity
+        style={{
+          backgroundColor: Colors.button[100],
+          borderRadius: 12,
+          width: 25,
+          height: 25,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Image
+          source={require('../../assets/Png/bookmark.png')}
+          style={{ width: 15, height: 15, alignSelf: 'center' }}
+        />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -294,7 +368,9 @@ const EventScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'} />
+      <StatusBar
+        barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'}
+      />
 
       <View style={{ backgroundColor: '#FFFFF', height: 140 }}>
         <View style={styles.header}>
@@ -316,7 +392,11 @@ const EventScreen = ({ navigation }: any) => {
             }}
           />
           {isSearching ? (
-            <ActivityIndicator style={{ marginLeft: 8 }} size="small" color="#2DA3C7" />
+            <ActivityIndicator
+              style={{ marginLeft: 8 }}
+              size="small"
+              color="#2DA3C7"
+            />
           ) : searchQuery ? (
             <TouchableOpacity onPress={clearSearch} style={styles.microphone}>
               <Text style={{ fontWeight: '700' }}>Clear</Text>
@@ -334,10 +414,10 @@ const EventScreen = ({ navigation }: any) => {
 
       <FlatList
         data={searchQuery.trim() ? searchResults : NearbyEvents}
-        keyExtractor={(i) => String(i.id)}
+        keyExtractor={i => String(i.id)}
         renderItem={renderNear}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20, }}
+        contentContainerStyle={{ paddingBottom: 20 }}
         ListHeaderComponent={() => (
           <View>
             <View style={styles.sectionHeader}>
@@ -346,17 +426,25 @@ const EventScreen = ({ navigation }: any) => {
               </Text>
               <TouchableOpacity onPress={() => setUpcomingModalVisible(true)}>
                 <Text style={styles.seeMore}>
-                  {searchQuery.trim() ? `${searchResults.length} found` : 'See more'}
+                  {searchQuery.trim()
+                    ? `${searchResults.length} found`
+                    : 'See more'}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {searchQuery.trim() ? (
               isSearching ? (
-                <ActivityIndicator style={{ marginVertical: 20 }} size="large" color="#2DA3C7" />
+                <ActivityIndicator
+                  style={{ marginVertical: 20 }}
+                  size="large"
+                  color="#2DA3C7"
+                />
               ) : searchResults.length === 0 ? (
                 <View style={{ padding: 20 }}>
-                  <Text style={{ color: '#666' }}>No results for "{searchQuery}"</Text>
+                  <Text style={{ color: '#666' }}>
+                    No results for "{searchQuery}"
+                  </Text>
                 </View>
               ) : null
             ) : (
@@ -364,17 +452,23 @@ const EventScreen = ({ navigation }: any) => {
                 <View style={{ marginTop: 10 }}>
                   <FlatList
                     data={sampleEvents}
-                    keyExtractor={(i) => String(i.id)}
+                    keyExtractor={i => String(i.id)}
                     renderItem={renderUpcoming}
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ paddingLeft: 12, }}
+                    contentContainerStyle={{ paddingLeft: 12 }}
                   />
                 </View>
 
                 <View style={[styles.sectionHeader, { marginTop: 16 }]}>
                   <Text style={styles.sectionTitle}>Events Near You</Text>
-                  <TouchableOpacity onPress={() => { NearbyEvents.length == 0 ? Alert.alert('', 'No Event Found') : setNearbyModalVisible(true) }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      NearbyEvents.length == 0
+                        ? Alert.alert('', 'No Event Found')
+                        : setNearbyModalVisible(true);
+                    }}
+                  >
                     <Text style={styles.seeMore}>See more</Text>
                   </TouchableOpacity>
                 </View>
@@ -385,7 +479,15 @@ const EventScreen = ({ navigation }: any) => {
         ListEmptyComponent={() =>
           !searchQuery.trim() ? (
             <View style={{ padding: 20 }}>
-              <Text style={{ color: '#000', fontWeight: '700', alignSelf: 'center' }}>No nearby events found</Text>
+              <Text
+                style={{
+                  color: '#000',
+                  fontWeight: '700',
+                  alignSelf: 'center',
+                }}
+              >
+                No nearby events found
+              </Text>
             </View>
           ) : null
         }
@@ -395,8 +497,16 @@ const EventScreen = ({ navigation }: any) => {
       <Modal visible={upcomingModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>Upcoming Events</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '700' }}>
+                Upcoming Events
+              </Text>
               <TouchableOpacity onPress={() => setUpcomingModalVisible(false)}>
                 <Text style={{ fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
@@ -404,7 +514,7 @@ const EventScreen = ({ navigation }: any) => {
 
             <FlatList
               data={sampleEvents}
-              keyExtractor={(i) => String(i.id)}
+              keyExtractor={i => String(i.id)}
               renderItem={renderUpcoming}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingTop: 12 }}
@@ -417,15 +527,23 @@ const EventScreen = ({ navigation }: any) => {
       <Modal visible={nearbyModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>Events Near You</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '700' }}>
+                Events Near You
+              </Text>
               <TouchableOpacity onPress={() => setNearbyModalVisible(false)}>
                 <Text style={{ fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
             </View>
             <FlatList
               data={NearbyEvents}
-              keyExtractor={(i) => String(i.id)}
+              keyExtractor={i => String(i.id)}
               renderItem={renderNear}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingTop: 12 }}
@@ -440,7 +558,11 @@ const EventScreen = ({ navigation }: any) => {
 export default EventScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
   header: {
     height: 80,
     justifyContent: 'center',
@@ -483,12 +605,26 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 175,
     borderRadius: 12,
-    alignSelf: 'center'
+    alignSelf: 'center',
   },
-  upBadgeRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 12 },
+  upBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 12,
+  },
   readBadge: { backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 12 },
   readBadgeText: { fontSize: 12, color: '#000' },
-  bookmarkBtn: { backgroundColor: Colors.button[100], borderRadius: 18, width: 30, height: 30, position: 'absolute', top: 20, right: 20, alignItems: 'center', justifyContent: 'center', },
+  bookmarkBtn: {
+    backgroundColor: Colors.button[100],
+    borderRadius: 18,
+    width: 30,
+    height: 30,
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   upTitleWrap: { flex: 1, justifyContent: 'flex-end', padding: 12 },
   upTitleWhite: { color: '#000', fontSize: 16, fontWeight: '700' },
   upMetaWhite: { color: '#000', fontSize: 12, opacity: 0.95 },
@@ -504,7 +640,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     marginTop: 15,
-    borderBottomWidth: 0.9, borderBottomColor: Colors.text[400], width: widthPercentageToDP(95)
+    borderBottomWidth: 0.9,
+    borderBottomColor: Colors.text[400],
+    width: widthPercentageToDP(95),
   },
   microphone: {
     marginLeft: 8,
@@ -517,9 +655,13 @@ const styles = StyleSheet.create({
   },
   nearImage: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
   nearBody: { flex: 1 },
-  nearTitle: { fontSize: 14, fontWeight: '700', width: widthPercentageToDP(60), },
-  nearMeta: { fontSize: 12, color: '#6B6B6B', },
-  nearDate: { fontSize: 12, color: '#6B6B6B', },
+  nearTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    width: widthPercentageToDP(60),
+  },
+  nearMeta: { fontSize: 12, color: '#6B6B6B' },
+  nearDate: { fontSize: 12, color: '#6B6B6B' },
   iconSmall: { width: 14, height: 14 },
   bookBtn: {
     width: 48,

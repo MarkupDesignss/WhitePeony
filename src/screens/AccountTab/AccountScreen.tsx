@@ -8,9 +8,10 @@ import {
   Switch,
   ScrollView,
   Alert,
-  Platform,
   StatusBar,
-
+  Linking,
+  Dimensions,
+  Platform,
 } from 'react-native';
 
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -26,6 +27,10 @@ import { HttpStatusCode } from 'axios';
 import { LocalStorage } from '../../helpers/localstorage';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import InAppBrowser from 'react-native-inappbrowser-reborn';
+
+const { width } = Dimensions.get('window');
+
 type AccountScreenProps = {
   navigation: StackNavigationProp<any>;
 };
@@ -33,11 +38,85 @@ type AccountScreenProps = {
 const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { showLoader, hideLoader } = CommonLoader();
 
-  const { userData, setIsLoggedIn, isLoggedIn } = useContext<UserData>(UserDataContext);
+  const { userData, setIsLoggedIn, isLoggedIn } =
+    useContext<UserData>(UserDataContext);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [modalAddress, setModalAddress] = useState(false);
   const [modalAddressADD, setmodalAddressADD] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Function to open external URLs with InAppBrowser
+  const openInAppBrowser = async (url: string, title?: string) => {
+    try {
+      if (await InAppBrowser.isAvailable()) {
+        const result = await InAppBrowser.open(url, {
+          // iOS Properties
+          dismissButtonStyle: 'cancel',
+          preferredBarTintColor: '#000000',
+          preferredControlTintColor: '#ffffff',
+          readerMode: false,
+          animated: true,
+          modalPresentationStyle: 'fullScreen',
+          modalEnabled: true,
+          enableBarCollapsing: false,
+          // Android Properties
+          showTitle: true,
+          toolbarColor: '#000000',
+          secondaryToolbarColor: '#000000',
+          navigationBarColor: '#000000',
+          navigationBarDividerColor: 'white',
+          enableUrlBarHiding: true,
+          enableDefaultShare: true,
+          forceCloseOnRedirection: false,
+          animations: {
+            startEnter: 'slide_in_right',
+            startExit: 'slide_out_left',
+            endEnter: 'slide_in_left',
+            endExit: 'slide_out_right',
+          },
+          headers: {
+            'my-custom-header': 'my custom header value',
+          },
+        });
+        console.log('InAppBrowser result:', result);
+      } else {
+        // Fallback to Linking if InAppBrowser is not available
+        Linking.openURL(url);
+      }
+    } catch (error) {
+      console.log('InAppBrowser error:', error);
+      Alert.alert('Error', 'Unable to open the link');
+    }
+  };
+
+  // Function to handle policy links
+  const handlePolicyLink = (policyType: 'terms' | 'privacy' | 'cookies') => {
+    let url = '';
+    let title = '';
+
+    switch (policyType) {
+      case 'terms':
+        url = 'https://whitepeony.eu/terms-conditions/';
+        title = 'Terms & Conditions';
+        break;
+      case 'privacy':
+        url = 'https://whitepeony.eu/privacy-policy/';
+        title = 'Privacy Policy';
+        break;
+      case 'cookies':
+        url = 'https://whitepeony.eu/cookies/';
+        title = 'Cookie Policy';
+        break;
+      default:
+        url = 'https://whitepeony.eu/';
+    }
+
+    openInAppBrowser(url, title);
+  };
+
+  const openWebViewScreen = (url: string, title: string) => {
+    navigation.navigate('WebViewScreen', { url, title });
+  };
 
   const signout = async () => {
     Alert.alert('White Peony', 'Are you sure you want to logout?', [
@@ -47,13 +126,14 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
         style: 'cancel',
       },
       {
-        text: 'OK', onPress: () => {
+        text: 'OK',
+        onPress: () => {
           handleSignout(setIsLoggedIn);
           Toast.show({
-            type: "success",
-            text1: "Log Out Successfully!",
+            type: 'success',
+            text1: 'Log Out Successfully!',
           });
-        }
+        },
       },
     ]);
   };
@@ -66,9 +146,10 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
         style: 'cancel',
       },
       {
-        text: 'OK', onPress: () => {
+        text: 'OK',
+        onPress: () => {
           DeleteAcc();
-        }
+        },
       },
     ]);
   };
@@ -80,27 +161,28 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
       hideLoader();
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { message, data } = res.data;
-        console.log("DeleteAcc response data:", res.data);
-        Toast.show({ type: "success", text1: message });
+        console.log('DeleteAcc response data:', res.data);
+        Toast.show({ type: 'success', text1: message });
         setTimeout(() => {
           setIsLoggedIn(false);
           LocalStorage.save('@login', false);
           LocalStorage.save('@user', null);
           LocalStorage.flushQuestionKeys();
         }, 700);
-
       } else {
         Toast.show({
-          type: "error",
-          text1: res?.data?.message || "Something went wrong!",
+          type: 'error',
+          text1: res?.data?.message || 'Something went wrong!',
         });
       }
     } catch (err: any) {
       hideLoader();
-      console.log("Error in DeleteAcc:", JSON.stringify(err));
+      console.log('Error in DeleteAcc:', JSON.stringify(err));
       Toast.show({
-        type: "error",
-        text1: err?.response?.data?.message || "Something went wrong! Please try again.",
+        type: 'error',
+        text1:
+          err?.response?.data?.message ||
+          'Something went wrong! Please try again.',
       });
     }
   };
@@ -109,33 +191,40 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Account</Text>
-        {isLoggedIn ? (<TouchableOpacity onPress={() => signout()} style={styles.logoutIcon}>
-          <Image
-            source={require('../../assets/Png/logout1.png')}
-            style={{ width: 20, height: 20 }}
-          />
-        </TouchableOpacity>) :
-          <Text onPress={() => setModalVisible(true)} style={styles.logoutIcon}>Login</Text>}
+        {isLoggedIn ? (
+          <TouchableOpacity onPress={() => signout()} style={styles.logoutIcon}>
+            <Image
+              source={require('../../assets/Png/logout1.png')}
+              style={{ width: 20, height: 20 }}
+            />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => setModalVisible(true)}
+            style={styles.logoutIcon}
+          >
+            <Text style={styles.loginText}>Login</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <LoginModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        // login
-        onGoogleLogin={() => Alert.alert("Google Login")}
-        onFacebookLogin={() => Alert.alert("Facebook Login")}
-        // otp
+        onGoogleLogin={() => Alert.alert('Google Login')}
+        onFacebookLogin={() => Alert.alert('Facebook Login')}
         phoneNumber="email or phone number"
       />
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
-
-        {isLoggedIn ?
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {isLoggedIn ? (
           <LinearGradient
             colors={['#FCFFBF', '#F7FB9D']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.profileCard}
-
           >
             {/* Diagonal Shine Overlay */}
             <LinearGradient
@@ -146,434 +235,496 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={{
-                position: 'absolute',
-                top: -20,
-                right: -40,
-                width: 150,
-                height: 250,
-                transform: [{ rotate: '35deg' }],
-              }}
+              style={styles.diagonalShine}
             />
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              ...(userData?.type !== 'b2c'
-                ? { paddingTop: 12 }
-                : { paddingHorizontal: 12 }),
-            }}>
-              {userData?.profile_image ? <Image
-                source={{ uri: Image_url + userData?.profile_image }}
-                style={styles.avatar}
-              /> :
-                <Image
-                  source={{ uri: 'https://i.postimg.cc/mZXFdw63/person.png' }}
-                  style={styles.avatar}
-                />
-              }
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.name}>{userData?.name}</Text>
-                <Text style={styles.since}>Member since {formatDate(userData?.created_at)}</Text>
+
+            <View style={styles.profileHeader}>
+              <View style={styles.avatarContainer}>
+                {userData?.profile_image ? (
+                  <Image
+                    source={{ uri: Image_url + userData?.profile_image }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: 'https://i.postimg.cc/mZXFdw63/person.png' }}
+                    style={styles.avatar}
+                  />
+                )}
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {userData?.name || 'User Name'}
+                </Text>
+                <Text style={styles.since}>
+                  Member since {formatDate(userData?.created_at)}
+                </Text>
               </View>
             </View>
-            {userData?.type !== 'b2c' ?
+
+            {userData?.type !== 'b2c' && (
               <>
-                <View style={{ borderColor: Colors.button[100], borderWidth: 1, width: '90%', marginVertical: 12, alignSelf: 'center' }}></View>
-                <View style={{ paddingHorizontal: 12 }}>
-                  <Text style={{ fontWeight: '700', fontSize: 14 }}>Super Shiny</Text>
-                  <Text style={{ fontSize: 10, color: '#000', fontWeight: '700', marginTop: 5 }}>
+                <View style={styles.separator} />
+
+                <View style={styles.superShinyContent}>
+                  <Text style={styles.superShinyTitle}>Super Shiny</Text>
+                  <Text style={styles.growthValue}>
                     Growth Value 10000€ / 2500012000€
                   </Text>
                   <View style={styles.progressBackground}>
                     <View style={[styles.progressFill, { width: '30%' }]} />
                   </View>
                 </View>
-                <View style={{ backgroundColor: Colors.button[100], marginTop: 12, borderBottomLeftRadius: 11, borderBottomRightRadius: 11 }}>
-                  <Text style={{ fontSize: 12, padding: 12 }}>
+
+                <View style={styles.privilegesFooter}>
+                  <Text style={styles.privilegesText}>
                     4 Privileges In Total, 1 Unlocked
                   </Text>
                 </View>
-              </> : null}
+              </>
+            )}
           </LinearGradient>
-          : null}
+        ) : null}
 
-
-        {isLoggedIn ? <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}
-          style={{
-            width: '90%',
-            alignSelf: 'center',
-            borderRadius: 6,
-            height: 51,
-            borderWidth: 1,
-            borderColor: '#E5E5E5',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingHorizontal: 12,
-            marginTop: 12,
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image
-              source={require('../../assets/Png/user.png')}
-              style={{ width: 16, height: 14 }}
-            />
-            <Text style={{ marginLeft: 8 }}>View Full Profile</Text>
-          </View>
-
-          <Text>›</Text>
-        </TouchableOpacity> : null}
-
-        <View
-          style={{
-            width: '90%',
-            alignSelf: 'center',
-            marginTop: 12,
-            borderWidth: 1,
-            borderColor: '#E5E5E5',
-            height: 'auto',
-            borderRadius: 6,
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          {isLoggedIn ? <TouchableOpacity onPress={() => navigation.navigate('OrdersScreen')}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-
-              backgroundColor: '#FFFFFF',
-            }}
+        {isLoggedIn ? (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('EditProfile')}
+            style={styles.menuButton}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.menuButtonLeft}>
               <Image
-                source={require('../../assets/Png/order.png')}
-                style={{ width: 16, height: 14 }}
+                source={require('../../assets/Png/user.png')}
+                style={styles.menuIcon}
               />
-              <Text style={{ marginLeft: 8 }}>My Orders</Text>
+              <Text style={styles.menuButtonText}>View Full Profile</Text>
             </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        ) : null}
 
-            <Text>›</Text>
-          </TouchableOpacity> : null}
+        <View style={styles.menuCard}>
+          {isLoggedIn ? (
+            <>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('OrdersScreen')}
+                style={styles.menuItem}
+              >
+                <View style={styles.menuItemLeft}>
+                  <Image
+                    source={require('../../assets/Png/order.png')}
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>My Orders</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                onPress={() => navigation.navigate('MyEventsScreen')}
+                style={styles.menuItem}
+              >
+                <View style={styles.menuItemLeft}>
+                  <Image
+                    source={require('../../assets/Png/events.png')}
+                    style={styles.menuIcon}
+                  />
+                  <Text style={styles.menuItemText}>My Events</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
 
-          {isLoggedIn ? <TouchableOpacity onPress={() => navigation.navigate('MyEventsScreen')}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-
-              backgroundColor: '#FFFFFF',
-            }}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('WishlistScreen')}
+            style={styles.menuItem}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Image
-                source={require('../../assets/Png/events.png')}
-                style={{ width: 16, height: 14 }}
-              />
-              <Text style={{ marginLeft: 8 }}>My Events</Text>
-            </View>
-
-            <Text>›</Text>
-          </TouchableOpacity> : null}
-
-          <TouchableOpacity onPress={() => navigation.navigate('WishlistScreen')}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-              backgroundColor: '#FFFFFF',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.menuItemLeft}>
               <Image
                 source={require('../../assets/Png/star.png')}
-                style={{ width: 16, height: 14 }}
+                style={styles.menuIcon}
               />
-              <Text style={{ marginLeft: 8 }}>My Favorities</Text>
+              <Text style={styles.menuItemText}>My Favorities</Text>
             </View>
-
-            <Text>›</Text>
+            <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          {isLoggedIn ? <TouchableOpacity onPress={() => setModalAddress(true)}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-
-              backgroundColor: '#FFFFFF',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Image
-                source={require('../../assets/Png/paymentmethod.png')}
-                style={{ width: 16, height: 14 }}
-              />
-              <Text style={{ marginLeft: 8 }}>My Address</Text>
-            </View>
-
-            <Text>›</Text>
-          </TouchableOpacity> : null}
+          {isLoggedIn ? (
+            <TouchableOpacity
+              onPress={() => setModalAddress(true)}
+              style={[styles.menuItem, styles.lastMenuItem]}
+            >
+              <View style={styles.menuItemLeft}>
+                <Image
+                  source={require('../../assets/Png/paymentmethod.png')}
+                  style={styles.menuIcon}
+                />
+                <Text style={styles.menuItemText}>My Address</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        <Text style={{ marginTop: 20, marginBottom: 6, color: '#000000', width: '90%', alignSelf: 'center', fontSize: 17 }}>
-          Notifications
-        </Text>
-        <TouchableOpacity onPress={() => navigation.navigate('NotificationScreen')}
-          style={{
-            width: '90%',
-            alignSelf: 'center',
-            borderRadius: 6,
-            height: 51,
-            borderWidth: 1,
-            borderColor: '#E5E5E5',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingHorizontal: 12,
-            marginTop: 12,
-            backgroundColor: '#FFFFFF',
-          }}
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('NotificationScreen')}
+          style={styles.notificationButton}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={styles.menuItemLeft}>
             <Image
               source={require('../../assets/Png/bellnoti.png')}
-              style={{ width: 16, height: 14 }}
+              style={styles.menuIcon}
             />
-            <Text style={{ marginLeft: 8 }}>Notification</Text>
+            <Text style={styles.menuItemText}>Notification</Text>
           </View>
-
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }], marginTop: 10, }}
-          />
+          <View style={styles.switchContainer}>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
+              trackColor={{ false: '#767577', true: Colors.button[100] }}
+              thumbColor={notificationsEnabled ? '#FFFFFF' : '#f4f3f4'}
+              ios_backgroundColor="#3e3e3e"
+              style={styles.switch}
+            />
+          </View>
         </TouchableOpacity>
 
-        <Text style={{ marginTop: 20, marginBottom: 6, color: '#000000', width: '90%', alignSelf: 'center', fontSize: 17 }}>
-          Policies
-        </Text>
-        <View
-          style={{
-            width: '90%',
-            alignSelf: 'center',
-            marginTop: 12,
-            borderWidth: 1,
-            borderColor: '#E5E5E5',
-            borderRadius: 6,
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          <TouchableOpacity onPress={() => navigation.navigate('Slugs', { slug: 'terms-policy' })}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-
-              backgroundColor: '#FFFFFF',
-            }}
+        <Text style={styles.sectionTitle}>Policies</Text>
+        <View style={styles.policiesCard}>
+          <TouchableOpacity
+            onPress={() => handlePolicyLink('terms')}
+            style={styles.menuItem}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.menuItemLeft}>
               <Image
                 source={require('../../assets/Png/task.png')}
-                style={{ width: 16, height: 14 }}
+                style={styles.menuIcon}
               />
-              <Text style={{ marginLeft: 8 }}>Terms & Conditions</Text>
+              <Text style={styles.menuItemText}>Terms & Conditions</Text>
             </View>
-
-            <Text>›</Text>
+            <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate('SelectLanguageScreen')}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-              backgroundColor: '#FFFFFF',
-            }}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('SelectLanguageScreen')}
+            style={styles.menuItem}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.menuItemLeft}>
               <Image
                 source={require('../../assets/Png/cookies.png')}
-                style={{ width: 16, height: 14 }}
+                style={styles.menuIcon}
               />
-              <Text style={{ marginLeft: 8 }}>Language Change</Text>
+              <Text style={styles.menuItemText}>Language Change</Text>
             </View>
-
-            <Text>›</Text>
+            <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Slugs', { slug: 'cookies-policy' })}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-
-              backgroundColor: '#FFFFFF',
-            }}
+          <TouchableOpacity
+            onPress={() => handlePolicyLink('cookies')}
+            style={styles.menuItem}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.menuItemLeft}>
               <Image
                 source={require('../../assets/Png/cookies.png')}
-                style={{ width: 16, height: 14 }}
+                style={styles.menuIcon}
               />
-              <Text style={{ marginLeft: 8 }}>Cookies</Text>
+              <Text style={styles.menuItemText}>Cookies</Text>
             </View>
-
-            <Text>›</Text>
+            <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Slugs', { slug: 'privacy-policy' })}
-            style={{
-              width: '95%',
-              alignSelf: 'center',
-              borderRadius: 6,
-              height: 51,
-              borderBottomWidth: 1,
-              borderBottomColor: '#E5E5E5',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-              backgroundColor: '#FFFFFF',
-            }}
+          <TouchableOpacity
+            onPress={() => handlePolicyLink('privacy')}
+            style={[styles.menuItem, styles.lastMenuItem]}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.menuItemLeft}>
               <Image
                 source={require('../../assets/Png/shieldpro.png')}
-                style={{ width: 16, height: 14 }}
+                style={styles.menuIcon}
               />
-              <Text style={{ marginLeft: 8 }}>Privacy Policy</Text>
+              <Text style={styles.menuItemText}>Privacy Policy</Text>
             </View>
-
-            <Text>›</Text>
+            <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
         </View>
 
-        {isLoggedIn ? <TouchableOpacity style={styles.deleteBtn} onPress={() => DeleteAccount()}>
-          <Image
-            source={require('../../assets/Png/delete.png')}
-            style={{ width: 16, height: 16, marginRight: 6 }}
-          />
-          <Text style={{ color: '#000000' }}>Delete Account</Text>
-        </TouchableOpacity> : null}
+        {isLoggedIn ? (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => DeleteAccount()}
+          >
+            <Image
+              source={require('../../assets/Png/delete.png')}
+              style={styles.deleteIcon}
+            />
+            <Text style={styles.deleteButtonText}>Delete Account</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
       <AddressModal
         visible={modalAddress}
         onClose={() => setModalAddress(false)}
-        onAddNew={() => { setModalAddress(false), setmodalAddressADD(true) }}
+        onAddNew={() => {
+          setModalAddress(false), setmodalAddressADD(true);
+        }}
       />
     </SafeAreaView>
-
   );
 };
 
 export default AccountScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, marginTop: StatusBar.currentHeight, backgroundColor: '#fff' },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   header: {
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginVertical: 20
+    marginVertical: 20,
+    paddingTop: StatusBar.currentHeight || 0,
   },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
-  logoutIcon: { position: 'absolute', right: 16, alignItems: 'center' },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+  },
+  logoutIcon: {
+    position: 'absolute',
+    right: 20,
+    padding: 8,
+  },
+  loginText: {
+    fontSize: 16,
+    color: Colors.button[100],
+    fontWeight: '500',
+  },
+  scrollContent: {
+    paddingBottom: 30,
+    paddingTop: 10,
+  },
   profileCard: {
-    width: '90%',
+    width: width * 0.9,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#AEB254',
-    paddingVertical: 12,
     alignSelf: 'center',
+    overflow: 'hidden',
+    marginBottom: 16,
   },
-  avatar: { width: 52, height: 52, borderRadius: 28, backgroundColor: '#fff' },
-  name: { fontSize: 14, fontWeight: '700' },
-  since: { fontSize: 12, color: '#6B6B6B' },
-
+  diagonalShine: {
+    position: 'absolute',
+    top: -40,
+    right: -80,
+    width: 200,
+    height: 300,
+    transform: [{ rotate: '35deg' }],
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  avatarContainer: {
+    marginRight: 12,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#fff',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 4,
+  },
+  since: {
+    fontSize: 12,
+    color: '#6B6B6B',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: Colors.button[100],
+    marginHorizontal: 16,
+    marginVertical: 0,
+  },
+  superShinyContent: {
+    padding: 16,
+    paddingBottom: 12,
+  },
+  superShinyTitle: {
+    fontWeight: '700',
+    fontSize: 14,
+    color: '#000',
+    marginBottom: 8,
+  },
+  growthValue: {
+    fontSize: 12,
+    color: '#000',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
   progressBackground: {
     height: 8,
     backgroundColor: '#F0F0F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 8,
+    backgroundColor: '#D7E109',
+    borderRadius: 4,
+  },
+  privilegesFooter: {
+    backgroundColor: Colors.button[100],
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 11,
+  },
+  privilegesText: {
+    fontSize: 12,
+    color: '#000',
+    fontWeight: '500',
+  },
+  menuButton: {
+    width: width * 0.9,
+    alignSelf: 'center',
     borderRadius: 6,
-    marginTop: 8,
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: '#FFFFFF',
   },
-  progressFill: { height: 8, backgroundColor: '#D7E109', borderRadius: 6 },
+  menuButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuButtonText: {
+    fontSize: 14,
+    color: '#000',
+    marginLeft: 12,
+  },
   menuCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 8,
-    // marginTop: 12,
+    width: width * 0.9,
+    alignSelf: 'center',
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
   },
-  menuRow: {
+  menuItem: {
+    width: '100%',
+    minHeight: 52,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
     alignItems: 'center',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
   },
-  rowBetween: {
+  lastMenuItem: {
+    borderBottomWidth: 0,
+  },
+  menuItemLeft: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    flex: 1,
   },
-  deleteBtn: {
-    marginTop: 20,
+  menuItemText: {
+    fontSize: 14,
+    color: '#000',
+    marginLeft: 12,
+    flex: 1,
+  },
+  menuIcon: {
+    width: 20,
+    height: 18,
+    resizeMode: 'contain',
+  },
+  chevron: {
+    fontSize: 20,
+    color: '#999',
+    marginLeft: 8,
+  },
+  sectionTitle: {
+    marginTop: 24,
+    marginBottom: 8,
+    color: '#000000',
+    width: width * 0.9,
+    alignSelf: 'center',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+
+  policiesCard: {
+    width: width * 0.9,
+    alignSelf: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  deleteButton: {
+    marginTop: 24,
     backgroundColor: '#E5E5E5',
     borderRadius: 20,
     paddingVertical: 12,
     alignItems: 'center',
-    width: '50%', alignSelf: 'center', flexDirection: 'row', justifyContent: 'center'
+    width: width * 0.5,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  deleteIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 8,
+  },
+  deleteButtonText: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  notificationButton: {
+    width: width * 0.9,
+    alignSelf: 'center',
+    borderRadius: 6,
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  switchContainer: {
+    marginLeft: 8,
+  },
+  switch: {
+    transform:
+      Platform.OS === 'ios'
+        ? [{ scaleX: 0.8 }, { scaleY: 0.8 }]
+        : [{ scaleX: 1 }, { scaleY: 1 }],
   },
 });

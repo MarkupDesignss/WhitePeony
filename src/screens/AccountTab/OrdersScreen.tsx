@@ -19,6 +19,7 @@ import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { formatDate } from '../../helpers/helpers';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../../constant';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const TABS = [
   { key: 'placed', label: 'Completed' },
@@ -135,7 +136,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     const itemsList = getItemsList(item?.items);
     const product0 = itemsList?.[0]?.product || itemsList?.[0] || null;
     const isExpanded = expandedIds.includes(item.id);
-    const formData= formatDate(item?.created_at || item?.updated_at);
+    const formData = formatDate(item?.created_at || item?.updated_at);
 
     return (
       <TouchableOpacity
@@ -272,100 +273,102 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   const filteredOrders = order.filter(o => (o?.status || '').toLowerCase() === activeTab);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.safe}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-    >
-      <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" enableOnAndroid={true}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
-            <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Orders</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search Products..."
-              placeholderTextColor={Colors.text[200]}
-              value={searchText}
-              onChangeText={setSearchText}
-              returnKeyType="search"
-            />
-            <TouchableOpacity style={styles.searchButton} activeOpacity={0.7}>
-              <Image source={require('../../assets/Png/search.png')} style={{ width: 16, height: 16 }} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+      <KeyboardAvoidingView
+        style={styles.safe}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+      >
+        <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" enableOnAndroid={true}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
+              <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
             </TouchableOpacity>
+            <Text style={styles.headerTitle}>Orders</Text>
+            <View style={{ width: 24 }} />
           </View>
 
-          <View style={styles.tabsContainer}>
-            {TABS.map((tab) => {
-              const isActive = tab.key === activeTab;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  onPress={() => setActiveTab(tab.key)}
-                  activeOpacity={0.7}
-                  style={[styles.tabItem, isActive ? styles.tabItemActive : null]}
-                >
-                  <Text style={[styles.tabText, isActive ? styles.tabTextActive : null]}>
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <FlatList
-            keyExtractor={(item) => String(item.id)}
-            data={filteredOrders}
-            renderItem={renderOrder}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
-            ListEmptyComponent={
-              <View style={{ marginTop: 40, alignItems: 'center' }}>
-                <Text style={{ color: '#888', fontSize: 16 }}>No orders found for "{activeTab}".</Text>
-              </View>
-            }
-          />
-
-          <Modal visible={writeModalVisible} transparent animationType="slide">
-            <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-              <View style={{ backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                <Text style={{ fontSize: 18, fontWeight: '700' }}>Write a Review</Text>
-                <Text style={{ marginTop: 8 }}>Rating</Text>
-                <View style={{ flexDirection: 'row', marginTop: 8 }}>
-                  {[1, 2, 3, 4, 5].map(r => (
-                    <TouchableOpacity key={r} onPress={() => setNewRating(r)} style={{ marginRight: 8 }}>
-                      <Text style={{ color: newRating >= r ? '#F0C419' : '#ccc', fontSize: 24 }}>★</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TextInput
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  placeholderTextColor={Colors.text[200]}
-                  placeholder="Write your review"
-                  style={{ borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 8, marginTop: 12 }}
-                  multiline
-                />
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, alignItems:'center' }}>
-                  <TouchableOpacity onPress={() => {setWriteModalVisible(false), setNewComment(''), setNewRating(0) }} style={{ marginRight: 8 }}>
-                    <Text style={{fontWeight:'500', fontSize:12, }}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={PostReview}>
-                    <Text style={{ color: '#007AFF' }}>Submit</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+          <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            <View style={styles.searchContainer}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search Products..."
+                placeholderTextColor={Colors.text[200]}
+                value={searchText}
+                onChangeText={setSearchText}
+                returnKeyType="search"
+              />
+              <TouchableOpacity style={styles.searchButton} activeOpacity={0.7}>
+                <Image source={require('../../assets/Png/search.png')} style={{ width: 16, height: 16 }} />
+              </TouchableOpacity>
             </View>
-          </Modal>
-        </View>
-      </KeyboardAwareScrollView>
-    </KeyboardAvoidingView>
+
+            <View style={styles.tabsContainer}>
+              {TABS.map((tab) => {
+                const isActive = tab.key === activeTab;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    onPress={() => setActiveTab(tab.key)}
+                    activeOpacity={0.7}
+                    style={[styles.tabItem, isActive ? styles.tabItemActive : null]}
+                  >
+                    <Text style={[styles.tabText, isActive ? styles.tabTextActive : null]}>
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <FlatList
+              keyExtractor={(item) => String(item.id)}
+              data={filteredOrders}
+              renderItem={renderOrder}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+              ListEmptyComponent={
+                <View style={{ marginTop: 40, alignItems: 'center' }}>
+                  <Text style={{ color: '#888', fontSize: 16 }}>No orders found for "{activeTab}".</Text>
+                </View>
+              }
+            />
+
+            <Modal visible={writeModalVisible} transparent animationType="slide">
+              <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+                <View style={{ backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700' }}>Write a Review</Text>
+                  <Text style={{ marginTop: 8 }}>Rating</Text>
+                  <View style={{ flexDirection: 'row', marginTop: 8 }}>
+                    {[1, 2, 3, 4, 5].map(r => (
+                      <TouchableOpacity key={r} onPress={() => setNewRating(r)} style={{ marginRight: 8 }}>
+                        <Text style={{ color: newRating >= r ? '#F0C419' : '#ccc', fontSize: 24 }}>★</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <TextInput
+                    value={newComment}
+                    onChangeText={setNewComment}
+                    placeholderTextColor={Colors.text[200]}
+                    placeholder="Write your review"
+                    style={{ borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 8, marginTop: 12 }}
+                    multiline
+                  />
+                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => { setWriteModalVisible(false), setNewComment(''), setNewRating(0) }} style={{ marginRight: 8 }}>
+                      <Text style={{ fontWeight: '500', fontSize: 12, }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={PostReview}>
+                      <Text style={{ color: '#007AFF' }}>Submit</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          </View>
+        </KeyboardAwareScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 

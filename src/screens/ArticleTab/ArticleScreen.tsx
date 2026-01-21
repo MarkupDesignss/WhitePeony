@@ -31,17 +31,18 @@ const getTimeAgo = (dateString?: string) => {
 
   if (diffSec < 60) return 'Just now';
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin} ${diffMin === 1 ? 'minute' : 'minutes'} ago`;
+  if (diffMin < 60)
+    return `${diffMin} ${diffMin === 1 ? 'minute' : 'minutes'} ago`;
   const diffHr = Math.floor(diffMin / 60);
   if (diffHr < 24) return `${diffHr} ${diffHr === 1 ? 'Hour' : 'Hours'} Ago`;
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 30) return `${diffDay} ${diffDay === 1 ? 'day' : 'days'} ago`;
   const diffMon = Math.floor(diffDay / 30);
-  if (diffMon < 12) return `${diffMon} ${diffMon === 1 ? 'month' : 'months'} ago`;
+  if (diffMon < 12)
+    return `${diffMon} ${diffMon === 1 ? 'month' : 'months'} ago`;
   const diffYr = Math.floor(diffMon / 12);
   return `${diffYr} ${diffYr === 1 ? 'year' : 'years'} ago`;
 };
-
 
 const ArticleScreen = ({ navigation }: any) => {
   const { showLoader, hideLoader } = CommonLoader();
@@ -51,11 +52,9 @@ const ArticleScreen = ({ navigation }: any) => {
   const [justForYouModalVisible, setJustForYouModalVisible] = useState(false);
   const [trendingModalVisible, setTrendingModalVisible] = useState(false);
 
-
   useEffect(() => {
     ArticleList();
-  }, [])
-
+  }, []);
 
   const ArticleList = async () => {
     try {
@@ -69,22 +68,31 @@ const ArticleScreen = ({ navigation }: any) => {
         setsampleArticle(data || []);
       } else {
         Toast.show({
-          type: "error",
-          text1: res?.data?.message || "Something went wrong!",
+          type: 'error',
+          text1: res?.data?.message || 'Something went wrong!',
         });
       }
     } catch (err: any) {
       hideLoader();
-      console.log("Error in EventList:", JSON.stringify(err));
+      console.log('Error in EventList:', JSON.stringify(err));
       Toast.show({
-        type: "error",
-        text1: err?.response?.data?.message || "Something went wrong! Please try again.",
+        type: 'error',
+        text1:
+          err?.response?.data?.message ||
+          'Something went wrong! Please try again.',
       });
     }
   };
 
   const renderUpcoming = ({ item, index }: { item: any; index: number }) => (
-    <TouchableOpacity style={{ alignSelf: 'center', left: 7, paddingLeft: 5 }} onPress={() => { navigation.navigate('ArticleDetails', { article: item.id }), setTrendingModalVisible(false) }} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={{ alignSelf: 'center', left: 7, paddingLeft: 5 }}
+      onPress={() => {
+        navigation.navigate('ArticleDetails', { article: item.id }),
+          setTrendingModalVisible(false);
+      }}
+      activeOpacity={0.8}
+    >
       <ImageBackground
         source={{ uri: Image_url + item.image }}
         style={[styles.upCard, { width: width - 40 }]}
@@ -92,11 +100,13 @@ const ArticleScreen = ({ navigation }: any) => {
       >
         <View style={styles.upBadgeRow}>
           <View style={styles.readBadge}>
-            <Text style={styles.readBadgeText}>{formatDate(item.updated_at)}</Text>
+            <Text style={styles.readBadgeText}>
+              {formatDate(item.updated_at)}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.bookmarkBtn}>
+          {/* <TouchableOpacity style={styles.bookmarkBtn}>
             <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 16, height: 16, alignItems: 'center', alignSelf: 'center' }} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
         <View style={styles.upTitleWrap}>
           <Text numberOfLines={2} style={styles.upTitleWhite}>
@@ -109,36 +119,76 @@ const ArticleScreen = ({ navigation }: any) => {
 
   const renderNear = ({ item }: { item: any }) => (
     <>
-      <TouchableOpacity onPress={() => { navigation.navigate('ArticleDetails', { article: item.id }), setJustForYouModalVisible(false) }} activeOpacity={0.8}>
-
+      <TouchableOpacity
+        onPress={() => {
+          navigation.navigate('ArticleDetails', { article: item.id }),
+            setJustForYouModalVisible(false);
+        }}
+        activeOpacity={0.8}
+      >
         <View style={styles.nearCard}>
-          <Image source={{ uri: Image_url + item.image }} style={styles.nearImage} />
+          <Image
+            source={{ uri: Image_url + item.image }}
+            style={styles.nearImage}
+          />
           <View style={{ flex: 1 }}>
             <View style={styles.nearBody}>
-              <Text numberOfLines={2} style={styles.nearTitle}> {item.content} </Text>
-              <View style={{ backgroundColor: Colors.button[100], width: 25, height: 25, borderRadius: 10, alignSelf: "center", justifyContent: 'center' }}>
+              <Text numberOfLines={2} style={styles.nearTitle}>
+                {' '}
+                {item.content}{' '}
+              </Text>
+              {/* <View style={{ backgroundColor: Colors.button[100], width: 25, height: 25, borderRadius: 10, alignSelf: "center", justifyContent: 'center' }}>
                 <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 15, height: 15, alignSelf: 'center' }} />
-              </View>
+              </View> */}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-              <Image source={Images.clock_3} style={{ width: 15, height: 15, tintColor: Colors.button[100], }} />
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 6,
+              }}
+            >
+              <Image
+                source={Images.clock_3}
+                style={{ width: 15, height: 15, tintColor: Colors.button[100] }}
+              />
               <Text style={styles.nearDate}>{getTimeAgo(item.updated_at)}</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-              <Image source={Images.views} tintColor={Colors.button[100]} style={{ width: 15, height: 15, }} />
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 6,
+              }}
+            >
+              <Image
+                source={Images.views}
+                tintColor={Colors.button[100]}
+                style={{ width: 15, height: 15 }}
+              />
               <Text style={styles.nearDate}>{item.views}</Text>
             </View>
           </View>
         </View>
       </TouchableOpacity>
 
-      <View style={{ borderBottomColor: Colors.text[400], borderBottomWidth: 1, marginVertical: 10, width: '90%', alignSelf: 'center' }} />
+      <View
+        style={{
+          borderBottomColor: Colors.text[400],
+          borderBottomWidth: 1,
+          marginVertical: 10,
+          width: '90%',
+          alignSelf: 'center',
+        }}
+      />
     </>
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'} />
+      <StatusBar
+        barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'}
+      />
 
       <View style={{ backgroundColor: '#FFFFF', height: 160 }}>
         <View style={styles.header}>
@@ -162,16 +212,26 @@ const ArticleScreen = ({ navigation }: any) => {
       <Modal visible={justForYouModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>Just For You</Text>
-              <TouchableOpacity onPress={() => setJustForYouModalVisible(false)}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '700' }}>
+                Just For You
+              </Text>
+              <TouchableOpacity
+                onPress={() => setJustForYouModalVisible(false)}
+              >
                 <Text style={{ fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
             </View>
 
             <FlatList
               data={sampleArticle}
-              keyExtractor={(i) => String(i.id)}
+              keyExtractor={i => String(i.id)}
               renderItem={renderUpcoming}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingTop: 12 }}
@@ -184,15 +244,23 @@ const ArticleScreen = ({ navigation }: any) => {
       <Modal visible={trendingModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>Trending Articles</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '700' }}>
+                Trending Articles
+              </Text>
               <TouchableOpacity onPress={() => setTrendingModalVisible(false)}>
                 <Text style={{ fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
             </View>
             <FlatList
               data={sampleArticle}
-              keyExtractor={(i) => String(i.id)}
+              keyExtractor={i => String(i.id)}
               renderItem={renderNear}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingTop: 12 }}
@@ -277,7 +345,11 @@ const ArticleScreen = ({ navigation }: any) => {
 export default ArticleScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', marginTop: StatusBar.currentHeight },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    marginTop: StatusBar.currentHeight,
+  },
   header: {
     height: 80,
     justifyContent: 'center',
@@ -338,11 +410,15 @@ const styles = StyleSheet.create({
   readBadge: {
     backgroundColor: 'rgba(255,255,255,0.85)',
     borderRadius: 12,
-    alignSelf: "center",
-
+    alignSelf: 'center',
   },
   readBadgeText: { fontSize: 12, color: '#6B6B6B', padding: 10 },
-  bookmarkBtn: { backgroundColor: Colors.button[100], padding: 6, alignSelf: 'center', borderRadius: 20 },
+  bookmarkBtn: {
+    backgroundColor: Colors.button[100],
+    padding: 6,
+    alignSelf: 'center',
+    borderRadius: 20,
+  },
   upTitleWrap: { flex: 1, justifyContent: 'flex-end', padding: 12 },
   upTitleWhite: { color: '#fff', fontSize: 16, fontWeight: '700' },
   dotsRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
@@ -372,7 +448,11 @@ const styles = StyleSheet.create({
   },
   nearImage: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
   nearBody: { flex: 1, flexDirection: 'row', justifyContent: 'space-between' },
-  nearTitle: { fontSize: 14, fontWeight: '700', width: widthPercentageToDP(45), },
+  nearTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    width: widthPercentageToDP(45),
+  },
   nearMeta: { fontSize: 12, color: '#999', marginTop: 6 },
   nearDate: { fontSize: 12, color: '#999', marginLeft: 10 },
   iconSmall: { width: 14, height: 14 },

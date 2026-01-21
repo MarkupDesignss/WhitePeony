@@ -8,10 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		2800E6545716698DF300CE7E /* Pods_WhitePeaony.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF06D83B68068678A9645735 /* Pods_WhitePeaony.framework */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		AB49F4AA099F4CC1FB75D2B5 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		CCAF2E4532F9D4D58DD878BA /* Pods_WhitePeaony.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B06F0051AFEA8F9225B6266 /* Pods_WhitePeaony.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,11 +19,11 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = WhitePeaony/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = WhitePeaony/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = WhitePeaony/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		194C84621EC386F125526ACF /* Pods-WhitePeaony.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WhitePeaony.release.xcconfig"; path = "Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony.release.xcconfig"; sourceTree = "<group>"; };
+		1B06F0051AFEA8F9225B6266 /* Pods_WhitePeaony.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_WhitePeaony.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		4288428C0AD1C052BBE12461 /* Pods-WhitePeaony.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WhitePeaony.release.xcconfig"; path = "Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony.release.xcconfig"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = WhitePeaony/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = WhitePeaony/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		AE6DE86D624C146156DF5C37 /* Pods-WhitePeaony.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WhitePeaony.debug.xcconfig"; path = "Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony.debug.xcconfig"; sourceTree = "<group>"; };
-		AF06D83B68068678A9645735 /* Pods_WhitePeaony.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_WhitePeaony.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DF7C568BC896D51A1501896B /* Pods-WhitePeaony.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WhitePeaony.debug.xcconfig"; path = "Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -32,7 +32,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2800E6545716698DF300CE7E /* Pods_WhitePeaony.framework in Frameworks */,
+				CCAF2E4532F9D4D58DD878BA /* Pods_WhitePeaony.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,7 +55,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				AF06D83B68068678A9645735 /* Pods_WhitePeaony.framework */,
+				1B06F0051AFEA8F9225B6266 /* Pods_WhitePeaony.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -92,8 +92,8 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				AE6DE86D624C146156DF5C37 /* Pods-WhitePeaony.debug.xcconfig */,
-				194C84621EC386F125526ACF /* Pods-WhitePeaony.release.xcconfig */,
+				DF7C568BC896D51A1501896B /* Pods-WhitePeaony.debug.xcconfig */,
+				4288428C0AD1C052BBE12461 /* Pods-WhitePeaony.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -105,13 +105,13 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "WhitePeaony" */;
 			buildPhases = (
-				7C611989EDBDC5D73977481F /* [CP] Check Pods Manifest.lock */,
+				1ADF9748B6F2DA4A0B114A79 /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				12912A589130C5262790AC04 /* [CP] Embed Pods Frameworks */,
-				F76C7D3AB1E287060DD93388 /* [CP] Copy Pods Resources */,
+				D9641C07189E0FC948F34FEC /* [CP] Embed Pods Frameworks */,
+				6EFAC317FF25B1694F503183 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -183,28 +183,7 @@
 			shellPath = /bin/sh;
 			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
-		12912A589130C5262790AC04 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			inputPaths = (
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		7C611989EDBDC5D73977481F /* [CP] Check Pods Manifest.lock */ = {
+		1ADF9748B6F2DA4A0B114A79 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -226,7 +205,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		F76C7D3AB1E287060DD93388 /* [CP] Copy Pods Resources */ = {
+		6EFAC317FF25B1694F503183 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -247,6 +226,27 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		D9641C07189E0FC948F34FEC /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WhitePeaony/Pods-WhitePeaony-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -263,7 +263,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AE6DE86D624C146156DF5C37 /* Pods-WhitePeaony.debug.xcconfig */;
+			baseConfigurationReference = DF7C568BC896D51A1501896B /* Pods-WhitePeaony.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -416,7 +416,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.whitepeaony.app;
 				PRODUCT_NAME = WhitePeaony;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -426,7 +426,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 194C84621EC386F125526ACF /* Pods-WhitePeaony.release.xcconfig */;
+			baseConfigurationReference = 4288428C0AD1C052BBE12461 /* Pods-WhitePeaony.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -578,7 +578,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.whitepeaony.app;
 				PRODUCT_NAME = WhitePeaony;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";

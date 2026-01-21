@@ -17,6 +17,7 @@ import { UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
 import { Colors } from '../../constant';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MyEventsScreen = ({ navigation }) => {
     const [events, setEvents] = useState([]);
@@ -24,38 +25,35 @@ const MyEventsScreen = ({ navigation }) => {
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
 
-
-
     useEffect(() => {
-        OrderList()
-    }, [])
-
+        OrderList();
+    }, []);
 
     const OrderList = async () => {
         try {
             showLoader();
             const res = await UserService.eventsListing();
             if (res && res.data && res.status === HttpStatusCode.Ok) {
-                hideLoader()
-                console.log("'logsss", res.data)
-                const apiOrders = Array.isArray(res?.data?.registered_events) ? res.data.registered_events : [];
+                hideLoader();
+                console.log("'logsss", res.data);
+                const apiOrders = Array.isArray(res?.data?.registered_events)
+                    ? res.data.registered_events
+                    : [];
 
-                setEvents(apiOrders)
+                setEvents(apiOrders);
             } else {
-                hideLoader()
-                console.log("error", res?.data)
+                hideLoader();
+                console.log('error', res?.data);
                 // handle non-OK response if needed
             }
         } catch (err) {
-            hideLoader()
-            console.log("error", err)
+            hideLoader();
+            console.log('error', err);
             // handle network/error
         }
     };
 
-
-
-    const openBookingDetail = (booking) => {
+    const openBookingDetail = booking => {
         setSelectedBooking(booking);
         setModalVisible(true);
     };
@@ -65,47 +63,42 @@ const MyEventsScreen = ({ navigation }) => {
         setModalVisible(false);
     };
 
-    const handleCancelEvent = (item) => {
-        Alert.alert(
-            'Cancel Event',
-            'Are you sure you want to cancel this event?',
-            [
-                { text: 'No', style: 'cancel' },
-                {
-                    text: 'Yes, Cancel',
-                    style: 'destructive',
-                    onPress: () => CancelButton(item?.event_id),
-                    // onPress: () => setEvents(events.filter((e) => e.id !== id)),
-                },
-            ]
-        );
+    const handleCancelEvent = item => {
+        Alert.alert('Cancel Event', 'Are you sure you want to cancel this event?', [
+            { text: 'No', style: 'cancel' },
+            {
+                text: 'Yes, Cancel',
+                style: 'destructive',
+                onPress: () => CancelButton(item?.event_id),
+                // onPress: () => setEvents(events.filter((e) => e.id !== id)),
+            },
+        ]);
     };
 
-    const CancelButton = async (id) => {
+    const CancelButton = async id => {
         try {
             showLoader();
             const res = await UserService.eventscancel(id);
             if (res && res.data && res.status === HttpStatusCode.Ok) {
-                hideLoader()
-                console.log("'logsss", res.data)
-                setEvents(events.filter((e) => e.id !== id))
+                hideLoader();
+                console.log("'logsss", res.data);
+                setEvents(events.filter(e => e.id !== id));
                 // const apiOrders = Array.isArray(res?.data?.registered_events) ? res.data.registered_events : [];
 
                 // setEvents(apiOrders)
             } else {
-                hideLoader()
-                console.log("error", res?.data)
+                hideLoader();
+                console.log('error', res?.data);
                 // handle non-OK response if needed
             }
         } catch (err) {
-            hideLoader()
-            console.log("error", JSON.stringify(err))
+            hideLoader();
+            console.log('error', JSON.stringify(err));
             // handle network/error
         }
+    };
 
-    }
-
-    const openEventDetail = (event) => {
+    const openEventDetail = event => {
         setSelectedBooking(event);
         setModalVisible(true);
     };
@@ -140,10 +133,17 @@ const MyEventsScreen = ({ navigation }) => {
     );
 
     return (
-        <View style={styles.container}>
+
+        <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
-                    <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => navigation?.goBack()}
+                >
+                    <Image
+                        source={require('../../assets/Png/back.png')}
+                        style={{ width: 20, height: 20 }}
+                    />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>My Event</Text>
                 <View />
@@ -156,7 +156,7 @@ const MyEventsScreen = ({ navigation }) => {
             ) : (
                 <FlatList
                     data={events}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={item => item.id}
                     renderItem={renderEventCard}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 30 }}
@@ -202,7 +202,8 @@ const MyEventsScreen = ({ navigation }) => {
                                             : { color: 'orange' },
                                     ]}
                                 >
-                                    💳 Payment Status: {selectedBooking.payment_status.toUpperCase()}
+                                    💳 Payment Status:{' '}
+                                    {selectedBooking.payment_status.toUpperCase()}
                                 </Text>
 
                                 <Text style={styles.modalDescription}>
@@ -217,7 +218,7 @@ const MyEventsScreen = ({ navigation }) => {
                     </Pressable>
                 </Pressable>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 };
 
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 18,
         borderRadius: 8,
-        borderWidth: 1
+        borderWidth: 1,
     },
     cancelText: {
         color: 'red',

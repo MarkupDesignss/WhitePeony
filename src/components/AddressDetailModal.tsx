@@ -1,13 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, TouchableWithoutFeedback, ScrollView } from 'react-native';
+import {
+    Modal,
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    TouchableWithoutFeedback,
+    ScrollView,
+    Platform,
+    KeyboardAvoidingView,
+    Keyboard,
+} from 'react-native';
 import { CommonLoader } from './CommonLoader/commonLoader';
 import { UserService } from '../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import Toast from 'react-native-toast-message';
-import { useRoute } from '@react-navigation/native';
 import { Colors } from '../constant';
 
-const AddressDetailModal = ({ isVisible, onClose, addresses, onAddressUpdated }) => {
+const AddressDetailModal = ({
+    isVisible,
+    onClose,
+    addresses,
+    onAddressUpdated,
+    onModalOpen,
+}) => {
     const { showLoader, hideLoader } = CommonLoader();
     const [selectedType, setSelectedType] = useState('home');
     const [formData, setFormData] = useState({
@@ -19,6 +36,9 @@ const AddressDetailModal = ({ isVisible, onClose, addresses, onAddressUpdated })
         zip: '',
     });
 
+    // Track keyboard visibility
+    const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
     // validation errors
     const [errors, setErrors] = useState({
         name: '',
@@ -29,15 +49,37 @@ const AddressDetailModal = ({ isVisible, onClose, addresses, onAddressUpdated })
         zip: '',
     });
 
+    // Keyboard listeners
+    useEffect(() => {
+        const keyboardDidShowListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => {
+                setIsKeyboardVisible(true);
+            },
+        );
+
+        const keyboardDidHideListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                setIsKeyboardVisible(false);
+            },
+        );
+
+        return () => {
+            keyboardDidShowListener.remove();
+            keyboardDidHideListener.remove();
+        };
+    }, []);
+
     const validate = () => {
         const e: any = {};
 
-        if (!formData.name || !formData.name.trim()) e.name = 'Full name is required';
+        if (!formData.name || !formData.name.trim())
+            e.name = 'Full name is required';
 
         if (!formData.email || !formData.email.trim()) {
             e.email = 'Email is required';
         } else {
-            // simple email regex
             const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!re.test(formData.email.trim())) e.email = 'Invalid email';
         }
@@ -49,7 +91,8 @@ const AddressDetailModal = ({ isVisible, onClose, addresses, onAddressUpdated })
             if (digits.length < 6) e.phone = 'Enter a valid contact number';
         }
 
-        if (!formData.address || !formData.address.trim()) e.address = 'Full address is required';
+        if (!formData.address || !formData.address.trim())
+            e.address = 'Full address is required';
         if (!formData.city || !formData.city.trim()) e.city = 'City is required';
         if (!formData.zip || !formData.zip.trim()) e.zip = 'ZIP code is required';
 
@@ -72,43 +115,55 @@ const AddressDetailModal = ({ isVisible, onClose, addresses, onAddressUpdated })
         { key: 'other', label: 'Other', icon: '➕' },
     ];
 
-    // ✅ Hooks can safely call effects
     useEffect(() => {
         console.log('Editing address:', addresses);
         if (addresses) {
             setFormData({
-                name: addresses.name || "",
-                email: addresses.email || "",
-                phone: addresses.phone || "",
-                address: addresses.full_address || "",
-                city: addresses.city || "",
-                zip: addresses.postal_code || "",
+                name: addresses.name || '',
+                email: addresses.email || '',
+                phone: addresses.phone || '',
+                address: addresses.full_address || '',
+                city: addresses.city || '',
+                zip: addresses.postal_code || '',
             });
-            setSelectedType(addresses.address_type || "home");
+            setSelectedType(addresses.address_type || 'home');
         } else {
-            // reset when adding new
             setFormData({
-                name: "",
-                email: "",
-                phone: "",
-                address: "",
-                city: "",
-                zip: "",
+                name: '',
+                email: '',
+                phone: '',
+                address: '',
+                city: '',
+                zip: '',
             });
-            setSelectedType("home");
-            setErrors({ name: '', email: '', phone: '', address: '', city: '', zip: '' });
+            setSelectedType('home');
+            setErrors({
+                name: '',
+                email: '',
+                phone: '',
+                address: '',
+                city: '',
+                zip: '',
+            });
         }
     }, [addresses]);
+
+    useEffect(() => {
+        if (isVisible && onModalOpen) {
+            onModalOpen();
+        }
+    }, [isVisible, onModalOpen]);
 
     if (!isVisible) return null;
 
     const handleChange = (name, value) => {
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setFormData(prev => ({ ...prev, [name]: value }));
         setErrors((p: any) => ({ ...p, [name]: '' }));
     };
 
-    // ✅ Submit handler — decides Add or Update
     const handleSubmit = async () => {
+        Keyboard.dismiss();
+
         if (!validate()) {
             Toast.show({ type: 'error', text1: 'Please fix validation errors' });
             return;
@@ -129,10 +184,8 @@ const AddressDetailModal = ({ isVisible, onClose, addresses, onAddressUpdated })
             let res;
 
             if (addresses?.id) {
-                // 🟡 Update API call
                 res = await UserService.addressdupdate(addresses.id, payload);
             } else {
-                // 🆕 Add new API call
                 res = await UserService.addaddress(payload);
             }
 
@@ -140,130 +193,211 @@ const AddressDetailModal = ({ isVisible, onClose, addresses, onAddressUpdated })
 
             if (res?.status === HttpStatusCode.Ok && res?.data) {
                 Toast.show({
-                    type: "success",
-                    text1: res.data?.message || "Address saved successfully!",
+                    type: 'success',
+                    text1: res.data?.message || 'Address saved successfully!',
                 });
-                onAddressUpdated && onAddressUpdated(); // Refresh address list in parent
-                onClose(); // close modal
+                onAddressUpdated && onAddressUpdated();
+                onClose();
             } else {
                 Toast.show({
-                    type: "error",
-                    text1: res?.data?.message || "Something went wrong!",
+                    type: 'error',
+                    text1: res?.data?.message || 'Something went wrong!',
                 });
             }
         } catch (err) {
             hideLoader();
-            console.log("Error in handleSubmit:", err);
+            console.log('Error in handleSubmit:', err);
             Toast.show({
-                type: "error",
-                text1: err?.response?.data?.message || "Something went wrong! Please try again.",
+                type: 'error',
+                text1:
+                    err?.response?.data?.message ||
+                    'Something went wrong! Please try again.',
             });
         }
     };
 
+    const handleClose = () => {
+        Keyboard.dismiss();
+        onClose();
+    };
+
     return (
-        <Modal transparent animationType="slide" visible={isVisible} onRequestClose={onClose}>
-            <TouchableWithoutFeedback onPress={onClose}>
-                <View style={styles.overlay}>
-                    <View style={styles.modalContent}>
-                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                            <Text style={styles.closeButtonText}>×</Text>
-                        </TouchableOpacity>
-
-                        <Text style={styles.modalTitle}>
-                            {addresses ? "Update Address" : "Add New Address"}
-                        </Text>
-
-                        <Text style={styles.bodytext}>
-                            Complete address helps us serve you better.
-                        </Text>
-
-                        {/* Address Type Selector */}
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addressTypeScroll}>
-                            {addressTypes.map((type) => (
-                                <TouchableOpacity
-                                    key={type.key}
-                                    style={[
-                                        styles.addressTypeButton,
-                                        selectedType === type.key && styles.addressTypeButtonSelected,
-                                    ]}
-                                    onPress={() => setSelectedType(type.key)}>
-                                    <Text style={styles.addressTypeIcon}>{type.icon}</Text>
-                                    <Text
-                                        style={[
-                                            styles.addressTypeLabel,
-                                            selectedType === type.key && styles.addressTypeLabelSelected,
-                                        ]}>
-                                        {type.label}
+        <Modal
+            transparent
+            animationType="slide"
+            visible={isVisible}
+            onRequestClose={handleClose}
+        >
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
+            >
+                <TouchableWithoutFeedback onPress={handleClose}>
+                    <View style={styles.overlay}>
+                        <TouchableWithoutFeedback onPress={() => { }}>
+                            <View
+                                style={[
+                                    styles.modalContent,
+                                    isKeyboardVisible && styles.modalContentWithKeyboard,
+                                ]}
+                            >
+                                {/* Header with close button */}
+                                <View style={styles.header}>
+                                    <Text style={styles.modalTitle}>
+                                        {addresses ? 'Update Address' : 'Add New Address'}
                                     </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
+                                    <TouchableOpacity
+                                        style={styles.closeButton}
+                                        onPress={handleClose}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    >
+                                        <Text style={styles.closeButtonText}>×</Text>
+                                    </TouchableOpacity>
+                                </View>
 
-                        {/* Form Fields */}
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Full Name*"
-                            placeholderTextColor={Colors.text[200]}
-                            value={formData.name}
-                            onChangeText={(text) => handleChange("name", text)}
-                        />
-                        {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Email ID*"
-                            placeholderTextColor={Colors.text[200]}
-                            value={formData.email}
-                            onChangeText={(text) => handleChange("email", text)}
-                        />
-                        {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+                                <Text style={styles.bodytext}>
+                                    Complete address helps us serve you better.
+                                </Text>
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Contact Number*"
-                            placeholderTextColor={Colors.text[200]}
-                            value={formData.phone}
-                            onChangeText={(text) => handleChange("phone", text)}
-                        />
-                        {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
+                                <ScrollView
+                                    showsVerticalScrollIndicator={false}
+                                    keyboardShouldPersistTaps="handled"
+                                    contentContainerStyle={styles.scrollContainer}
+                                >
+                                    {/* Address Type Selector */}
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={styles.addressTypeScroll}
+                                    >
+                                        {addressTypes.map(type => (
+                                            <TouchableOpacity
+                                                key={type.key}
+                                                style={[
+                                                    styles.addressTypeButton,
+                                                    selectedType === type.key &&
+                                                    styles.addressTypeButtonSelected,
+                                                ]}
+                                                onPress={() => setSelectedType(type.key)}
+                                            >
+                                                <Text style={styles.addressTypeIcon}>{type.icon}</Text>
+                                                <Text
+                                                    style={[
+                                                        styles.addressTypeLabel,
+                                                        selectedType === type.key &&
+                                                        styles.addressTypeLabelSelected,
+                                                    ]}
+                                                >
+                                                    {type.label}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Full Address*"
-                            placeholderTextColor={Colors.text[200]}
-                            value={formData.address}
-                            onChangeText={(text) => handleChange("address", text)}
-                        />
-                        {errors.address ? <Text style={styles.errorText}>{errors.address}</Text> : null}
+                                    {/* Form Fields */}
+                                    <View style={styles.formContainer}>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Full Name*"
+                                            placeholderTextColor={Colors.text[200]}
+                                            value={formData.name}
+                                            onChangeText={text => handleChange('name', text)}
+                                            returnKeyType="next"
+                                            blurOnSubmit={false}
+                                        />
+                                        {errors.name ? (
+                                            <Text style={styles.errorText}>{errors.name}</Text>
+                                        ) : null}
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="City*"
-                            placeholderTextColor={Colors.text[200]}
-                            value={formData.city}
-                            onChangeText={(text) => handleChange("city", text)}
-                        />
-                        {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Email ID*"
+                                            placeholderTextColor={Colors.text[200]}
+                                            value={formData.email}
+                                            onChangeText={text => handleChange('email', text)}
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
+                                            returnKeyType="next"
+                                            blurOnSubmit={false}
+                                        />
+                                        {errors.email ? (
+                                            <Text style={styles.errorText}>{errors.email}</Text>
+                                        ) : null}
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="ZIP Code*"
-                            placeholderTextColor={Colors.text[200]}
-                            value={formData.zip}
-                            onChangeText={(text) => handleChange("zip", text)}
-                        />
-                        {errors.zip ? <Text style={styles.errorText}>{errors.zip}</Text> : null}
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Contact Number*"
+                                            placeholderTextColor={Colors.text[200]}
+                                            value={formData.phone}
+                                            onChangeText={text => handleChange('phone', text)}
+                                            keyboardType="phone-pad"
+                                            returnKeyType="next"
+                                            blurOnSubmit={false}
+                                        />
+                                        {errors.phone ? (
+                                            <Text style={styles.errorText}>{errors.phone}</Text>
+                                        ) : null}
 
+                                        <TextInput
+                                            style={[styles.input, styles.addressInput]}
+                                            placeholder="Full Address*"
+                                            placeholderTextColor={Colors.text[200]}
+                                            value={formData.address}
+                                            onChangeText={text => handleChange('address', text)}
+                                            multiline
+                                            numberOfLines={3}
+                                            textAlignVertical="top"
+                                            returnKeyType="next"
+                                            blurOnSubmit={false}
+                                        />
+                                        {errors.address ? (
+                                            <Text style={styles.errorText}>{errors.address}</Text>
+                                        ) : null}
 
-                        {/* Submit */}
-                        <TouchableOpacity style={styles.confirmButton} onPress={handleSubmit}>
-                            <Text style={styles.confirmButtonText}>
-                                {addresses ? "Update Address" : "Save Address"}
-                            </Text>
-                        </TouchableOpacity>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="City*"
+                                            placeholderTextColor={Colors.text[200]}
+                                            value={formData.city}
+                                            onChangeText={text => handleChange('city', text)}
+                                            returnKeyType="next"
+                                            blurOnSubmit={false}
+                                        />
+                                        {errors.city ? (
+                                            <Text style={styles.errorText}>{errors.city}</Text>
+                                        ) : null}
+
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="ZIP Code*"
+                                            placeholderTextColor={Colors.text[200]}
+                                            value={formData.zip}
+                                            onChangeText={text => handleChange('zip', text)}
+                                            keyboardType="numeric"
+                                            returnKeyType="done"
+                                            onSubmitEditing={handleSubmit}
+                                        />
+                                        {errors.zip ? (
+                                            <Text style={styles.errorText}>{errors.zip}</Text>
+                                        ) : null}
+
+                                        {/* Submit */}
+                                        <TouchableOpacity
+                                            style={styles.confirmButton}
+                                            onPress={handleSubmit}
+                                        >
+                                            <Text style={styles.confirmButtonText}>
+                                                {addresses ? 'Update Address' : 'Save Address'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </ScrollView>
+                            </View>
+                        </TouchableWithoutFeedback>
                     </View>
-                </View>
-            </TouchableWithoutFeedback>
+                </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
         </Modal>
     );
 };
@@ -279,60 +413,91 @@ const styles = StyleSheet.create({
     },
     overlay: {
         flex: 1,
-        justifyContent: "flex-end",
-        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
     },
     modalContent: {
-        backgroundColor: '#fff', borderTopLeftRadius: 16, borderRadius: 27, padding: 16, maxHeight: '90%', width: '95%', alignSelf: 'center', bottom: 20
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        padding: 16,
+        maxHeight: '90%',
+        width: '100%',
+    },
+    modalContentWithKeyboard: {
+        maxHeight: '95%',
+    },
+    scrollContainer: {
+        flexGrow: 1,
+        paddingBottom: 20,
+    },
+    formContainer: {
+        flex: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+        marginTop: 10,
     },
     closeButton: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
+        backgroundColor: 'rgba(255,255,255,0.8)',
+        borderRadius: 15,
+        width: 30,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     closeButtonText: {
-        fontSize: 25,
-        color: 'black',
+        fontSize: 24,
+        color: '#000',
+        fontWeight: '300',
+        lineHeight: 24,
     },
     modalTitle: {
         fontSize: 18,
         fontWeight: 'bold',
+        flex: 1,
+        marginRight: 10,
     },
     bodytext: {
-        fontSize: 14, color: '#666', marginBottom: 20,
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 20,
     },
     input: {
-        height: 45,
+        height: 48,
         borderColor: '#ddd',
         borderWidth: 1,
-        borderRadius: 5,
-        marginBottom: 10,
-        paddingLeft: 10,
+        borderRadius: 8,
+        marginBottom: 4,
+        paddingHorizontal: 12,
         fontSize: 16,
+        backgroundColor: '#fff',
+    },
+    addressInput: {
+        height: 80,
+        paddingTop: 12,
+        paddingBottom: 12,
     },
     confirmButton: {
         backgroundColor: Colors.button[100],
-        paddingVertical: 12,
-        borderRadius: 5,
-        marginTop: 10,
+        paddingVertical: 14,
+        borderRadius: 8,
+        marginTop: 16,
         alignItems: 'center',
+        justifyContent: 'center',
     },
     confirmButtonText: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '700',
         color: '#000',
-    },
-    addressTypeContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-        width: '90%'
     },
     addressTypeScroll: {
         paddingVertical: 2,
         paddingHorizontal: 2,
         marginBottom: 20,
-
     },
     addressTypeButton: {
         flexDirection: 'row',
@@ -362,4 +527,3 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 });
-

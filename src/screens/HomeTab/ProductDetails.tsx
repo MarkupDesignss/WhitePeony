@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
-  StatusBar
+  StatusBar,
 } from 'react-native';
 // gesture handling for custom zoom removed in favor of `react-native-image-viewing`
 import { Colors } from '../../constant';
@@ -27,10 +27,14 @@ import { formatDate } from '../../helpers/helpers';
 import { WishlistContext } from '../../context';
 import { useCart } from '../../context/CartContext';
 import RecommendedProductCard from './RecommendedProductCard';
-import { heightPercentageToDP, widthPercentageToDP } from '../../constant/dimentions';
+import {
+  heightPercentageToDP,
+  widthPercentageToDP,
+} from '../../constant/dimentions';
 import LinearGradient from 'react-native-linear-gradient';
 import Video from 'react-native-video';
 import LoginModal from '../../components/LoginModal';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 const HERO_HEIGHT = 300;
@@ -38,7 +42,6 @@ const HERO_HEIGHT = 300;
 type ProductDetailsProps = {
   route: { params: { productId: string } };
 };
-
 
 const ProductDetails = ({ route }: ProductDetailsProps) => {
   const { addToCart, cart, isLoggedIn } = useCart(); // ✅ hook at top
@@ -58,20 +61,19 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const [isInCart, setIsInCart] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
 
-
   useEffect(() => {
     try {
       if (!productData) return;
       const variantId = selectedVariant?.id ?? null;
       const present = Array.isArray(cart)
         ? cart.some((c: any) => {
-          const cartProductId = c.product_id ?? c.id;
-          const cartVariantId = c.variant_id ?? null;
-          return (
-            Number(cartProductId) === Number(productData.id) &&
-            String(cartVariantId) === String(variantId)
-          );
-        })
+            const cartProductId = c.product_id ?? c.id;
+            const cartVariantId = c.variant_id ?? null;
+            return (
+              Number(cartProductId) === Number(productData.id) &&
+              String(cartVariantId) === String(variantId)
+            );
+          })
         : false;
       // also respect locally set productData.is_cart to prevent flicker
       setIsInCart(Boolean(present || productData?.is_cart));
@@ -79,9 +81,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       console.log('isInCart sync error', e);
     }
   }, [cart, selectedVariant, productData?.id]);
-
-
-
 
   // Load a product by id and set up state (images, variants, related products, reviews)
   const loadProduct = async (productId: any) => {
@@ -94,12 +93,16 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         const resolvedBase = res.data?.base_url || baseUrl;
         setBaseUrl(resolvedBase);
 
-        const first = Array.isArray(fetchedProducts) ? fetchedProducts[0] : fetchedProducts;
+        const first = Array.isArray(fetchedProducts)
+          ? fetchedProducts[0]
+          : fetchedProducts;
 
         if (first) {
           const images = [first.front_image, first.back_image, first.side_image]
             .filter(Boolean)
-            .map((img: string) => (img.startsWith('http') ? img : `${resolvedBase}${img}`));
+            .map((img: string) =>
+              img.startsWith('http') ? img : `${resolvedBase}${img}`,
+            );
 
           const extraImgs = (first.images || []).map((img: string) =>
             img.startsWith('http') ? img : `${resolvedBase}${img}`,
@@ -112,10 +115,10 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           const variantItems = allVariants.map((v: any, index: number) => ({
             label: `${v.weight || v.unit || v.name} - ₹${v.price}`,
             value: v.id,
-            discount: v.percentage
+            discount: v.percentage,
           }));
           setWeightItems(allVariants);
-          console.log('varients', allVariants)
+          console.log('varients', allVariants);
 
           const variant0 = allVariants.length ? allVariants[0] : null;
           const price = variant0?.price || first.main_price || '0';
@@ -138,10 +141,12 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           try {
             const variantId = variant0?.id ?? null;
             const present = Array.isArray(cart)
-              ? cart.some((c: any) => (
-                (c.id ?? c.product_id) === normalized.id &&
-                ((c.variant_id ?? c.variantId ?? null) === (variantId || null))
-              ))
+              ? cart.some(
+                  (c: any) =>
+                    (c.id ?? c.product_id) === normalized.id &&
+                    (c.variant_id ?? c.variantId ?? null) ===
+                      (variantId || null),
+                )
               : false;
             setIsInCart(Boolean(present || normalized?.is_cart));
           } catch {
@@ -189,13 +194,20 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         const resolvedBase = res.data?.base_url || baseUrl;
         setBaseUrl(resolvedBase);
 
-        const mapped = (Array.isArray(fetchedProducts) ? fetchedProducts : [fetchedProducts]).map((p: any) => {
+        const mapped = (
+          Array.isArray(fetchedProducts) ? fetchedProducts : [fetchedProducts]
+        ).map((p: any) => {
           const images = [p.front_image, p.back_image, p.side_image]
             .filter(Boolean)
-            .map((img: string) => (img.startsWith('http') ? img : `${resolvedBase}${img}`));
-          const extraImgs = (p.images || []).map((img: string) => (img.startsWith('http') ? img : `${resolvedBase}${img}`));
+            .map((img: string) =>
+              img.startsWith('http') ? img : `${resolvedBase}${img}`,
+            );
+          const extraImgs = (p.images || []).map((img: string) =>
+            img.startsWith('http') ? img : `${resolvedBase}${img}`,
+          );
           const allImages = extraImgs.length ? extraImgs : images;
-          const variant = p.variants && p.variants.length ? p.variants[0] : null;
+          const variant =
+            p.variants && p.variants.length ? p.variants[0] : null;
           const price = variant?.price || p.main_price || p.price || '0';
           const unit = variant?.unit || p.unit || '';
           return { ...p, images: allImages, price, unit };
@@ -250,7 +262,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const resolveImageSource = (img: any) =>
     typeof img === 'string' ? { uri: img } : img;
 
-
   // Reviews modal state
   const [showModalVisible, setShowModalVisible] = useState(false);
   const [reviews, setReviews] = useState<Array<any>>([]);
@@ -271,7 +282,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         price: v.price,
         unit: v.unit,
         value: v.id,
-        discount: v.percentage
+        discount: v.percentage,
       }));
       setWeightItems(items);
       setVariants(productData.variants);
@@ -372,7 +383,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       // Show success message
       Toast.show({
         type: 'success',
-        text1: 'Added to cart successfully!'
+        text1: 'Added to cart successfully!',
       });
     } catch (e) {
       const error = e as any;
@@ -402,10 +413,9 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       // Show success message
       Toast.show({
         type: 'success',
-        text1: 'Added to cart successfully!'
+        text1: 'Added to cart successfully!',
       });
       navigation.navigate('CheckoutScreen');
-
     } catch (e) {
       const error = e as any;
       if (error.status === 401) {
@@ -419,8 +429,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }
   };
 
-
-
   // Replace existing cart button with new component
   const CartButton = () => {
     if (productData?.stock_quantity === 0) {
@@ -428,13 +436,16 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }
 
     return (
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: heightPercentageToDP(3), width: '100%' }}>
-
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginTop: heightPercentageToDP(3),
+          width: '100%',
+        }}
+      >
         <TouchableOpacity
-          style={[
-            styles.cartButton,
-            isInCart && styles.cartButtonActive,
-          ]}
+          style={[styles.cartButton, isInCart && styles.cartButtonActive]}
           onPress={handleCartAction}
         >
           <Text style={styles.cartButtonText}>
@@ -451,15 +462,24 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             }
           }}
         >
-          <View style={{ borderWidth: 1, borderColor: '#999', borderRadius: 20, height: 45, justifyContent: 'center', width: widthPercentageToDP(40) }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', alignSelf: 'center' }}>Check-Out</Text>
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: '#999',
+              borderRadius: 20,
+              height: 45,
+              justifyContent: 'center',
+              width: widthPercentageToDP(40),
+            }}
+          >
+            <Text
+              style={{ fontSize: 12, fontWeight: '700', alignSelf: 'center' }}
+            >
+              Check-Out
+            </Text>
           </View>
         </TouchableOpacity>
-
-
-      </View >
-
-
+      </View>
     );
   };
 
@@ -480,7 +500,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const average = reviewStats.average_rating || 0;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -501,18 +521,38 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             {isWishlisted(productData?.id) ? (
               <Video
                 source={require('../../assets/Png/splash.mp4')}
-                style={{  width: 25, height: 25, borderRadius: 15, justifyContent: 'center', alignItems: 'center', }}
+                style={{
+                  width: 25,
+                  height: 25,
+                  borderRadius: 15,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
                 muted={true}
-                repeat={true}
+                repeat={false}
                 resizeMode="cover"
-                onError={(e) => console.log('Video error', e)}
+                onError={e => console.log('Video error', e)}
               />
             ) : (
               // Use the outline heart image for non-wishlisted state so touch events are not intercepted
-              <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.button[100], justifyContent: 'center', alignItems: 'center', }}>
+              <View
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: Colors.button[100],
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
                 <Image
                   source={require('../../assets/Png/heart-1.png')}
-                  style={{ position: 'absolute', width: 15, height: 15, alignSelf: 'center' }}
+                  style={{
+                    position: 'absolute',
+                    width: 15,
+                    height: 15,
+                    alignSelf: 'center',
+                  }}
                 />
               </View>
             )}
@@ -554,13 +594,12 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   startAutoplay();
                 }}
               >
-
                 {/* Animated fade for image change */}
                 <Animated.View style={{ opacity: animOpacity }}>
                   <Image
                     source={resolveImageSource(item)}
                     style={styles.heroImage}
-                    resizeMode='contain'
+                    resizeMode="contain"
                   />
                 </Animated.View>
               </TouchableOpacity>
@@ -595,7 +634,9 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
 
         {/* Zoom viewer using react-native-image-viewing */}
         <ImageView
-          images={productImages.map((img: any) => (typeof img === 'string' ? { uri: img } : img))}
+          images={productImages.map((img: any) =>
+            typeof img === 'string' ? { uri: img } : img,
+          )}
           imageIndex={zoomIndex}
           visible={zoomVisible}
           onRequestClose={closeZoom}
@@ -606,19 +647,26 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         <LoginModal
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
-          onGoogleLogin={() => Alert.alert("Google Login")}
-          onFacebookLogin={() => Alert.alert("Facebook Login")}
+          onGoogleLogin={() => Alert.alert('Google Login')}
+          onFacebookLogin={() => Alert.alert('Facebook Login')}
           phoneNumber="email or phone number"
         />
 
-
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 16,
+          }}
+        >
           <Text style={styles.title}>
             {productData?.name !== null ? productData?.name : ''}
           </Text>
           <Text style={{ color: '#F0C419', fontSize: 14, fontWeight: '700' }}>
-            ★ <Text style={{ color: '#000', fontWeight: '500' }}>({productData?.average_rating})</Text>
+            ★{' '}
+            <Text style={{ color: '#000', fontWeight: '500' }}>
+              ({productData?.average_rating})
+            </Text>
           </Text>
         </View>
 
@@ -648,7 +696,9 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                     const v = variants[index];
                     if (v) {
                       setSelectedIndex(index);
-                      setDisplayPrice(v.price ?? productData.price ?? displayPrice);
+                      setDisplayPrice(
+                        v.price ?? productData.price ?? displayPrice,
+                      );
                       setDisplayUnit(v.unit ?? productData.unit ?? displayUnit);
                       setSelectedVariant(v);
                     }
@@ -657,14 +707,14 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                     borderColor: isSelected ? '#000' : Colors.text[400],
                     borderWidth: 1,
                     borderRadius: 8,
-                    height: item.discount != 0 || null ? 50: 40,
+                    height: item.discount != 0 || null ? 50 : 40,
                     width: widthPercentageToDP(25),
                     marginBottom: heightPercentageToDP(1),
                     backgroundColor: '#FFF',
                   }}
                 >
                   {/* percentage badge */}
-                  {item.discount != 0 || null ?
+                  {item.discount != 0 || null ? (
                     <LinearGradient
                       colors={[Colors.button[100], '#ffffff']}
                       start={{ x: 0, y: 0 }}
@@ -684,8 +734,8 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                       >
                         {item.discount}% OFF
                       </Text>
-                    </LinearGradient> : null
-                  }
+                    </LinearGradient>
+                  ) : null}
 
                   {/* Unit */}
                   <Text
@@ -707,7 +757,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
 
         <CartButton />
 
-        <Text style={{ marginTop: 20, fontWeight: '700', }}>
+        <Text style={{ marginTop: 20, fontWeight: '700' }}>
           Product Description
         </Text>
         <Text
@@ -716,24 +766,31 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         >
           {productData?.description ?? ''}
         </Text>
-        {descExpanded ? <TouchableOpacity
-          onPress={() => setDescExpanded(prev => !prev)}
-          activeOpacity={0.7}
-        >
-          <Text style={{ marginTop: 8, color: Colors.button[100], fontWeight: '700' }}>
-            {descExpanded ? 'Read less' : 'Read more'}
-          </Text>
-        </TouchableOpacity> : null}
+        {descExpanded ? (
+          <TouchableOpacity
+            onPress={() => setDescExpanded(prev => !prev)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={{
+                marginTop: 8,
+                color: Colors.button[100],
+                fontWeight: '700',
+              }}
+            >
+              {descExpanded ? 'Read less' : 'Read more'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         {/* recommended row placeholder */}
         <Text style={{ marginTop: 20, fontWeight: '700', bottom: 10 }}>
           Recommended For You
         </Text>
 
-
         <FlatList
           data={relatedProducts}
-          keyExtractor={(i) => String(i.id)}
+          keyExtractor={i => String(i.id)}
           renderItem={({ item }) => (
             <RecommendedProductCard
               item={item}
@@ -760,8 +817,19 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   const isFull = average >= r;
                   const isHalf = average >= r - 0.5 && average < r;
                   return (
-                    <View key={r} style={{ width: 18, height: 18, position: 'relative' }}>
-                      <Text style={{ color: '#ccc', fontSize: 18, position: 'absolute' }}>★</Text>
+                    <View
+                      key={r}
+                      style={{ width: 18, height: 18, position: 'relative' }}
+                    >
+                      <Text
+                        style={{
+                          color: '#ccc',
+                          fontSize: 18,
+                          position: 'absolute',
+                        }}
+                      >
+                        ★
+                      </Text>
                       <View
                         style={{
                           width: isFull ? '100%' : isHalf ? '50%' : '0%',
@@ -769,7 +837,9 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                           position: 'absolute',
                         }}
                       >
-                        <Text style={{ color: '#F0C419', fontSize: 18 }}>★</Text>
+                        <Text style={{ color: '#F0C419', fontSize: 18 }}>
+                          ★
+                        </Text>
                       </View>
                     </View>
                   );
@@ -805,7 +875,11 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           <View style={styles.reviewsButtons}>
             <TouchableOpacity
               style={styles.showBtn}
-              onPress={() => { reviews.length == 0 ? Toast.show({ type: 'info', text1: 'No Review Found' }) : setShowModalVisible(true) }}
+              onPress={() => {
+                reviews.length == 0
+                  ? Toast.show({ type: 'info', text1: 'No Review Found' })
+                  : setShowModalVisible(true);
+              }}
             >
               <Text style={styles.showBtnText}>Show Review</Text>
             </TouchableOpacity>
@@ -841,12 +915,19 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                       borderBottomColor: '#eee',
                     }}
                   >
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", flex: 1, }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        flex: 1,
+                      }}
+                    >
                       <Text style={{ fontWeight: '700' }}>
                         {r.customer?.name}{' '}
                       </Text>
-                      <Text style={{ fontWeight: '400', }}>{formatDate(r.updated_at)}</Text>
-
+                      <Text style={{ fontWeight: '400' }}>
+                        {formatDate(r.updated_at)}
+                      </Text>
                     </View>
                     <Text style={{ color: '#F0C419' }}>
                       {'★'.repeat(r.rating)}
@@ -870,7 +951,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           </View>
         </Modal>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -902,7 +983,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sideVideo: { width: '100%', height: '100%' },
-  sideVideoInner: { width: '100%', height: '100%', },
+  sideVideoInner: { width: '100%', height: '100%' },
   playOverlay: {
     position: 'absolute',
     width: 24,
@@ -913,7 +994,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backBtn: {
-
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.9)',
@@ -1104,8 +1184,10 @@ const styles = StyleSheet.create({
 
   cartButton: {
     backgroundColor: Colors.button[100],
-    borderRadius: 20, height: 45, justifyContent: 'center', width: widthPercentageToDP(40)
-
+    borderRadius: 20,
+    height: 45,
+    justifyContent: 'center',
+    width: widthPercentageToDP(40),
   },
   cartButtonActive: {
     backgroundColor: Colors.button[100],
@@ -1117,7 +1199,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#000',
-    alignSelf: 'center'
+    alignSelf: 'center',
   },
   cartPrice: {
     fontSize: 14,

@@ -1,17 +1,32 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, Modal, Dimensions, Animated, TextInput, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Modal,
+  Dimensions,
+  Animated,
+  TextInput,
+  StatusBar,
+} from 'react-native';
 import { useCart } from '../../context/CartContext'; // adjust import path if needed
 import { Image_url, UserService } from '../../service/ApiService'; // replace with your actual functions
-import { heightPercentageToDP, widthPercentageToDP } from '../../constant/dimentions';
+import {
+  heightPercentageToDP,
+  widthPercentageToDP,
+} from '../../constant/dimentions';
 import { Colors } from '../../constant';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { HttpStatusCode } from 'axios';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 48) / 2;
-
 
 const CategoryDetailsList = ({ navigation, route }: any) => {
   const { addToCart, cart } = useCart();
@@ -25,7 +40,13 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
   const [filterMinPrice, setFilterMinPrice] = useState('');
   const [filterMaxPrice, setFilterMaxPrice] = useState('');
 
-  const ProductImageCarousel = ({ images, width }: { images: any[], width?: number }) => {
+  const ProductImageCarousel = ({
+    images,
+    width,
+  }: {
+    images: any[];
+    width?: number;
+  }) => {
     const [index, setIndex] = useState(0);
     const opacity = useRef(new Animated.Value(1)).current;
 
@@ -55,18 +76,25 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     return (
       <Animated.View style={{ opacity }}>
         {source ? (
-          <Image source={source} style={[styles.cardImage, width ? { width } : {}]} />
+          <Image
+            source={source}
+            style={[styles.cardImage, width ? { width } : {}]}
+          />
         ) : (
-          <View style={[styles.cardImage, width ? { width } : {}, { backgroundColor: '#eee' }]} />
+          <View
+            style={[
+              styles.cardImage,
+              width ? { width } : {},
+              { backgroundColor: '#eee' },
+            ]}
+          />
         )}
       </Animated.View>
     );
   };
 
-
   // 🧩 Fetch products based on mode
   const fetchProducts = async (filterParams: any = {}) => {
-    console.log(mode)
     showLoader();
     try {
       let response: any = [];
@@ -74,26 +102,27 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       else if (mode === 'Best Sale') response = await UserService.mostsellingproduct();
       else if (mode === 'all') response = await UserService.product();
       else if (categoryId) {
-        // If filters are present, use filter endpoint
-        const hasFilter = filterParams && (filterParams.rating || filterParams.min_price || filterParams.max_price);
+        const hasFilter =
+          filterParams &&
+          (filterParams.rating || filterParams.min_price || filterParams.max_price);
         if (hasFilter) {
-          console.log('Applying filters:', filterParams);
-          response = await UserService.FilterProducts({
-            ...filterParams
-          });
+          response = await UserService.FilterProducts({ ...filterParams });
         } else {
           response = await UserService.GetCategoryByID(categoryId);
         }
       }
 
-      // normalize possible response shapes: some endpoints return { data: [...] } and
-      // others return { data: { data: [...] } } or similar. Try both.
       const payload = response?.data?.data ?? response?.data ?? response ?? [];
-      const productsArray = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      const productsArray = Array.isArray(payload) ? payload : payload?.data ?? [];
 
-      if (productsArray && productsArray.length) {
+      // ✅ Filter products for product_type 'b2c' only
+      const b2cProducts = productsArray.filter(
+        (p: any) => p.product_type === 'b2c'
+      );
+
+      if (b2cProducts.length) {
         const cartIds = new Set(cart.map((c: any) => String(c.id || c.product_id)));
-        const updatedProducts = productsArray.map((p: any) => {
+        const updatedProducts = b2cProducts.map((p: any) => {
           const pid = String(p.id ?? p.product_id ?? p.productId ?? '');
           return {
             ...p,
@@ -112,6 +141,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     }
   };
 
+
   // 🧠 Fetch products initially (once when page loads)
   useEffect(() => {
     fetchProducts();
@@ -120,12 +150,14 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
   // 🔁 Recalculate `is_cart` whenever cart changes (no refetch needed)
   useEffect(() => {
     if (apiProducts.length) {
-      const cartIds = new Set(cart.map((c: any) => String(c.id || c.product_id)));
-      setApiProducts((prev) =>
-        prev.map((p) => ({
+      const cartIds = new Set(
+        cart.map((c: any) => String(c.id || c.product_id)),
+      );
+      setApiProducts(prev =>
+        prev.map(p => ({
           ...p,
           is_cart: cartIds.has(String(p.id)) ? 'true' : 'false',
-        }))
+        })),
       );
     }
   }, [cart]);
@@ -149,13 +181,15 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
   // 🧩 Handle sorting of products
   const ApiSorting = async (sortType: string) => {
     try {
-      showLoader();;
+      showLoader();
       const res = await UserService.Sorting(sortType);
 
       if (res?.status === HttpStatusCode.Ok) {
         const sortedProducts = res?.data?.data || [];
         // normalize ids and update cart status
-        const cartIds = new Set(cart.map((c: any) => String(c.id || c.product_id)));
+        const cartIds = new Set(
+          cart.map((c: any) => String(c.id || c.product_id)),
+        );
         const updatedProducts = sortedProducts.map((p: any) => {
           const pid = String(p.id ?? p.product_id ?? p.productId ?? '');
           return {
@@ -165,7 +199,11 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           };
         });
 
-        console.log('ApiSorting -> setting products', updatedProducts.length, updatedProducts[0]);
+        console.log(
+          'ApiSorting -> setting products',
+          updatedProducts.length,
+          updatedProducts[0],
+        );
         setApiProducts(updatedProducts);
         setSortVisible(false); // Close the sorting modal
         Toast.show({ type: 'success', text1: 'Products sorted successfully' });
@@ -173,17 +211,17 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         console.log('Failed to sort products:', res);
         Toast.show({
           type: 'error',
-          text1: 'Failed to sort products'
+          text1: 'Failed to sort products',
         });
       }
     } catch (err) {
       console.log('Sorting error:', err);
       Toast.show({
         type: 'error',
-        text1: 'Failed to sort products'
+        text1: 'Failed to sort products',
       });
     } finally {
-      hideLoader();;
+      hideLoader();
     }
   };
 
@@ -205,13 +243,25 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             {item.name}
           </Text>
           <View style={{ flexDirection: 'row', marginTop: 8 }}>
-            {[1, 2, 3, 4, 5].map((r) => {
+            {[1, 2, 3, 4, 5].map(r => {
               const isFull = item?.average_rating >= r;
-              const isHalf = item?.average_rating >= r - 0.5 && item?.average_rating < r;
+              const isHalf =
+                item?.average_rating >= r - 0.5 && item?.average_rating < r;
               return (
-                <View key={r} style={{ width: 18, height: 18, position: 'relative' }}>
+                <View
+                  key={r}
+                  style={{ width: 18, height: 18, position: 'relative' }}
+                >
                   {/* base gray star */}
-                  <Text style={{ color: '#ccc', fontSize: 18, position: 'absolute' }}>★</Text>
+                  <Text
+                    style={{
+                      color: '#ccc',
+                      fontSize: 18,
+                      position: 'absolute',
+                    }}
+                  >
+                    ★
+                  </Text>
                   {/* overlay half or full star */}
                   <View
                     style={{
@@ -223,18 +273,27 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                     <Text style={{ color: '#F0C419', fontSize: 18 }}>★</Text>
                   </View>
                 </View>
-              )
+              );
             })}
           </View>
           <Text style={styles.cardPrice}>
-            {Math.round(item?.variants[0]?.price)} € {item?.variants[0]?.weight ? `- ${item?.variants[0]?.weight}` : item?.variants[0]?.unit ? `- ${item?.variants[0]?.unit}` : ''}
+            {Math.round(item?.variants[0]?.price)} €{' '}
+            {item?.variants[0]?.weight
+              ? `- ${item?.variants[0]?.weight}`
+              : item?.variants[0]?.unit
+                ? `- ${item?.variants[0]?.unit}`
+                : ''}
           </Text>
 
           {item.stock_quantity === 0 ? (
             <Text style={styles.outOfStock}>Out of Stock</Text>
           ) : (
             <TouchableOpacity
-              onPress={() => (item.is_cart === 'true' ? console.log('Navigate to Cart') : handleAddToCart(item))}
+              onPress={() =>
+                item.is_cart === 'true'
+                  ? console.log('Navigate to Cart')
+                  : handleAddToCart(item)
+              }
               style={styles.filterBtn}
             >
               <Text style={styles.filterText}>
@@ -244,182 +303,253 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           )}
         </View>
       </TouchableOpacity>
-
     );
   };
 
-
   return (
-    <LinearGradient colors={['#F3F3F3', '#FFFFFF']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} >
-          <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{categoryTitle}</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('CheckoutScreen')}>
-          <Image source={require('../../assets/Png/order.png')} style={styles.icon} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.headerRight}>
-        <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterVisible(true)} >
-          <Text style={styles.filterText}>Filters ▾</Text> </TouchableOpacity>
-        <TouchableOpacity style={styles.sortBtn} onPress={() => setSortVisible(true)} >
-          <Text style={styles.sortText}>Sort ▾</Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={apiProducts}
-        extraData={apiProducts}
-        keyExtractor={(i, idx) => (i?.id ? String(i.id) : String(idx))}
-        numColumns={2}
-        contentContainerStyle={styles.list}
-        renderItem={renderItem}
-        ListEmptyComponent={() => {
-          return (
-            <View style={{ flex: 1, justifyContent: 'center', alignSelf: 'center', marginTop: heightPercentageToDP(40) }}>
-              <Text style={{ fontSize: 14, fontWeight: '700' }}>No Data Found</Text>
-            </View>)
-        }}
-        columnWrapperStyle={{ justifyContent: 'space-between' }} /> {/* Filter Modal */}
-
-      <Modal visible={filterVisible} animationType="slide" transparent >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Filters</Text>
-            <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontWeight: '600', marginBottom: 4 }}>Rating</Text>
-              <View style={{ flexDirection: 'row', marginBottom: 12 }}>
-                {[5, 4, 3, 2, 1].map(r => (
-                  <TouchableOpacity
-                    key={r}
+    <SafeAreaView style={{ flex: 1 }}>
+      <LinearGradient colors={['#F3F3F3', '#FFFFFF']} style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Image
+              source={require('../../assets/Png/back.png')}
+              style={{ width: 20, height: 20 }}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{categoryTitle}</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('CheckoutScreen')}>
+            <Image
+              source={require('../../assets/Png/order.png')}
+              style={styles.icon}
+            />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.filterBtn}
+            onPress={() => setFilterVisible(true)}
+          >
+            <Text style={styles.filterText}>Filters ▾</Text>{' '}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sortBtn}
+            onPress={() => setSortVisible(true)}
+          >
+            <Text style={styles.sortText}>Sort ▾</Text>
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={apiProducts}
+          extraData={apiProducts}
+          keyExtractor={(i, idx) => (i?.id ? String(i.id) : String(idx))}
+          numColumns={2}
+          contentContainerStyle={styles.list}
+          renderItem={renderItem}
+          ListEmptyComponent={() => {
+            return (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignSelf: 'center',
+                  marginTop: heightPercentageToDP(40),
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700' }}>
+                  No Data Found
+                </Text>
+              </View>
+            );
+          }}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
+        />{' '}
+        {/* Filter Modal */}
+        <Modal visible={filterVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Filters</Text>
+              <View style={{ marginVertical: 10 }}>
+                <Text style={{ fontWeight: '600', marginBottom: 4 }}>Rating</Text>
+                <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                  {[5, 4, 3, 2, 1].map(r => (
+                    <TouchableOpacity
+                      key={r}
+                      style={{
+                        backgroundColor:
+                          filterRating == String(r) ? '#AEB254' : '#eee',
+                        borderRadius: 12,
+                        padding: 8,
+                        marginRight: 8,
+                      }}
+                      onPress={() => setFilterRating(String(r))}
+                    >
+                      <Text style={{ fontWeight: '600' }}>{r}★</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={{ fontWeight: '600', marginBottom: 4 }}>
+                  Min Price
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text>€</Text>
+                  <TextInput
                     style={{
-                      backgroundColor: filterRating == String(r) ? '#AEB254' : '#eee',
-                      borderRadius: 12,
-                      padding: 8,
-                      marginRight: 8,
+                      borderWidth: 1,
+                      borderColor: '#ccc',
+                      borderRadius: 8,
+                      padding: 6,
+                      marginLeft: 6,
+                      width: 80,
                     }}
-                    onPress={() => setFilterRating(String(r))}
-                  >
-                    <Text style={{ fontWeight: '600' }}>{r}★</Text>
-                  </TouchableOpacity>
-                ))}
+                    keyboardType="numeric"
+                    placeholderTextColor={Colors.text[200]}
+                    value={filterMinPrice}
+                    onChangeText={setFilterMinPrice}
+                    placeholder="Min"
+                  />
+                </View>
+                <Text style={{ fontWeight: '600', marginBottom: 4 }}>
+                  Max Price
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text>€</Text>
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: '#ccc',
+                      borderRadius: 8,
+                      padding: 6,
+                      marginLeft: 6,
+                      width: 80,
+                    }}
+                    keyboardType="numeric"
+                    placeholderTextColor={Colors.text[200]}
+                    value={filterMaxPrice}
+                    onChangeText={setFilterMaxPrice}
+                    placeholder="Max"
+                  />
+                </View>
               </View>
-              <Text style={{ fontWeight: '600', marginBottom: 4 }}>Min Price</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <Text>€</Text>
-                <TextInput
-                  style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 6, marginLeft: 6, width: 80 }}
-                  keyboardType="numeric"
-                  placeholderTextColor={Colors.text[200]}
-                  value={filterMinPrice}
-                  onChangeText={setFilterMinPrice}
-                  placeholder="Min"
-                />
-              </View>
-              <Text style={{ fontWeight: '600', marginBottom: 4 }}>Max Price</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <Text>€</Text>
-                <TextInput
-                  style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 6, marginLeft: 6, width: 80 }}
-                  keyboardType="numeric"
-                  placeholderTextColor={Colors.text[200]}
-                  value={filterMaxPrice}
-                  onChangeText={setFilterMaxPrice}
-                  placeholder="Max"
-                />
+              <View
+                style={{ flexDirection: 'row', justifyContent: 'space-between' }}
+              >
+                <TouchableOpacity
+                  style={[styles.modalClose, { flex: 1 }]}
+                  onPress={async () => {
+                    setFilterVisible(false);
+                    setFilterRating('');
+                    setFilterMinPrice('');
+                    setFilterMaxPrice('');
+                    await fetchProducts();
+                  }}
+                >
+                  <Text style={[styles.modalCloseText, { textAlign: 'center' }]}>
+                    Reset
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalClose, { flex: 1 }]}
+                  onPress={async () => {
+                    setFilterVisible(false);
+                    await fetchProducts({
+                      rating: filterRating,
+                      min_price: filterMinPrice,
+                      max_price: filterMaxPrice,
+                    });
+                  }}
+                >
+                  <Text style={[styles.modalCloseText, { textAlign: 'center' }]}>
+                    Apply
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <TouchableOpacity style={[styles.modalClose, { flex: 1 }]} onPress={async () => {
-                setFilterVisible(false);
-                setFilterRating('');
-                setFilterMinPrice('');
-                setFilterMaxPrice('');
-                await fetchProducts();
-              }}>
-                <Text style={[styles.modalCloseText, { textAlign: 'center' }]}>Reset</Text>
+          </View>
+        </Modal>{' '}
+        {/* Filter Modal */}
+        <Modal visible={sortVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Sort By</Text>
+                <TouchableOpacity onPress={() => setSortVisible(false)}>
+                  <Image
+                    source={require('../../assets/Png/close.png')}
+                    style={styles.closeIcon}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => ApiSorting('id_asc')}
+                style={styles.sortOption}
+              >
+                <Text style={styles.sortOptionText}>Newest First</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalClose, { flex: 1 }]} onPress={async () => {
-                setFilterVisible(false);
-                await fetchProducts({
-                  rating: filterRating,
-                  min_price: filterMinPrice,
-                  max_price: filterMaxPrice,
-                });
-              }}>
-                <Text style={[styles.modalCloseText, { textAlign: 'center' }]}>Apply</Text>
+
+              <TouchableOpacity
+                onPress={() => ApiSorting('id_desc')}
+                style={styles.sortOption}
+              >
+                <Text style={styles.sortOptionText}>Oldest First</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => ApiSorting('price_desc')}
+                style={styles.sortOption}
+              >
+                <Text style={styles.sortOptionText}>Price: High to Low</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => ApiSorting('price_asc')}
+                style={styles.sortOption}
+              >
+                <Text style={styles.sortOptionText}>Price: Low to High</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => ApiSorting('id_asc')}
+                style={styles.sortOption}
+              >
+                <Text style={styles.sortOptionText}>Name: A to Z</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => ApiSorting('id_desc')}
+                style={styles.sortOption}
+              >
+                <Text style={styles.sortOptionText}>Name: Z to A</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal> {/* Filter Modal */}
-
-      <Modal visible={sortVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Sort By</Text>
-              <TouchableOpacity onPress={() => setSortVisible(false)}>
-                <Image source={require('../../assets/Png/close.png')} style={styles.closeIcon} />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => ApiSorting('id_asc')}
-              style={styles.sortOption}
-            >
-              <Text style={styles.sortOptionText}>Newest First</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => ApiSorting('id_desc')}
-              style={styles.sortOption}
-            >
-              <Text style={styles.sortOptionText}>Oldest First</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => ApiSorting('price_desc')}
-              style={styles.sortOption}
-            >
-              <Text style={styles.sortOptionText}>Price: High to Low</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => ApiSorting('price_asc')}
-              style={styles.sortOption}
-            >
-              <Text style={styles.sortOptionText}>Price: Low to High</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => ApiSorting('id_asc')}
-              style={styles.sortOption}
-            >
-              <Text style={styles.sortOptionText}>Name: A to Z</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => ApiSorting('id_desc')}
-              style={styles.sortOption}
-            >
-              <Text style={styles.sortOptionText}>Name: Z to A</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </LinearGradient>);
+        </Modal>
+      </LinearGradient>
+    </SafeAreaView>
+  );
 };
 
 export default CategoryDetailsList;
 
-
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginTop: StatusBar.currentHeight
+    marginTop: StatusBar.currentHeight,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -460,7 +590,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -469,14 +598,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  headerRight: { flexDirection: 'row', alignItems: 'center', width: '95%', alignSelf: 'center', justifyContent: 'space-around', marginVertical: 12 },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '95%',
+    alignSelf: 'center',
+    justifyContent: 'space-around',
+    marginVertical: 12,
+  },
   filterBtn: {
     padding: 8,
     backgroundColor: '#AEB254',
     borderRadius: 20,
     marginVertical: 10,
     width: widthPercentageToDP(30),
-    alignItems: 'center'
+    alignItems: 'center',
   },
   filterText: { color: Colors.text[100] },
   sortBtn: {
@@ -487,7 +623,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#EEE',
-
   },
   sortText: { color: Colors.text[300] },
 
@@ -509,9 +644,14 @@ const styles = StyleSheet.create({
     padding: 5,
     paddingHorizontal: 10,
     margin: 5,
-
   },
-  cardImage: { width: 177, height: 245, borderRadius: 9, borderWidth: 1, borderColor: Colors.text[400] },
+  cardImage: {
+    width: 177,
+    height: 245,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: Colors.text[400],
+  },
   cardBody: { padding: 8, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { fontSize: 13, fontWeight: '600' },
   cardPrice: {
@@ -568,5 +708,4 @@ const styles = StyleSheet.create({
     color: '#000',
     marginRight: 8,
   },
-
 });

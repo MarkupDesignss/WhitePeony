@@ -2803,6 +2803,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
+  - RNInAppBrowser (3.7.0):
+    - React-Core
   - RNLocalize (3.6.1):
     - boost
     - DoubleConversion
@@ -3198,6 +3200,7 @@ DEPENDENCIES:
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - "RNCMaskedView (from `../node_modules/@react-native-community/masked-view`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNInAppBrowser (from `../node_modules/react-native-inappbrowser-reborn`)
   - RNLocalize (from `../node_modules/react-native-localize`)
   - "RNNotifee (from `../node_modules/@notifee/react-native`)"
   - RNPermissions (from `../node_modules/react-native-permissions`)
@@ -3392,6 +3395,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-community/masked-view"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNInAppBrowser:
+    :path: "../node_modules/react-native-inappbrowser-reborn"
   RNLocalize:
     :path: "../node_modules/react-native-localize"
   RNNotifee:
@@ -3498,6 +3503,7 @@ SPEC CHECKSUMS:
   RNCAsyncStorage: fd44f4b03e007e642e98df6726737bc66e9ba609
   RNCMaskedView: 4c5ee1c8667d56077246cc6d1977f77393923560
   RNGestureHandler: c6327cf6e2bd384dc90351ccfff0da8142d62f54
+  RNInAppBrowser: 6d3eb68d471b9834335c664704719b8be1bfdb20
   RNLocalize: 9988fa71fb84c415902898b35cc6aa5af052731e
   RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNPermissions: c28bce4dc987ffce444ac818451f5fbbd05c96fc
@@ -3507,6 +3513,6 @@ SPEC CHECKSUMS:
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 33b53536a0500d039f2cd78caf1d5d68712d3af7
 
-PODFILE CHECKSUM: 4d1260adf4fbb620eeca02b70bb8b9af862aaaa6
+PODFILE CHECKSUM: b9d46c56b23778c8608d5b0fce30bc76525a40a3
 
 COCOAPODS: 1.16.2
