@@ -887,6 +887,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         </View>
 
         {/* Show Reviews Modal */}
+        {/* Show Reviews Modal */}
         <Modal visible={showModalVisible} transparent animationType="slide">
           <View
             style={{
@@ -904,8 +905,35 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                 maxHeight: '70%',
               }}
             >
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>Reviews</Text>
-              <ScrollView style={{ marginTop: 12 }}>
+              {/* Header with title and close icon */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                <Text style={{ fontSize: 18, fontWeight: '700' }}>Reviews</Text>
+                <TouchableOpacity
+                  onPress={() => setShowModalVisible(false)}
+                  style={{
+                    padding: 8,
+                    marginRight: -8,
+                  }}
+                >
+                  <Image
+                    source={require('../../assets/Png/close.png')} // Add your close icon
+                    style={{ width: 24, height: 24 }}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                scrollEventThrottle={16}
+                style={{ marginTop: 0 }}
+              >
                 {reviews.map(r => (
                   <View
                     key={r.id}
@@ -936,17 +964,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   </View>
                 ))}
               </ScrollView>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'flex-end',
-                  marginTop: 12,
-                }}
-              >
-                <TouchableOpacity onPress={() => setShowModalVisible(false)}>
-                  <Text style={{ color: '#007AFF' }}>Close</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </View>
         </Modal>

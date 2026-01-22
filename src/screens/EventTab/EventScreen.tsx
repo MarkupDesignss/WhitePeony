@@ -464,7 +464,7 @@ const EventScreen = ({ navigation }: any) => {
                   />
                 </View>
 
-                <View style={[styles.sectionHeader, { marginTop: 16 }]}>
+                <View style={[styles.sectionHeader, {}]}>
                   <Text style={styles.sectionTitle}>Events Near You</Text>
                   <TouchableOpacity
                     onPress={() => {
@@ -482,12 +482,14 @@ const EventScreen = ({ navigation }: any) => {
         )}
         ListEmptyComponent={() =>
           !searchQuery.trim() ? (
-            <View style={{ padding: 20 }}>
+            <View style={{ paddingTop: 80 }}>
               <Text
                 style={{
                   color: '#000',
                   fontWeight: '700',
                   alignSelf: 'center',
+                  textAlign: 'center',
+                  flex: 1,
                 }}
               >
                 No nearby events found
@@ -536,10 +538,9 @@ const EventScreen = ({ navigation }: any) => {
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-
               }}
             >
-              <Text style={{ fontSize: 18, fontWeight: '700', }}>
+              <Text style={{ fontSize: 18, fontWeight: '700' }}>
                 Events Near You
               </Text>
               <TouchableOpacity onPress={() => setNearbyModalVisible(false)}>

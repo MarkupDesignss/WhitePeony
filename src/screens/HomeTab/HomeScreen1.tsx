@@ -30,7 +30,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { UserData, UserDataContext } from '../../context/userDataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LoginModal from '../../components/LoginModal';
-
+import { useFocusEffect } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 const SMALL_CARD_WIDTH = Math.round(width * 0.3);
@@ -41,7 +41,6 @@ const SMALL_HEIGHT = 120;
 const BIG_HEIGHT = SMALL_HEIGHT * 2 + GAP;
 
 const HomeScreen1 = ({ navigation }: any) => {
-  // FIX: Added userType from context
   const { setUserData, isLoggedIn, userType } =
     useContext<UserData>(UserDataContext);
 
@@ -73,19 +72,26 @@ const HomeScreen1 = ({ navigation }: any) => {
     const index = Math.round(offsetX / (WISHLIST_CARD_WIDTH + 12));
     setActiveRec(index);
   };
-  // FIX 1: Helper function to get current product type
+
+  // Helper function to get current product type
   const getCurrentProductType = () => {
-    if (isLoggedIn && (userType === 'b2c' || userType === 'b2b')) {
-      return userType;
+    // If userType is null or undefined, return null to show ALL products
+    if (userType === null || userType === undefined) {
+      return null;
     }
-    return 'b2c'; // Default for non-logged in users
+    return userType; // 'b2c' or 'b2b'
   };
 
-  // FIX 2: Helper function to filter products by type
+  // Helper function to filter products by type
   const filterProductsByType = (products: any[]) => {
     if (!Array.isArray(products)) return [];
 
     const currentType = getCurrentProductType();
+
+    // If currentType is null, return ALL products (no filtering)
+    if (currentType === null) {
+      return products;
+    }
 
     return products.filter(item => {
       // Check if item has product_type property
@@ -99,50 +105,200 @@ const HomeScreen1 = ({ navigation }: any) => {
       return item.product_type === currentType;
     });
   };
-  useEffect(() => {
-    if (userType) {
-      GetCategoryProducts();
-      bigsale(); // This will fetch products based on userType
-      RecommendProducts();
-      OrderList();
-      ApiSorting();
-      GetHeader();
+
+  // Helper function to get featured products based on user type
+  const getFeaturedProducts = (data: any) => {
+    const currentType = getCurrentProductType();
+
+    // If userType is null, combine both b2c and b2b featured products
+    if (currentType === null) {
+      const b2cFeatured = data?.b2c || [];
+      const b2bFeatured = data?.b2b || [];
+      return [...b2cFeatured, ...b2bFeatured];
     }
-  }, [userType]);
+
+    return data?.[currentType] || [];
+  };
+
+  // Helper function to get sales products based on user type
+  const getSalesProducts = (data: any) => {
+    const currentType = getCurrentProductType();
+
+    // If userType is null, combine both b2c and b2b sales products
+    if (currentType === null) {
+      const b2cSales = data?.b2c || [];
+      const b2bSales = data?.b2b || [];
+      return [...b2cSales, ...b2bSales];
+    }
+
+    return data?.[currentType] || [];
+  };
+
+  // Helper function to get promotional banners based on user type
+  // Helper function to get promotional banners based on user type
+  // Helper function to get promotional banners based on user type
+  const getPromotionalBanners = (data: any) => {
+    const currentType = getCurrentProductType();
+
+    console.log('Current user type for banners:', currentType);
+    console.log('Raw banner data:', data);
+    console.log('isLoggedIn:', isLoggedIn); // Add this to see login state
+
+    // If user is NOT logged in, show only b2c banners
+    if (!isLoggedIn) {
+      console.log('User not logged in, showing only b2c banners');
+      const b2cBanners = data?.b2c || [];
+      console.log('B2C banners count:', b2cBanners.length);
+
+      // Remove duplicates and return b2c banners only
+      return removeDuplicateBanners(b2cBanners);
+    }
+
+    // If userType is null or undefined (logged in but no specific type), 
+    // combine both b2c and b2b banners
+    if (currentType === null || currentType === undefined) {
+      console.log('User logged in but no specific type, combining all banners');
+      const b2cBanners = data?.b2c || [];
+      const b2bBanners = data?.b2b || [];
+
+      console.log('Combining banners - b2c:', b2cBanners.length, 'b2b:', b2bBanners.length);
+
+      // Combine all banners
+      const allBanners = [...b2cBanners, ...b2bBanners];
+
+      // Remove duplicates using multiple criteria
+      const uniqueBanners = removeDuplicateBanners(allBanners);
+
+      console.log('Unique banners after deduplication:', uniqueBanners.length);
+      return uniqueBanners;
+    }
+
+    // For specific user types (b2c or b2b), just return their banners
+    const typeBanners = data?.[currentType] || [];
+    console.log(`${currentType} banners:`, typeBanners.length);
+
+    // Still deduplicate in case there are duplicates within the same type
+    return removeDuplicateBanners(typeBanners);
+  };
+
+
+  const removeDuplicateBanners = (banners: any[]) => {
+    if (!Array.isArray(banners) || banners.length === 0) return [];
+
+    const seenCombinations = new Set();
+    const uniqueBanners = [];
+
+    for (const banner of banners) {
+      if (!banner || typeof banner !== 'object') continue;
+
+      // Create a unique key using multiple properties
+      const combinationKey = [
+        banner?.id,
+        banner?.image_url,
+        banner?.product_id,
+        banner?.title
+      ].filter(Boolean).join('|');
+
+      // If we haven't seen this combination, add it to unique banners
+      if (combinationKey && !seenCombinations.has(combinationKey)) {
+        seenCombinations.add(combinationKey);
+        uniqueBanners.push(banner);
+      }
+    }
+
+    return uniqueBanners;
+  };
+
+  // Helper function to filter orders by product type
+  const filterOrdersByType = (orders: any[]) => {
+    if (!Array.isArray(orders)) return [];
+
+    const currentType = getCurrentProductType();
+
+    // If currentType is null, return ALL orders
+    if (currentType === null) {
+      return orders.filter(
+        order => Array.isArray(order.items) && order.items.length > 0,
+      );
+    }
+
+    return orders.filter(order => {
+      if (!Array.isArray(order.items) || order.items.length === 0) {
+        return false;
+      }
+
+      // Check if any item in the order has the matching product type
+      return order.items.some(
+        item => item?.product?.product_type === currentType,
+      );
+    });
+  };
+
+  const refreshAllData = () => {
+    GetCategoryProducts();
+    bigsale();
+    RecommendProducts();
+    OrderList();
+    ApiSorting();
+    GetHeader();
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Home screen focused, refreshing data...');
+      refreshAllData();
+
+      // Optional: Refresh wishlist data based on login state
+      if (isLoggedIn) {
+        fetchServerWishlist();
+      }
+
+      // Optional: Return cleanup function
+      return () => {
+        console.log('Home screen unfocused');
+      };
+    }, [userType, isLoggedIn]), // Dependencies
+  );
 
   // update wishlist items depending on login state (server vs local)
   useEffect(() => {
     if (isLoggedIn) {
       fetchServerWishlist();
     } else {
-      // For local wishlist, we need to fetch product details to filter by type
-      // This might need additional logic depending on your implementation
-      const localIds = Array.isArray(wishlistIds) ? wishlistIds : [];
-      // You might need to fetch product details to check their type
-      // For now, just show empty or handle differently
-      setwishlistitem([]);
+      // For non-logged in users, use local wishlist
+      const localWishlist = Array.isArray(wishlistIds)
+        ? wishlistIds.map(id => ({ id }))
+        : [];
+      setwishlistitem(localWishlist);
     }
-  }, [isLoggedIn, wishlistIds, userType]); // Added userType dependency
+  }, [isLoggedIn, wishlistIds, userType]);
+
   const GetHeader = async () => {
     try {
       showLoader();
       const res = await UserService.header();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
-        // Get current user type
-        const currentType = getCurrentProductType();
-        const banners = res?.data?.data?.[currentType] || [];
+        // Log raw data for debugging
+        console.log('Raw header data:', JSON.stringify(res?.data?.data, null, 2));
+
+        // Use helper function to get appropriate banners
+        const banners = getPromotionalBanners(res?.data?.data || {});
+
+        // Log filtered banners for debugging
+        console.log('Filtered banners count:', banners.length);
+        console.log('Filtered banners:', JSON.stringify(banners, null, 2));
+
         setPromotional(banners);
       }
     } catch (err) {
-      // handle network/error
+      console.log('GetHeader error:', err);
     } finally {
       hideLoader();
     }
   };
-
   const GetCategoryProducts = async () => {
     try {
-      setIsLoadingCategory(true); // Set loading to true
+      setIsLoadingCategory(true);
       showLoader();
       const res = await UserService.GetCategory();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
@@ -156,12 +312,13 @@ const HomeScreen1 = ({ navigation }: any) => {
     } catch (err) {
       console.log('error category', err);
       hideLoader();
-      setIsLoadingCategory(false); // Set loading to false on error
+      setIsLoadingCategory(false);
     }
   };
+
   const GetCategoryID = async (categoryId: any) => {
     try {
-      setIsLoadingCategory(true); // Set loading to true
+      setIsLoadingCategory(true);
       showLoader();
       const res = await UserService.GetCategoryByID(categoryId);
       if (res && res.data && res.status === HttpStatusCode.Ok) {
@@ -175,52 +332,61 @@ const HomeScreen1 = ({ navigation }: any) => {
       console.log('error category', err);
       hideLoader();
     } finally {
-      setIsLoadingCategory(false); // Always set loading to false when done
+      setIsLoadingCategory(false);
     }
   };
+
   const featuredproduct = async () => {
     try {
       showLoader();
       const res = await UserService.featuredproducts();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
-        const fetchedProducts = res?.data?.data || [];
+        const fetchedProducts = res?.data?.data || {};
 
-        // Get current user type and show appropriate products
-        const currentType = getCurrentProductType();
-        const typeProducts = fetchedProducts?.[currentType] || [];
+        // Use helper function to get appropriate featured products
+        const typeProducts = getFeaturedProducts(fetchedProducts);
         setFeaturesProduct(typeProducts);
 
-        (await isLoggedIn) ? OrderList() : null;
+        if (isLoggedIn) {
+          await OrderList();
+        }
       }
     } catch (err) {
       console.log('error featuredproduct', err);
       hideLoader();
     }
-  };// Helper function to check if sale is currently active
-  // Helper function to check if sale is currently active (with timezone handling)
-const isSaleActive = (startDate: string, endDate: string) => {
-  try {
-    const today = new Date();
-    const end = new Date(endDate.split(' ')[0]); // Get date only
-    
-    // Reset time to compare only dates
-    const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-    
-    return todayDateOnly <= endDateOnly;
-  } catch (error) {
-    return false;
-  }
-};
+  };
+
+  // Helper function to check if sale is currently active
+  const isSaleActive = (startDate: string, endDate: string) => {
+    try {
+      const today = new Date();
+      const end = new Date(endDate.split(' ')[0]); // Get date only
+
+      // Reset time to compare only dates
+      const todayDateOnly = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+      const endDateOnly = new Date(
+        end.getFullYear(),
+        end.getMonth(),
+        end.getDate(),
+      );
+
+      return todayDateOnly <= endDateOnly;
+    } catch (error) {
+      return false;
+    }
+  };
+
   const filterActiveBigSaleProducts = (products: any[]) => {
     if (!Array.isArray(products)) return [];
 
     return products.filter(item => {
-      // 1. Check if sale has valid dates
       if (!item?.start_date || !item?.end_date) return false;
-
-      // 2. Check if sale is currently active
       return isSaleActive(item.start_date, item.end_date);
     });
   };
@@ -233,20 +399,16 @@ const isSaleActive = (startDate: string, endDate: string) => {
         hideLoader();
         const fetchedProducts = res.data?.data || {};
 
-        // Get current user type
-        const currentType = getCurrentProductType();
-
-        // Check if the current type exists in the response
-        const typeProducts = fetchedProducts?.[currentType] || [];
-
-        // ✅ USE THE HELPER FUNCTION HERE
+        // Use helper function to get appropriate sales products
+        const typeProducts = getSalesProducts(fetchedProducts);
         const activeSalesProducts = filterActiveBigSaleProducts(typeProducts);
 
-        // Only set salesProduct if there are ACTIVE products
-        if (Array.isArray(activeSalesProducts) && activeSalesProducts.length > 0) {
+        if (
+          Array.isArray(activeSalesProducts) &&
+          activeSalesProducts.length > 0
+        ) {
           setsalesProduct(activeSalesProducts);
         } else {
-          // If no active products, set empty array (section won't show)
           setsalesProduct([]);
         }
       }
@@ -256,6 +418,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
       setsalesProduct([]);
     }
   };
+
   const RecommendProducts = async () => {
     try {
       showLoader();
@@ -263,8 +426,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
         const fetchedProducts = res.data?.data || [];
-
-        // Use filterProductsByType instead of hardcoded filter
         const filteredProducts = filterProductsByType(fetchedProducts);
         setApiRecommend(filteredProducts);
       }
@@ -273,6 +434,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
       console.log('recommenderror', err);
     }
   };
+
   const fetchServerWishlist = async () => {
     try {
       showLoader();
@@ -291,29 +453,17 @@ const isSaleActive = (startDate: string, endDate: string) => {
       }
     }
   };
+
   const OrderList = async () => {
     try {
       showLoader();
       const response = await UserService.order();
       if (response && response.data && response.status === HttpStatusCode.Ok) {
         hideLoader();
+        const orders = response.data?.orders || [];
 
-        // Filter orders to only show relevant product types
-        const currentType = getCurrentProductType();
-        const filteredOrders = Array.isArray(response.data.orders)
-          ? response.data.orders.filter(order => {
-            // Check if items exist and filter by product type
-            if (Array.isArray(order.items) && order.items.length > 0) {
-              // Assuming order items have product with product_type
-              const relevantItems = order.items.filter(
-                item => item?.product?.product_type === currentType,
-              );
-              return relevantItems.length > 0;
-            }
-            return false;
-          })
-          : [];
-
+        // Filter orders by product type
+        const filteredOrders = filterOrdersByType(orders);
         setorderitem(filteredOrders);
       }
     } catch (err) {
@@ -321,14 +471,13 @@ const isSaleActive = (startDate: string, endDate: string) => {
       console.log('Order fetch exception:', err);
     }
   };
+
   const ApiSorting = async () => {
     try {
       showLoader();
       const res = await UserService.Sorting('price_asc');
       if (res?.status === HttpStatusCode.Ok) {
         const sortedProducts = res?.data?.data || [];
-
-        // Use filterProductsByType instead of hardcoded filter
         const filteredProducts = filterProductsByType(sortedProducts);
         setlowestitem(filteredProducts);
       } else {
@@ -344,22 +493,30 @@ const isSaleActive = (startDate: string, endDate: string) => {
         type: 'error',
         text1: 'Failed to sort products',
       });
+    } finally {
+      hideLoader();
     }
   };
-  const PromotionalBanner: React.FC<{ promotional: any[] }> = ({
+
+  // PromotionalBanner component
+  const PromotionalBanner: React.FC<{ promotional: any[]; navigation: any }> = ({
     promotional = [] as any[],
+    navigation,
   }) => {
     if (!promotional.length) return null;
+
     return (
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
-          <View key={String(index)} style={styles.page}>
+          <View
+            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''}`}
+            style={styles.page}
+          >
             <Image
               source={{ uri: Image_url + item.image_url }}
               style={styles.imageBackground}
               resizeMode="cover"
             />
-
             <View
               style={{
                 position: 'absolute',
@@ -376,7 +533,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
               >
                 {item?.title}
               </Text>
-
               <TouchableOpacity
                 style={styles.button}
                 onPress={() =>
@@ -393,6 +549,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
       </View>
     );
   };
+
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFF0' }}>
@@ -434,10 +591,12 @@ const isSaleActive = (startDate: string, endDate: string) => {
           </View>
         </TouchableOpacity>
       </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={{ backgroundColor: '#FFFFF0' }}
       >
+        {/* Search Bar */}
         <TouchableOpacity onPress={() => navigation.navigate('Searchpage')}>
           <View
             style={{
@@ -492,7 +651,9 @@ const isSaleActive = (startDate: string, endDate: string) => {
             />
           </View>
         </TouchableOpacity>
+
         <View style={{ backgroundColor: '#fff', flex: 1 }}>
+          {/* Categories Horizontal List */}
           <View
             style={{
               paddingVertical: heightPercentageToDP(2),
@@ -537,7 +698,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
                     >
                       {item?.name}
                     </Text>
-
                     <View
                       style={{
                         marginTop: 6,
@@ -552,6 +712,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
               }}
             />
           </View>
+
           <View
             style={{
               borderWidth: 0.7,
@@ -562,11 +723,8 @@ const isSaleActive = (startDate: string, endDate: string) => {
             }}
           />
 
-          {/* Categories as 2-column grid */}
-          {/* Categories as 2-column grid */}
-          {/* Categories as 2-column grid */}
+          {/* Categories Grid */}
           {isLoadingCategory ? (
-            // Show loader while loading
             <View style={styles.container}>
               <View style={[styles.row, { justifyContent: 'center' }]}>
                 <View
@@ -579,16 +737,15 @@ const isSaleActive = (startDate: string, endDate: string) => {
                     minHeight: BIG_HEIGHT,
                   }}
                 >
-                  {/* Show loading indicator */}
-                  <Text style={[styles.title, { marginTop: 10 }]}>Loading products...</Text>
+                  <Text style={[styles.title, { marginTop: 10 }]}>
+                    Loading products...
+                  </Text>
                 </View>
               </View>
             </View>
           ) : categoryProduct.length !== 0 ? (
-            // Show products when loaded and have data
             <View style={styles.container}>
               <View style={styles.row}>
-                {/* BIG CARD - Only show if we have at least 1 product */}
                 {categoryProduct.length > 0 ? (
                   <LinearGradient
                     colors={['#EFEFCA', '#E2E689']}
@@ -607,7 +764,10 @@ const isSaleActive = (startDate: string, endDate: string) => {
                         <Text style={{ ...styles.title }}>All</Text>
                         <Text
                           numberOfLines={2}
-                          style={[styles.title, { color: '#000', marginTop: 8 }]}
+                          style={[
+                            styles.title,
+                            { color: '#000', marginTop: 8 },
+                          ]}
                         >
                           {categoryProduct[0].name}
                         </Text>
@@ -673,7 +833,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
                     </TouchableOpacity>
                   </LinearGradient>
                 ) : (
-                  // Fallback empty big card when no products
                   <View
                     style={{
                       flex: 1,
@@ -695,9 +854,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
                   </View>
                 )}
 
-                {/* RIGHT STACK */}
                 <View style={styles.stack}>
-                  {/* First column of small cards */}
                   <View style={{ justifyContent: 'space-between', gap: 8 }}>
                     {categoryProduct.slice(1, 3).map((item, index) => (
                       <LinearGradient
@@ -727,7 +884,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
                       </LinearGradient>
                     ))}
 
-                    {/* Show empty cards if less than 2 items in first column */}
                     {categoryProduct.length < 3 &&
                       Array.from({
                         length: 2 - Math.min(categoryProduct.length - 1, 2),
@@ -751,7 +907,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
                       ))}
                   </View>
 
-                  {/* Second column of small cards */}
                   <View style={{ justifyContent: 'space-between', gap: 8 }}>
                     {categoryProduct.slice(3, 5).map((item, index) => (
                       <LinearGradient
@@ -781,7 +936,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
                       </LinearGradient>
                     ))}
 
-                    {/* Show empty cards if less than 2 items in second column */}
                     {categoryProduct.length < 5 &&
                       Array.from({
                         length: 2 - Math.max(categoryProduct.length - 3, 0),
@@ -808,7 +962,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
               </View>
             </View>
           ) : (
-            // Show "No Products Found" only when not loading and no data
             <View style={styles.container}>
               <View style={[styles.row, { justifyContent: 'center' }]}>
                 <View
@@ -875,7 +1028,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
             </View>
           )}
 
-          {/* FREQUENTLY BOUGHT */}
+          {/* Frequently Bought */}
           <View
             style={{
               paddingHorizontal: widthPercentageToDP(3),
@@ -885,20 +1038,16 @@ const isSaleActive = (startDate: string, endDate: string) => {
             {orderitem?.some(order => order.items?.length > 0) ? (
               <>
                 <Text style={styles.sectionTitle}>Frequently Bought</Text>
-
                 <FlatList
                   data={orderitem}
                   keyExtractor={item => String(item.id)}
                   horizontal
-                  // columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 10 }}
-                  renderItem={item => {
-                    //console.log('itemm', item?.item)
+                  renderItem={({ item }) => {
                     return (
                       <TouchableOpacity
                         onPress={() =>
                           navigation.navigate('ProductDetails', {
-                            productId:
-                              item?.item?.items[0]?.product?.front_image.id,
+                            productId: item?.items[0]?.product?.id,
                           })
                         }
                       >
@@ -913,7 +1062,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
                               source={{
                                 uri:
                                   Image_url +
-                                  item?.item?.items[0]?.product?.front_image,
+                                  item?.items[0]?.product?.front_image,
                               }}
                               style={styles.freqImage}
                             />
@@ -922,13 +1071,13 @@ const isSaleActive = (startDate: string, endDate: string) => {
                               source={{
                                 uri:
                                   Image_url +
-                                  item?.item?.items[0]?.product?.back_image,
+                                  item?.items[0]?.product?.back_image,
                               }}
                               style={styles.freqImage}
                             />
                           </View>
                           <Text style={styles.freqText}>
-                            {item?.item?.items[0]?.product?.name}
+                            {item?.items[0]?.product?.name}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -936,13 +1085,10 @@ const isSaleActive = (startDate: string, endDate: string) => {
                   }}
                 />
               </>
-            ) : (
-              <View></View>
-            )}
+            ) : null}
 
-            {/* FEATURED */}
+            {/* Featured This Week */}
             <Text style={styles.sectionTitle}>Featured This Week</Text>
-
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -951,7 +1097,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
                 item?.id ? String(item.id) : String(index)
               }
               renderItem={({ item }) => {
-                //console.log('urlss', item?.product?.front_image)
                 return (
                   <TouchableOpacity
                     onPress={() =>
@@ -977,7 +1122,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
             />
           </View>
 
-          {/* Big Sale Section - Only show if there are products for current user type */}
+          {/* Big Sale Section */}
           {salesProduct.length > 0 && (
             <View
               style={{
@@ -993,7 +1138,6 @@ const isSaleActive = (startDate: string, endDate: string) => {
                 source={require('../../assets/bg3x.png')}
                 style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
               />
-
               <View
                 style={{ position: 'absolute', top: 10, alignItems: 'center' }}
               >
@@ -1001,7 +1145,9 @@ const isSaleActive = (startDate: string, endDate: string) => {
                   source={require('../../assets/bigsales.png')}
                   style={{ width: 75, height: 65, resizeMode: 'cover' }}
                 />
-                <Text style={{ fontSize: 12, fontWeight: '700', marginTop: 15 }}>
+                <Text
+                  style={{ fontSize: 12, fontWeight: '700', marginTop: 15 }}
+                >
                   {formatDate(salesProduct[0]?.start_date).slice(0, 13)} -{' '}
                   {formatDate(salesProduct[0]?.end_date).slice(0, 13)}
                 </Text>
@@ -1010,7 +1156,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   keyExtractor={(item, index) => String(index)}
-                  renderItem={item => {
+                  renderItem={({ item }) => {
                     return (
                       <TouchableOpacity
                         style={{
@@ -1022,7 +1168,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
                         }}
                         onPress={() =>
                           navigation.navigate('ProductDetails', {
-                            productId: item?.item?.product?.id,
+                            productId: item?.product?.id,
                           })
                         }
                       >
@@ -1052,13 +1198,13 @@ const isSaleActive = (startDate: string, endDate: string) => {
                                 padding: 2,
                               }}
                             >
-                              Upto {item?.item?.percentage}% Off
+                              Upto {item?.percentage}% Off
                             </Text>
                           </View>
                           <Image
                             resizeMode="contain"
                             source={{
-                              uri: Image_url + item?.item?.product?.front_image,
+                              uri: Image_url + item?.product?.front_image,
                             }}
                             style={{
                               width: 70,
@@ -1077,11 +1223,10 @@ const isSaleActive = (startDate: string, endDate: string) => {
             </View>
           )}
 
-          {/* Lowest Prices Ever - horizontal small cards */}
+          {/* Lowest Prices Ever */}
           <View
             style={{
               width: '100%',
-              // height: heightPercentageToDP(35),
               marginVertical: heightPercentageToDP(0),
               justifyContent: 'center',
               alignItems: 'center',
@@ -1169,9 +1314,8 @@ const isSaleActive = (startDate: string, endDate: string) => {
                         <TouchableOpacity
                           onPress={async () => {
                             if (wished) {
-                              // Remove from wishlist
                               try {
-                                toggleWishlist(item.id); // update local state immediately
+                                toggleWishlist(item.id);
                                 if (isLoggedIn) {
                                   showLoader();
                                   const res = await UserService.wishlistDelete(
@@ -1206,9 +1350,8 @@ const isSaleActive = (startDate: string, endDate: string) => {
                                 });
                               }
                             } else {
-                              // Add to wishlist
                               try {
-                                toggleWishlist(item.id); // update local state immediately
+                                toggleWishlist(item.id);
                                 if (!isLoggedIn) {
                                   Toast.show({
                                     type: 'success',
@@ -1306,7 +1449,7 @@ const isSaleActive = (startDate: string, endDate: string) => {
             </View>
           </View>
 
-          {/* Your Wishlist - horizontal scroll with slightly larger cards */}
+          {/* Your Wishlist */}
           {wishlistitem?.length != 0 ? (
             <View
               style={{
@@ -1401,9 +1544,12 @@ const isSaleActive = (startDate: string, endDate: string) => {
                 wishlistitem?.length == 0 ? heightPercentageToDP(3) : null,
             }}
           ></View>
-          <PromotionalBanner promotional={Promotional} />
 
-          {/* Recommended For You - horizontal with simple pagination */}
+          {/* Promotional Banner */}
+
+          <PromotionalBanner promotional={Promotional} navigation={navigation} />
+
+          {/* Recommended For You */}
           <View
             style={{
               paddingHorizontal: widthPercentageToDP(3),
@@ -1471,9 +1617,8 @@ const isSaleActive = (startDate: string, endDate: string) => {
                       <TouchableOpacity
                         onPress={async () => {
                           if (wished) {
-                            // Remove from wishlist
                             try {
-                              toggleWishlist(item.id); // update local state immediately
+                              toggleWishlist(item.id);
                               if (isLoggedIn) {
                                 showLoader();
                                 const res = await UserService.wishlistDelete(
@@ -1508,9 +1653,8 @@ const isSaleActive = (startDate: string, endDate: string) => {
                               });
                             }
                           } else {
-                            // Add to wishlist
                             try {
-                              toggleWishlist(item.id); // update local state immediately
+                              toggleWishlist(item.id);
                               if (!isLoggedIn) {
                                 Toast.show({
                                   type: 'success',
@@ -1637,8 +1781,6 @@ const styles = StyleSheet.create({
     color: '#2E2E2E',
     width: '90%',
     textAlign: 'center',
-    // height: 40,
-    // textAlignVertical: 'center',
     fontFamily: Fonts.Anciza_Medium_Italic,
   },
 
@@ -1751,10 +1893,10 @@ const styles = StyleSheet.create({
 
   featuredCard: {
     width: 110,
-    height: 130,
+    // height: 130,
     borderRadius: 10,
     marginRight: 12,
-    padding: 5,
+    padding:8,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#236FE3',

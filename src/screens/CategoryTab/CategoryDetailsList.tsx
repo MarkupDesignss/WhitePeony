@@ -367,10 +367,21 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           columnWrapperStyle={{ justifyContent: 'space-between' }}
         />{' '}
         {/* Filter Modal */}
+        {/* Filter Modal */}
         <Modal visible={filterVisible} animationType="slide" transparent>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Filters</Text>
+              {/* Header with title and close icon */}
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Filters</Text>
+                <TouchableOpacity onPress={() => setFilterVisible(false)}>
+                  <Image
+                    source={require('../../assets/Png/close.png')}
+                    style={styles.closeIcon}
+                  />
+                </TouchableOpacity>
+              </View>
+
               <View style={{ marginVertical: 10 }}>
                 <Text style={{ fontWeight: '600', marginBottom: 4 }}>Rating</Text>
                 <View style={{ flexDirection: 'row', marginBottom: 12 }}>

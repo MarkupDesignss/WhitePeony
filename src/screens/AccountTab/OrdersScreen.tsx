@@ -61,18 +61,46 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     try {
       showLoader();
       const res = await UserService.order();
+
+      console.log('=== ORDER API CALLED ===');
+      console.log('API Endpoint: Order list');
+      console.log('Response status:', res?.status);
+      console.log('Full response:', JSON.stringify(res?.data, null, 2));
+
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
+
         const apiOrders = Array.isArray(res?.data?.orders)
           ? res.data.orders
           : [];
+
+        // Check specifically for ratings in the response
+        console.log('=== CHECKING RATINGS IN ORDER DATA ===');
+        apiOrders.forEach((order: any, index: number) => {
+          console.log(`Order ${index + 1} (ID: ${order.id}):`);
+          console.log('  - Direct rating property:', order.rating);
+          console.log('  - Reviews array:', order.reviews);
+          console.log('  - Items:', order.items);
+
+          // Check if rating is in items
+          if (order.items && Array.isArray(order.items)) {
+            order.items.forEach((item: any, itemIndex: number) => {
+              console.log(`  Item ${itemIndex + 1}:`);
+              console.log(`    - Item rating:`, item.rating);
+              console.log(`    - Item product rating:`, item.product?.rating);
+              console.log(`    - Item product reviews:`, item.product?.reviews);
+            });
+          }
+        });
+
         setOrder(apiOrders);
       } else {
         hideLoader();
+        console.log('Order API response not OK');
       }
     } catch (err) {
       hideLoader();
-      console.log('error', err);
+      console.log('Order API error:', err);
     }
   };
 
@@ -100,13 +128,18 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         product_id: selectedProductId,
       };
 
-      console.log('Submitting review for product:', selectedProductName);
+      console.log('=== REVIEW API CALLED ===');
       console.log('Product ID:', selectedProductId);
-      console.log('Payload:', payload);
+      console.log('Selected rating (newRating):', newRating);
+      console.log('Payload being sent:', JSON.stringify(payload, null, 2));
 
       showLoader();
 
       const res = await UserService.Review(payload, selectedProductId);
+
+      console.log('=== REVIEW API RESPONSE ===');
+      console.log('Response status:', res?.status);
+      console.log('Response data:', JSON.stringify(res?.data, null, 2));
 
       if (res && res?.data && res?.status === HttpStatusCode.Ok) {
         hideLoader();
@@ -115,6 +148,11 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
           text1: 'Thank you for your rating and review!',
           text2: 'Your feedback has been submitted successfully.',
         });
+
+        // Log what happened
+        console.log('Review submitted successfully!');
+        console.log('Submitted rating:', newRating);
+        console.log('Selected product ID:', selectedProductId);
 
         // Close modal and reset
         setWriteModalVisible(false);
@@ -127,6 +165,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         OrderList();
       } else {
         hideLoader();
+        console.log('Review API returned error status:', res?.status);
         Toast.show({
           type: 'error',
           text1: 'Something went wrong!',
@@ -135,10 +174,15 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
       }
     } catch (error: any) {
       hideLoader();
-      console.log('Review submission error:', error);
+      console.log('=== REVIEW SUBMISSION ERROR ===');
+      console.log('Error:', error);
+
+      if (error.response) {
+        console.log('Error response data:', error.response.data);
+        console.log('Error response status:', error.response.status);
+      }
 
       let errorMessage = 'Something went wrong! Please try again.';
-
       if (error.response) {
         errorMessage =
           error.response.data?.message ||
@@ -156,7 +200,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const handleOpenReviewModal = (productId: string, productName: string) => {
-    console.log('handleOpenReviewModal called with:', { productId, productName });
+    console.log('handleOpenReviewModal called with:', {
+      productId,
+      productName,
+    });
 
     if (!productId) {
       console.log('No productId provided!');
@@ -175,7 +222,6 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     console.log('Setting modal visible: true');
     setWriteModalVisible(true);
   };
-
 
   const toggleExpand = (id: string | number) => {
     setExpandedIds(prev =>
@@ -284,8 +330,8 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
               {item?.tracking_number
                 ? `${item.tracking_number}`
                 : item?.payment_status
-                  ? item.payment_status
-                  : 'No tracking info'}
+                ? item.payment_status
+                : 'No tracking info'}
             </Text>
           </View>
           <Image
@@ -340,33 +386,66 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
             <Text style={styles.rateReviewLabel}>Rate & Review </Text>
             <View style={{ flexDirection: 'row', marginTop: -10 }}>
               {[1, 2, 3, 4, 5].map(r => {
-                const rating = product?.reviews?.[0]?.rating || 0;
-                const isFull = rating >= r;
-                const isHalf = rating >= r - 0.5 && rating < r;
-                return (
-                  <View
-                    key={r}
-                    style={{ width: 18, height: 18, position: 'relative' }}
-                  >
+                // Get rating from ALL possible locations
+                const rating =
+                  item.rating ||
+                  item?.reviews?.[0]?.rating ||
+                  item?.items?.[0]?.rating ||
+                  item?.items?.[0]?.product?.rating ||
+                  item?.items?.[0]?.product?.reviews?.[0]?.rating ||
+                  0;
+
+                console.log(`Star ${r}: Looking for rating...`);
+                console.log(`  - item.rating: ${item.rating}`);
+                console.log(
+                  `  - item.reviews?.[0]?.rating: ${item.reviews?.[0]?.rating}`,
+                );
+                console.log(
+                  `  - item.items?.[0]?.rating: ${item.items?.[0]?.rating}`,
+                );
+                console.log(
+                  `  - item.items?.[0]?.product?.rating: ${item.items?.[0]?.product?.rating}`,
+                );
+                console.log(`  - Final rating value: ${rating}`);
+
+                const numericRating = Number(rating) || 0;
+
+                // NO RATING → TEXT STARS
+                if (numericRating === 0) {
+                  return (
                     <Text
+                      key={r}
                       style={{
                         color: '#ccc',
                         fontSize: 18,
-                        position: 'absolute',
+                        marginRight: 2,
                       }}
                     >
                       ★
                     </Text>
-                    <View
-                      style={{
-                        width: isFull ? '100%' : isHalf ? '50%' : '0%',
-                        overflow: 'hidden',
-                        position: 'absolute',
-                      }}
-                    >
-                      <Text style={{ color: '#F0C419', fontSize: 18 }}>★</Text>
-                    </View>
-                  </View>
+                  );
+                }
+
+                // HAS RATING → IMAGE STARS
+                const isFull = numericRating >= r;
+
+                console.log(
+                  `Star ${r}: Showing ${
+                    isFull ? 'filled' : 'empty'
+                  } star for rating ${numericRating}`,
+                );
+
+                return (
+                  <Image
+                    key={r}
+                    source={require('../../assets/Png/star.png')}
+                    style={{
+                      width: 18,
+                      height: 18,
+                      marginRight: 2,
+                      tintColor: isFull ? '#F0C419' : '#ccc',
+                    }}
+                  />
                 );
               })}
             </View>
@@ -534,14 +613,14 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                   {newRating === 5
                     ? 'Excellent'
                     : newRating === 4
-                      ? 'Good'
-                      : newRating === 3
-                        ? 'Average'
-                        : newRating === 2
-                          ? 'Poor'
-                          : newRating === 1
-                            ? 'Terrible'
-                            : 'Select a rating'}
+                    ? 'Good'
+                    : newRating === 3
+                    ? 'Average'
+                    : newRating === 2
+                    ? 'Poor'
+                    : newRating === 1
+                    ? 'Terrible'
+                    : 'Select a rating'}
                 </Text>
 
                 <Text style={styles.modalSubtitle}>Your Review (Optional)</Text>
@@ -934,11 +1013,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     marginRight: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '500',
     color: '#666',
+    textAlign: 'center',
   },
   submitButton: {
     flex: 1,
@@ -946,8 +1027,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 10,
     backgroundColor: '#007AFF',
-    marginLeft: 10,
+
     alignItems: 'center',
+    justifyContent: 'center',
   },
   submitButtonDisabled: {
     backgroundColor: '#c0c0c0',
