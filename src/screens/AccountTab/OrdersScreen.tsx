@@ -11,6 +11,9 @@ import {
   StatusBar,
   Modal,
   KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ScrollView,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Image_url, UserService } from '../../service/ApiService';
@@ -44,9 +47,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   const [searchText, setSearchText] = useState('');
   const [order, setOrder] = useState<UiOrder[]>([]);
   const [writeModalVisible, setWriteModalVisible] = useState(false);
-  const [newRating, setNewRating] = useState<number>(0);
+  const [newRating, setNewRating] = useState<number>(5);
   const [newComment, setNewComment] = useState<string>('');
-  const [ratingID, setRatingID] = useState<string>('');
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [selectedProductName, setSelectedProductName] = useState<string>('');
   const [expandedIds, setExpandedIds] = useState<Array<string | number>>([]);
 
   useEffect(() => {
@@ -59,7 +63,9 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
       const res = await UserService.order();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
-        const apiOrders = Array.isArray(res?.data?.orders) ? res.data.orders : [];
+        const apiOrders = Array.isArray(res?.data?.orders)
+          ? res.data.orders
+          : [];
         setOrder(apiOrders);
       } else {
         hideLoader();
@@ -71,49 +77,105 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const PostReview = async () => {
+    if (!newRating) {
+      Toast.show({
+        type: 'error',
+        text1: 'Please select a rating',
+      });
+      return;
+    }
+
+    if (!selectedProductId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Product not found',
+      });
+      return;
+    }
 
     try {
       const payload = {
         rating: newRating,
         review: newComment || 'No comment',
+        product_id: selectedProductId,
       };
 
+      console.log('Submitting review for product:', selectedProductName);
+      console.log('Product ID:', selectedProductId);
+      console.log('Payload:', payload);
+
       showLoader();
-      await UserService.Review(payload, ratingID)
-        .then(async (res) => {
-          hideLoader();
-          if (res && res?.data && res?.status === HttpStatusCode.Ok) {
-            Toast.show({
-              type: 'success',
-              text1: res?.data?.message,
-            });
-            OrderList();
-            setRatingID('');
-            setNewComment('');
-            setNewRating(5);
-            setWriteModalVisible(false);
-          } else {
-            Toast.show({
-              type: 'error',
-              text1: 'Something went wrong!',
-            });
-          }
-        })
-        .catch((err) => {
-          hideLoader();
-          Toast.show({
-            type: 'error',
-            text1: err.response?.data?.message,
-          });
+
+      const res = await UserService.Review(payload, selectedProductId);
+
+      if (res && res?.data && res?.status === HttpStatusCode.Ok) {
+        hideLoader();
+        Toast.show({
+          type: 'success',
+          text1: 'Thank you for your rating and review!',
+          text2: 'Your feedback has been submitted successfully.',
         });
-    } catch (error) {
+
+        // Close modal and reset
+        setWriteModalVisible(false);
+        setNewComment('');
+        setNewRating(5);
+        setSelectedProductId('');
+        setSelectedProductName('');
+
+        // Refresh order list
+        OrderList();
+      } else {
+        hideLoader();
+        Toast.show({
+          type: 'error',
+          text1: 'Something went wrong!',
+          text2: 'Please try again.',
+        });
+      }
+    } catch (error: any) {
       hideLoader();
+      console.log('Review submission error:', error);
+
+      let errorMessage = 'Something went wrong! Please try again.';
+
+      if (error.response) {
+        errorMessage =
+          error.response.data?.message ||
+          error.response.data?.error ||
+          errorMessage;
+      } else if (error.request) {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+
       Toast.show({
         type: 'error',
-        text1: 'Something went wrong! Please try again.',
+        text1: errorMessage,
       });
     }
   };
+
+  const handleOpenReviewModal = (productId: string, productName: string) => {
+    console.log('handleOpenReviewModal called with:', { productId, productName });
+
+    if (!productId) {
+      console.log('No productId provided!');
+      Toast.show({
+        type: 'error',
+        text1: 'Product information not available',
+      });
+      return;
+    }
+
+    setSelectedProductId(productId);
+    setSelectedProductName(productName);
+    setNewRating(5);
+    setNewComment('');
+
+    console.log('Setting modal visible: true');
+    setWriteModalVisible(true);
+  };
+
 
   const toggleExpand = (id: string | number) => {
     setExpandedIds(prev =>
@@ -132,9 +194,66 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     return [];
   };
 
+  const extractProductInfo = (item: any) => {
+    try {
+      console.log('Item data:', JSON.stringify(item, null, 2));
+
+      // First, let's log the entire items structure
+      console.log('Item items:', item?.items);
+
+      // Try to find product ID in different possible paths
+      let productId = null;
+      let productName = null;
+
+      // Path 1: items[0].product.id
+      if (item?.items?.[0]?.product?.id) {
+        productId = item.items[0].product.id.toString();
+        productName = item.items[0].product.name;
+        console.log('Found via path 1:', { productId, productName });
+      }
+      // Path 2: items[0].product_id
+      else if (item?.items?.[0]?.product_id) {
+        productId = item.items[0].product_id.toString();
+        productName = item.items[0].product_name || 'Product';
+        console.log('Found via path 2:', { productId, productName });
+      }
+      // Path 3: items[0].id (if it's the product itself)
+      else if (item?.items?.[0]?.id) {
+        productId = item.items[0].id.toString();
+        productName = item.items[0].name || 'Product';
+        console.log('Found via path 3:', { productId, productName });
+      }
+      // Path 4: Check if items is an array with nested structure
+      else if (Array.isArray(item?.items) && item.items.length > 0) {
+        // Try to find any product reference in the array
+        for (const orderItem of item.items) {
+          if (orderItem?.product?.id) {
+            productId = orderItem.product.id.toString();
+            productName = orderItem.product.name;
+            console.log('Found via path 4:', { productId, productName });
+            break;
+          }
+        }
+      }
+
+      // If still not found, check direct product properties
+      if (!productId && item?.product_id) {
+        productId = item.product_id.toString();
+        productName = item.product_name || 'Product';
+        console.log('Found via direct product_id:', { productId, productName });
+      }
+
+      console.log('Final extracted:', { productId, productName });
+      return { productId, productName };
+    } catch (error) {
+      console.log('Error extracting product info:', error);
+      return { productId: null, productName: null };
+    }
+  };
+
   const renderOrder = ({ item }: { item: any }) => {
     const itemsList = getItemsList(item?.items);
-    const product0 = itemsList?.[0]?.product || itemsList?.[0] || null;
+    const { product, productId, productName } = extractProductInfo(item);
     const isExpanded = expandedIds.includes(item.id);
     const formData = formatDate(item?.created_at || item?.updated_at);
 
@@ -156,10 +275,17 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
           />
           <View style={{ marginLeft: 6 }}>
             <Text style={styles.deliveryDate}>
-              {item?.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Order'} • {formData}
+              {item?.status
+                ? item.status.charAt(0).toUpperCase() + item.status.slice(1)
+                : 'Order'}{' '}
+              • {formData}
             </Text>
             <Text style={styles.deliveryStatus}>
-              {item?.tracking_number ? `${item.tracking_number}` : (item?.payment_status ? item.payment_status : 'No tracking info')}
+              {item?.tracking_number
+                ? `${item.tracking_number}`
+                : item?.payment_status
+                  ? item.payment_status
+                  : 'No tracking info'}
             </Text>
           </View>
           <Image
@@ -169,10 +295,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         </View>
 
         <View style={styles.productInfo}>
-          {product0?.front_image ? (
+          {product?.front_image ? (
             <Image
               source={{
-                uri: Image_url + product0?.front_image,
+                uri: Image_url + product?.front_image,
               }}
               style={styles.productImage}
             />
@@ -183,26 +309,38 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
             />
           )}
           <View style={styles.productDetails}>
+            <Text style={styles.productName}>{productName || 'Item'}</Text>
             <Text style={styles.productName}>
-              {product0?.name || 'Item'}
+              {item?.total_amount ? `${item.total_amount} €` : ''}
             </Text>
-            <Text style={styles.productName}>{item?.total_amount ? `${item.total_amount} €` : ''}</Text>
-            <Text style={styles.productQty}>Qty : {itemsList?.reduce((sum: number, it: any) => sum + (it?.quantity || it?.qty || 1), 1)}</Text>
+            <Text style={styles.productQty}>
+              Qty :{' '}
+              {itemsList?.reduce(
+                (sum: number, it: any) => sum + (it?.quantity || it?.qty || 1),
+                1,
+              )}
+            </Text>
           </View>
         </View>
 
         <TouchableOpacity
-          onPress={() => {
-            setRatingID(item?.items[0]?.product?.id);
-            setWriteModalVisible(true);
-          }}
+          onPress={() =>
+            productId &&
+            handleOpenReviewModal(productId, productName || 'Product')
+          }
           activeOpacity={0.7}
+          disabled={!productId}
         >
-          <View style={styles.rateReviewRow}>
+          <View
+            style={[
+              styles.rateReviewRow,
+              !productId && styles.disabledRateReview,
+            ]}
+          >
             <Text style={styles.rateReviewLabel}>Rate & Review </Text>
             <View style={{ flexDirection: 'row', marginTop: -10 }}>
-              {[1, 2, 3, 4, 5].map((r) => {
-                const rating = item?.items[0]?.product?.reviews[0]?.rating || 0;
+              {[1, 2, 3, 4, 5].map(r => {
+                const rating = product?.reviews?.[0]?.rating || 0;
                 const isFull = rating >= r;
                 const isHalf = rating >= r - 0.5 && rating < r;
                 return (
@@ -237,26 +375,73 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
 
         {isExpanded && (
           <View style={styles.orderDetails}>
-            <Text style={styles.detailLabel}>Order ID: <Text style={styles.detailValue}>{item?.id}</Text></Text>
-            <Text style={styles.detailLabel}>Tracking: <Text style={styles.detailValue}>{item?.tracking_number || '—'}</Text></Text>
-            <Text style={styles.detailLabel}>Payment: <Text style={styles.detailValue}>{item?.payment_status || '—'}</Text></Text>
-            <Text style={styles.detailLabel}>Total: <Text style={styles.detailValue}>{item?.total_amount ? `${item.total_amount} €` : '—'}</Text></Text>
+            <Text style={styles.detailLabel}>
+              Order ID: <Text style={styles.detailValue}>{item?.id}</Text>
+            </Text>
+            <Text style={styles.detailLabel}>
+              Tracking:{' '}
+              <Text style={styles.detailValue}>
+                {item?.tracking_number || '—'}
+              </Text>
+            </Text>
+            <Text style={styles.detailLabel}>
+              Payment:{' '}
+              <Text style={styles.detailValue}>
+                {item?.payment_status || '—'}
+              </Text>
+            </Text>
+            <Text style={styles.detailLabel}>
+              Total:{' '}
+              <Text style={styles.detailValue}>
+                {item?.total_amount ? `${item.total_amount} €` : '—'}
+              </Text>
+            </Text>
 
             <Text style={[styles.detailLabel, { marginTop: 8 }]}>Items:</Text>
             {itemsList && itemsList.length > 0 ? (
               itemsList.map((it: any, idx: number) => {
                 const p = it?.product || it;
+                const currentProductId = p?.id?.toString();
+                const currentProductName = p?.name || 'Item';
+
                 return (
                   <View key={idx} style={styles.itemRow}>
                     <Image
-                      source={p?.front_image ? { uri: Image_url + p.front_image } : require('../../assets/Png/product.png')}
-                      style={{ width: 48, height: 48, borderRadius: 8, marginRight: 8 }}
+                      source={
+                        p?.front_image
+                          ? { uri: Image_url + p.front_image }
+                          : require('../../assets/Png/product.png')
+                      }
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 8,
+                        marginRight: 8,
+                      }}
                     />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: '600' }}>{p?.name || 'Item'}</Text>
-                      <Text style={{ color: '#666', fontSize: 13 }}>
-                        Qty: {it?.quantity || it?.qty || 1} {p?.price ? `• ${p.price} €` : ''}
+                      <Text style={{ fontWeight: '600' }}>
+                        {currentProductName}
                       </Text>
+                      <Text style={{ color: '#666', fontSize: 13 }}>
+                        Qty: {it?.quantity || it?.qty || 1}{' '}
+                        {p?.price ? `• ${p.price} €` : ''}
+                      </Text>
+                      {currentProductId && (
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleOpenReviewModal(
+                              currentProductId,
+                              currentProductName,
+                            )
+                          }
+                          style={styles.reviewButton}
+                        >
+                          <Text style={styles.reviewButtonText}>
+                            Rate this item
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 );
@@ -270,7 +455,139 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     );
   };
 
-  const filteredOrders = order.filter(o => (o?.status || '').toLowerCase() === activeTab);
+  const filteredOrders = order.filter(
+    o => (o?.status || '').toLowerCase() === activeTab,
+  );
+
+  const renderModal = () => (
+    <Modal
+      visible={writeModalVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        setWriteModalVisible(false);
+        setNewComment('');
+        setNewRating(5);
+        setSelectedProductId('');
+        setSelectedProductName('');
+      }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalContainer}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Write a Review</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setWriteModalVisible(false);
+                    setNewComment('');
+                    setNewRating(5);
+                    setSelectedProductId('');
+                    setSelectedProductName('');
+                  }}
+                  style={styles.closeButton}
+                >
+                  <Text style={styles.closeButtonText}>×</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={styles.modalScrollView}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {selectedProductName && (
+                  <Text style={styles.productNameLabel}>
+                    Product: {selectedProductName}
+                  </Text>
+                )}
+
+                <Text style={styles.modalSubtitle}>
+                  How would you rate this product?
+                </Text>
+                <View style={styles.ratingContainer}>
+                  {[1, 2, 3, 4, 5].map(r => (
+                    <TouchableOpacity
+                      key={r}
+                      onPress={() => setNewRating(r)}
+                      style={styles.starButton}
+                    >
+                      <Text
+                        style={[
+                          styles.star,
+                          newRating >= r
+                            ? styles.starActive
+                            : styles.starInactive,
+                        ]}
+                      >
+                        ★
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.ratingText}>
+                  {newRating === 5
+                    ? 'Excellent'
+                    : newRating === 4
+                      ? 'Good'
+                      : newRating === 3
+                        ? 'Average'
+                        : newRating === 2
+                          ? 'Poor'
+                          : newRating === 1
+                            ? 'Terrible'
+                            : 'Select a rating'}
+                </Text>
+
+                <Text style={styles.modalSubtitle}>Your Review (Optional)</Text>
+                <TextInput
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  placeholderTextColor={Colors.text[200]}
+                  placeholder="Share your experience with this product..."
+                  style={styles.reviewInput}
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                  blurOnSubmit={true}
+                />
+              </ScrollView>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setWriteModalVisible(false);
+                    setNewComment('');
+                    setNewRating(5);
+                    setSelectedProductId('');
+                    setSelectedProductName('');
+                  }}
+                  style={styles.cancelButton}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={PostReview}
+                  style={[
+                    styles.submitButton,
+                    !newRating && styles.submitButtonDisabled,
+                  ]}
+                  disabled={!newRating}
+                >
+                  <Text style={styles.submitButtonText}>Submit Review</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -279,10 +596,19 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" enableOnAndroid={true}>
+        <KeyboardAwareScrollView
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid={true}
+        >
           <View style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation?.goBack()}>
-              <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation?.goBack()}
+            >
+              <Image
+                source={require('../../assets/Png/back.png')}
+                style={{ width: 20, height: 20 }}
+              />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Orders</Text>
             <View style={{ width: 24 }} />
@@ -299,21 +625,32 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 returnKeyType="search"
               />
               <TouchableOpacity style={styles.searchButton} activeOpacity={0.7}>
-                <Image source={require('../../assets/Png/search.png')} style={{ width: 16, height: 16 }} />
+                <Image
+                  source={require('../../assets/Png/search.png')}
+                  style={{ width: 16, height: 16 }}
+                />
               </TouchableOpacity>
             </View>
 
             <View style={styles.tabsContainer}>
-              {TABS.map((tab) => {
+              {TABS.map(tab => {
                 const isActive = tab.key === activeTab;
                 return (
                   <TouchableOpacity
                     key={tab.key}
                     onPress={() => setActiveTab(tab.key)}
                     activeOpacity={0.7}
-                    style={[styles.tabItem, isActive ? styles.tabItemActive : null]}
+                    style={[
+                      styles.tabItem,
+                      isActive ? styles.tabItemActive : null,
+                    ]}
                   >
-                    <Text style={[styles.tabText, isActive ? styles.tabTextActive : null]}>
+                    <Text
+                      style={[
+                        styles.tabText,
+                        isActive ? styles.tabTextActive : null,
+                      ]}
+                    >
                       {tab.label}
                     </Text>
                   </TouchableOpacity>
@@ -322,52 +659,25 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
             </View>
 
             <FlatList
-              keyExtractor={(item) => String(item.id)}
+              keyExtractor={item => String(item.id)}
               data={filteredOrders}
               renderItem={renderOrder}
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingBottom: 20,
+              }}
               ListEmptyComponent={
                 <View style={{ marginTop: 40, alignItems: 'center' }}>
-                  <Text style={{ color: '#888', fontSize: 16 }}>No orders found for "{activeTab}".</Text>
+                  <Text style={{ color: '#888', fontSize: 16 }}>
+                    No orders found for "{activeTab}".
+                  </Text>
                 </View>
               }
             />
-
-            <Modal visible={writeModalVisible} transparent animationType="slide">
-              <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-                <View style={{ backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '700' }}>Write a Review</Text>
-                  <Text style={{ marginTop: 8 }}>Rating</Text>
-                  <View style={{ flexDirection: 'row', marginTop: 8 }}>
-                    {[1, 2, 3, 4, 5].map(r => (
-                      <TouchableOpacity key={r} onPress={() => setNewRating(r)} style={{ marginRight: 8 }}>
-                        <Text style={{ color: newRating >= r ? '#F0C419' : '#ccc', fontSize: 24 }}>★</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <TextInput
-                    value={newComment}
-                    onChangeText={setNewComment}
-                    placeholderTextColor={Colors.text[200]}
-                    placeholder="Write your review"
-                    style={{ borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 8, marginTop: 12 }}
-                    multiline
-                  />
-                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, alignItems: 'center' }}>
-                    <TouchableOpacity onPress={() => { setWriteModalVisible(false), setNewComment(''), setNewRating(0) }} style={{ marginRight: 8 }}>
-                      <Text style={{ fontWeight: '500', fontSize: 12, }}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={PostReview}>
-                      <Text style={{ color: '#007AFF' }}>Submit</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
           </View>
         </KeyboardAwareScrollView>
       </KeyboardAvoidingView>
+      {renderModal()}
     </SafeAreaView>
   );
 };
@@ -384,26 +694,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-  },
-
-  button: {
-    marginTop: 20,
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    maxHeight: '80%',
   },
   backButton: { width: 32, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '600', color: '#111' },
@@ -422,7 +712,7 @@ const styles = StyleSheet.create({
     color: '#444',
     borderColor: '#444',
     fontSize: 14,
-    borderWidth: 1
+    borderWidth: 1,
   },
   searchButton: {
     backgroundColor: Colors.button[100],
@@ -452,9 +742,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tabItemActive: { backgroundColor: '#DEE9A0', },
+  tabItemActive: { backgroundColor: '#DEE9A0' },
   tabText: { fontSize: 14, fontWeight: '600', color: '#AAA' },
-  tabTextActive: { color: '#000', },
+  tabTextActive: { color: '#000' },
   orderCard: {
     backgroundColor: '#FFF',
     borderRadius: 20,
@@ -466,7 +756,11 @@ const styles = StyleSheet.create({
     elevation: 2,
     padding: 16,
   },
-  deliveryInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  deliveryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   deliveryDate: { fontWeight: '500', color: '#000', fontSize: 12 },
   deliveryStatus: { fontSize: 10, color: '#999' },
   productInfo: { flexDirection: 'row', marginBottom: 12 },
@@ -478,7 +772,12 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   productDetails: { flex: 1 },
-  productName: { fontSize: 14, fontWeight: '600', color: '#444', marginBottom: 4 },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#444',
+    marginBottom: 4,
+  },
   productQty: { fontSize: 12, color: '#555', fontWeight: '500' },
   rateReviewRow: {
     backgroundColor: '#FCFCEC',
@@ -490,6 +789,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
   },
+  disabledRateReview: {
+    opacity: 0.5,
+  },
   rateReviewLabel: { fontSize: 14, fontWeight: '600', color: '#000' },
   orderDetails: {
     marginTop: 12,
@@ -500,6 +802,161 @@ const styles = StyleSheet.create({
   detailLabel: { fontSize: 13, color: '#444', marginTop: 6 },
   detailValue: { fontWeight: '700', color: '#333' },
   itemRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  reviewButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  reviewButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    maxHeight: '85%',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    width: '100%',
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111',
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+    backgroundColor: '#f5f5f5',
+  },
+  closeButtonText: {
+    fontSize: 22,
+    color: '#666',
+    lineHeight: 24,
+  },
+  modalScrollView: {
+    maxHeight: 400,
+    paddingHorizontal: 20,
+  },
+  productNameLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#444',
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  starButton: {
+    marginHorizontal: 8,
+    padding: 4,
+  },
+  star: {
+    fontSize: 36,
+  },
+  starActive: {
+    color: '#F0C419',
+  },
+  starInactive: {
+    color: '#e0e0e0',
+  },
+  ratingText: {
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginBottom: 20,
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    minHeight: 140,
+    marginBottom: 20,
+    textAlignVertical: 'top',
+    backgroundColor: '#fafafa',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: '#f5f5f5',
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+  },
+  submitButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: '#007AFF',
+    marginLeft: 10,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#c0c0c0',
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
 });
 
 export default OrdersScreen;

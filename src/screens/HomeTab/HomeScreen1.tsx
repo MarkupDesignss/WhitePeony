@@ -41,7 +41,9 @@ const SMALL_HEIGHT = 120;
 const BIG_HEIGHT = SMALL_HEIGHT * 2 + GAP;
 
 const HomeScreen1 = ({ navigation }: any) => {
-  const { setUserData, isLoggedIn } = useContext<UserData>(UserDataContext);
+  // FIX: Added userType from context
+  const { setUserData, isLoggedIn, userType } =
+    useContext<UserData>(UserDataContext);
 
   const { toggleWishlist, isWishlisted, removeFromWishlist, wishlistIds } =
     React.useContext(WishlistContext);
@@ -58,6 +60,7 @@ const HomeScreen1 = ({ navigation }: any) => {
   const [lowestitem, setlowestitem] = useState<any[]>();
   const [Promotional, setPromotional] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [isLoadingCategory, setIsLoadingCategory] = useState(false);
 
   const { showLoader, hideLoader } = CommonLoader();
   const topPadding =
@@ -70,44 +73,65 @@ const HomeScreen1 = ({ navigation }: any) => {
     const index = Math.round(offsetX / (WISHLIST_CARD_WIDTH + 12));
     setActiveRec(index);
   };
+  // FIX 1: Helper function to get current product type
+  const getCurrentProductType = () => {
+    if (isLoggedIn && (userType === 'b2c' || userType === 'b2b')) {
+      return userType;
+    }
+    return 'b2c'; // Default for non-logged in users
+  };
 
+  // FIX 2: Helper function to filter products by type
+  const filterProductsByType = (products: any[]) => {
+    if (!Array.isArray(products)) return [];
+
+    const currentType = getCurrentProductType();
+
+    return products.filter(item => {
+      // Check if item has product_type property
+      if (!item?.product_type) {
+        // If product_type doesn't exist, check if it's a nested object
+        if (item?.product?.product_type) {
+          return item.product.product_type === currentType;
+        }
+        return false;
+      }
+      return item.product_type === currentType;
+    });
+  };
   useEffect(() => {
-    GetCategoryProducts();
-    bigsale();
-    RecommendProducts();
-    OrderList();
-    ApiSorting();
-    GetHeader();
-  }, []);
+    if (userType) {
+      GetCategoryProducts();
+      bigsale(); // This will fetch products based on userType
+      RecommendProducts();
+      OrderList();
+      ApiSorting();
+      GetHeader();
+    }
+  }, [userType]);
 
   // update wishlist items depending on login state (server vs local)
   useEffect(() => {
     if (isLoggedIn) {
       fetchServerWishlist();
     } else {
-      // map local wishlist ids to minimal display objects
+      // For local wishlist, we need to fetch product details to filter by type
+      // This might need additional logic depending on your implementation
       const localIds = Array.isArray(wishlistIds) ? wishlistIds : [];
-      const mapped = localIds.map(id => ({
-        id: String(id),
-        name: `Product ${id}`,
-        front_image: null,
-        variants: [{ price: 0 }],
-      }));
-      setwishlistitem(mapped);
+      // You might need to fetch product details to check their type
+      // For now, just show empty or handle differently
+      setwishlistitem([]);
     }
-  }, [isLoggedIn, wishlistIds]);
-
+  }, [isLoggedIn, wishlistIds, userType]); // Added userType dependency
   const GetHeader = async () => {
     try {
       showLoader();
       const res = await UserService.header();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const banners = res?.data?.data?.b2c || [];
-        //console.log("header", res?.data?.data?.b2c)
-
+        // Get current user type
+        const currentType = getCurrentProductType();
+        const banners = res?.data?.data?.[currentType] || [];
         setPromotional(banners);
-      } else {
-        // handle non-OK response if needed
       }
     } catch (err) {
       // handle network/error
@@ -118,6 +142,7 @@ const HomeScreen1 = ({ navigation }: any) => {
 
   const GetCategoryProducts = async () => {
     try {
+      setIsLoadingCategory(true); // Set loading to true
       showLoader();
       const res = await UserService.GetCategory();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
@@ -129,32 +154,30 @@ const HomeScreen1 = ({ navigation }: any) => {
         GetCategoryID(defaultId);
       }
     } catch (err) {
-      console.log('error catogry', err);
+      console.log('error category', err);
       hideLoader();
+      setIsLoadingCategory(false); // Set loading to false on error
     }
   };
-
   const GetCategoryID = async (categoryId: any) => {
-    // console.log("itemid", categoryId)
     try {
+      setIsLoadingCategory(true); // Set loading to true
       showLoader();
       const res = await UserService.GetCategoryByID(categoryId);
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
         const fetchedProducts = res?.data?.data || [];
-        //console.log("GetCategoryByID", fetchedProducts)
-        setcategoryProduct(fetchedProducts);
+        const filteredProducts = filterProductsByType(fetchedProducts);
+        setcategoryProduct(filteredProducts);
         await featuredproduct();
-      } else {
-        console.log('rescatdata', res?.data);
       }
     } catch (err) {
-      console.log('error catogry', err);
+      console.log('error category', err);
       hideLoader();
-      // handle network/error
+    } finally {
+      setIsLoadingCategory(false); // Always set loading to false when done
     }
   };
-
   const featuredproduct = async () => {
     try {
       showLoader();
@@ -162,17 +185,44 @@ const HomeScreen1 = ({ navigation }: any) => {
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
         const fetchedProducts = res?.data?.data || [];
-        //console.log("featuredproduct", fetchedProducts?.b2c)
-        setFeaturesProduct(fetchedProducts?.b2c);
+
+        // Get current user type and show appropriate products
+        const currentType = getCurrentProductType();
+        const typeProducts = fetchedProducts?.[currentType] || [];
+        setFeaturesProduct(typeProducts);
+
         (await isLoggedIn) ? OrderList() : null;
-      } else {
-        console.log('featuredproductelse', res?.data);
       }
     } catch (err) {
       console.log('error featuredproduct', err);
       hideLoader();
-      // handle network/error
     }
+  };// Helper function to check if sale is currently active
+  // Helper function to check if sale is currently active (with timezone handling)
+const isSaleActive = (startDate: string, endDate: string) => {
+  try {
+    const today = new Date();
+    const end = new Date(endDate.split(' ')[0]); // Get date only
+    
+    // Reset time to compare only dates
+    const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    
+    return todayDateOnly <= endDateOnly;
+  } catch (error) {
+    return false;
+  }
+};
+  const filterActiveBigSaleProducts = (products: any[]) => {
+    if (!Array.isArray(products)) return [];
+
+    return products.filter(item => {
+      // 1. Check if sale has valid dates
+      if (!item?.start_date || !item?.end_date) return false;
+
+      // 2. Check if sale is currently active
+      return isSaleActive(item.start_date, item.end_date);
+    });
   };
 
   const bigsale = async () => {
@@ -181,19 +231,31 @@ const HomeScreen1 = ({ navigation }: any) => {
       const res = await UserService.bigsales();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
-        const fetchedProducts = res.data?.data || [];
-        //console.log("bigsale", fetchedProducts?.b2c)
-        setsalesProduct(fetchedProducts?.b2c);
-      } else {
-        console.log('else sales', res.data);
-        // handle non-OK response if needed
+        const fetchedProducts = res.data?.data || {};
+
+        // Get current user type
+        const currentType = getCurrentProductType();
+
+        // Check if the current type exists in the response
+        const typeProducts = fetchedProducts?.[currentType] || [];
+
+        // ✅ USE THE HELPER FUNCTION HERE
+        const activeSalesProducts = filterActiveBigSaleProducts(typeProducts);
+
+        // Only set salesProduct if there are ACTIVE products
+        if (Array.isArray(activeSalesProducts) && activeSalesProducts.length > 0) {
+          setsalesProduct(activeSalesProducts);
+        } else {
+          // If no active products, set empty array (section won't show)
+          setsalesProduct([]);
+        }
       }
     } catch (err) {
-      console.log('error catogry', err);
+      console.log('error bigsale', err);
       hideLoader();
+      setsalesProduct([]);
     }
   };
-
   const RecommendProducts = async () => {
     try {
       showLoader();
@@ -201,22 +263,16 @@ const HomeScreen1 = ({ navigation }: any) => {
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
         const fetchedProducts = res.data?.data || [];
-        const b2cProducts = fetchedProducts.filter(
-          item => item.product_type === 'b2c',
-        );
-        setApiRecommend(b2cProducts);
-        //console.log("recommenddata", b2cProducts)
-      } else {
-        console.log('recommendelse', res?.data);
-        // handle non-OK response if needed
+
+        // Use filterProductsByType instead of hardcoded filter
+        const filteredProducts = filterProductsByType(fetchedProducts);
+        setApiRecommend(filteredProducts);
       }
     } catch (err) {
       hideLoader();
       console.log('recommenderror', err);
-      // handle network/error
     }
   };
-
   const fetchServerWishlist = async () => {
     try {
       showLoader();
@@ -224,60 +280,57 @@ const HomeScreen1 = ({ navigation }: any) => {
       const apiItems = res?.data?.data || [];
       hideLoader();
 
-      setwishlistitem(apiItems);
-      //console.log("addwishlist", apiItems)
+      // Filter wishlist items by product type
+      const filteredWishlist = filterProductsByType(apiItems);
+      setwishlistitem(filteredWishlist);
     } catch (e) {
       hideLoader();
       const error = e as any;
       if (error.status === 401) {
         console.log('Unauthorized access - perhaps token expired');
-      } else {
-        console.log('Unauthorized access - perhaps token Required');
       }
     }
   };
-
   const OrderList = async () => {
     try {
       showLoader();
-      const response = await UserService.order(); // <-- store API result in 'response'
-
+      const response = await UserService.order();
       if (response && response.data && response.status === HttpStatusCode.Ok) {
         hideLoader();
 
-        // Filter out orders that have empty items
+        // Filter orders to only show relevant product types
+        const currentType = getCurrentProductType();
         const filteredOrders = Array.isArray(response.data.orders)
-          ? response.data.orders.filter(
-              order => Array.isArray(order.items) && order.items.length > 0,
-            )
+          ? response.data.orders.filter(order => {
+            // Check if items exist and filter by product type
+            if (Array.isArray(order.items) && order.items.length > 0) {
+              // Assuming order items have product with product_type
+              const relevantItems = order.items.filter(
+                item => item?.product?.product_type === currentType,
+              );
+              return relevantItems.length > 0;
+            }
+            return false;
+          })
           : [];
 
         setorderitem(filteredOrders);
-
-        console.log('Filtered orderlist', filteredOrders);
-      } else {
-        hideLoader();
-        console.log('Order fetch error:', response?.data);
       }
     } catch (err) {
       hideLoader();
       console.log('Order fetch exception:', err);
     }
   };
-
   const ApiSorting = async () => {
     try {
       showLoader();
       const res = await UserService.Sorting('price_asc');
-
       if (res?.status === HttpStatusCode.Ok) {
         const sortedProducts = res?.data?.data || [];
-        const b2cProducts = sortedProducts.filter(
-          item => item.product_type === 'b2c',
-        );
 
-        setlowestitem(b2cProducts);
-        //console.log('ApiSorting -> setting products', sortedProducts);
+        // Use filterProductsByType instead of hardcoded filter
+        const filteredProducts = filterProductsByType(sortedProducts);
+        setlowestitem(filteredProducts);
       } else {
         console.log('Failed to sort products:', res);
         Toast.show({
@@ -293,7 +346,6 @@ const HomeScreen1 = ({ navigation }: any) => {
       });
     }
   };
-
   const PromotionalBanner: React.FC<{ promotional: any[] }> = ({
     promotional = [] as any[],
   }) => {
@@ -511,95 +563,148 @@ const HomeScreen1 = ({ navigation }: any) => {
           />
 
           {/* Categories as 2-column grid */}
-          {categoryProduct.length !== 0 ? (
+          {/* Categories as 2-column grid */}
+          {/* Categories as 2-column grid */}
+          {isLoadingCategory ? (
+            // Show loader while loading
+            <View style={styles.container}>
+              <View style={[styles.row, { justifyContent: 'center' }]}>
+                <View
+                  style={{
+                    flex: 1,
+                    borderRadius: 12,
+                    backgroundColor: '#EFEFCA',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    minHeight: BIG_HEIGHT,
+                  }}
+                >
+                  {/* Show loading indicator */}
+                  <Text style={[styles.title, { marginTop: 10 }]}>Loading products...</Text>
+                </View>
+              </View>
+            </View>
+          ) : categoryProduct.length !== 0 ? (
+            // Show products when loaded and have data
             <View style={styles.container}>
               <View style={styles.row}>
-                {/* BIG CARD */}
-                <LinearGradient
-                  colors={['#EFEFCA', '#E2E689']}
-                  start={{ x: 0.5, y: 0 }} // top
-                  end={{ x: 0.5, y: 1 }} // bottom
-                  style={{ flex: 1, borderRadius: 12 }}
-                >
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate('ProductDetails', {
-                        productId: categoryProduct[0].id,
-                      })
-                    }
+                {/* BIG CARD - Only show if we have at least 1 product */}
+                {categoryProduct.length > 0 ? (
+                  <LinearGradient
+                    colors={['#EFEFCA', '#E2E689']}
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                    style={{ flex: 1, borderRadius: 12 }}
+                  >
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate('ProductDetails', {
+                          productId: categoryProduct[0].id,
+                        })
+                      }
+                    >
+                      <View style={[styles.card, { height: BIG_HEIGHT }]}>
+                        <Text style={{ ...styles.title }}>All</Text>
+                        <Text
+                          numberOfLines={2}
+                          style={[styles.title, { color: '#000', marginTop: 8 }]}
+                        >
+                          {categoryProduct[0].name}
+                        </Text>
+                        <View
+                          style={{
+                            borderRadius: 4,
+                            backgroundColor: '#5f621a',
+                            width: 40,
+                            alignSelf: 'center',
+                            marginTop: 10,
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontWeight: '700',
+                              fontSize: 12,
+                              alignSelf: 'center',
+                              color: '#fff',
+                              textDecorationLine: 'line-through',
+                              textAlignVertical: 'center',
+                            }}
+                          >
+                            {Math.round(
+                              categoryProduct[0]?.variants?.[0]?.price || 0,
+                            )}{' '}
+                            €
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            borderRadius: 4,
+                            backgroundColor: '#E0CB54',
+                            width: 50,
+                            alignSelf: 'center',
+                            marginTop: 10,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontWeight: '700',
+                              fontSize: 12,
+                              alignSelf: 'center',
+                              padding: 5,
+                              color: '#000',
+                            }}
+                          >
+                            {Math.round(
+                              categoryProduct[0]?.variants?.[0]?.price || 0,
+                            )}{' '}
+                            €
+                          </Text>
+                        </View>
+                        <Image
+                          source={{
+                            uri:
+                              Image_url +
+                              (categoryProduct[0]?.front_image || ''),
+                          }}
+                          style={styles.imageBig}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  </LinearGradient>
+                ) : (
+                  // Fallback empty big card when no products
+                  <View
+                    style={{
+                      flex: 1,
+                      borderRadius: 12,
+                      backgroundColor: '#EFEFCA',
+                    }}
                   >
                     <View style={[styles.card, { height: BIG_HEIGHT }]}>
-                      <Text style={styles.title}>All</Text>
+                      <Text style={styles.title}>No Products</Text>
                       <Text
-                        numberOfLines={2}
                         style={[
                           styles.title,
-                          { color: '#000', marginTop: -10 },
+                          { color: '#666', marginTop: -10 },
                         ]}
                       >
-                        {categoryProduct[0].name}
+                        Available
                       </Text>
-                      <View
-                        style={{
-                          borderRadius: 4,
-                          backgroundColor: '#5f621a',
-                          width: 40,
-                          alignSelf: 'center',
-                          marginTop: 10,
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontWeight: '700',
-                            fontSize: 12,
-                            alignSelf: 'center',
-                            color: '#fff',
-                            textDecorationLine: 'line-through',
-                            textAlignVertical: 'center',
-                          }}
-                        >
-                          {Math.round(categoryProduct[0]?.variants[0]?.price)} €
-                        </Text>
-                      </View>
-                      <View
-                        style={{
-                          borderRadius: 4,
-                          backgroundColor: '#E0CB54',
-                          width: 50,
-                          alignSelf: 'center',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontWeight: '700',
-                            fontSize: 12,
-                            alignSelf: 'center',
-                            padding: 5,
-                            color: '#000',
-                          }}
-                        >
-                          {Math.round(categoryProduct[0]?.variants[0]?.price)} €
-                        </Text>
-                      </View>
-                      <Image
-                        source={{
-                          uri: Image_url + categoryProduct[0].front_image,
-                        }}
-                        style={styles.imageBig}
-                      />
                     </View>
-                  </TouchableOpacity>
-                </LinearGradient>
+                  </View>
+                )}
 
-                {/* RIGHT STACK: render one small card per item */}
+                {/* RIGHT STACK */}
                 <View style={styles.stack}>
+                  {/* First column of small cards */}
                   <View style={{ justifyContent: 'space-between', gap: 8 }}>
-                    {categoryProduct.slice(1, 3).map(item => (
+                    {categoryProduct.slice(1, 3).map((item, index) => (
                       <LinearGradient
+                        key={`first-${item.id}-${index}`}
                         colors={['#EFEFCA', '#E2E689']}
-                        start={{ x: 0.5, y: 0 }} // top
-                        end={{ x: 0.5, y: 1 }} // bottom
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 1 }}
                         style={{ flex: 1, borderRadius: 12 }}
                       >
                         <TouchableOpacity
@@ -609,10 +714,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             })
                           }
                         >
-                          <View
-                            key={`${item.id}`}
-                            style={[styles.card, { height: SMALL_HEIGHT }]}
-                          >
+                          <View style={[styles.card, { height: SMALL_HEIGHT }]}>
                             <Text numberOfLines={2} style={styles.title}>
                               {item.name}
                             </Text>
@@ -624,14 +726,39 @@ const HomeScreen1 = ({ navigation }: any) => {
                         </TouchableOpacity>
                       </LinearGradient>
                     ))}
+
+                    {/* Show empty cards if less than 2 items in first column */}
+                    {categoryProduct.length < 3 &&
+                      Array.from({
+                        length: 2 - Math.min(categoryProduct.length - 1, 2),
+                      }).map((_, index) => (
+                        <View
+                          key={`empty-first-${index}`}
+                          style={[
+                            styles.card,
+                            {
+                              height: SMALL_HEIGHT,
+                              backgroundColor: '#EFEFCA',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.title, { color: '#999' }]}>
+                            Empty
+                          </Text>
+                        </View>
+                      ))}
                   </View>
 
+                  {/* Second column of small cards */}
                   <View style={{ justifyContent: 'space-between', gap: 8 }}>
-                    {categoryProduct.slice(3, 5).map(item => (
+                    {categoryProduct.slice(3, 5).map((item, index) => (
                       <LinearGradient
+                        key={`second-${item.id}-${index}`}
                         colors={['#EFEFCA', '#E2E689']}
-                        start={{ x: 0.5, y: 0 }} // top
-                        end={{ x: 0.5, y: 1 }} // bottom
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 1 }}
                         style={{ flex: 1, borderRadius: 12 }}
                       >
                         <TouchableOpacity
@@ -641,10 +768,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             })
                           }
                         >
-                          <View
-                            key={`${item.id}`}
-                            style={[styles.card, { height: SMALL_HEIGHT }]}
-                          >
+                          <View style={[styles.card, { height: SMALL_HEIGHT }]}>
                             <Text numberOfLines={2} style={styles.title}>
                               {item.name}
                             </Text>
@@ -656,13 +780,98 @@ const HomeScreen1 = ({ navigation }: any) => {
                         </TouchableOpacity>
                       </LinearGradient>
                     ))}
+
+                    {/* Show empty cards if less than 2 items in second column */}
+                    {categoryProduct.length < 5 &&
+                      Array.from({
+                        length: 2 - Math.max(categoryProduct.length - 3, 0),
+                      }).map((_, index) => (
+                        <View
+                          key={`empty-second-${index}`}
+                          style={[
+                            styles.card,
+                            {
+                              height: SMALL_HEIGHT,
+                              backgroundColor: '#EFEFCA',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.title, { color: '#999' }]}>
+                            Empty
+                          </Text>
+                        </View>
+                      ))}
                   </View>
                 </View>
               </View>
             </View>
           ) : (
-            <View>
-              <Text>No data Found</Text>
+            // Show "No Products Found" only when not loading and no data
+            <View style={styles.container}>
+              <View style={[styles.row, { justifyContent: 'center' }]}>
+                <View
+                  style={{
+                    flex: 1,
+                    borderRadius: 12,
+                    backgroundColor: '#EFEFCA',
+                  }}
+                >
+                  <View style={[styles.card, { height: BIG_HEIGHT }]}>
+                    <Text style={styles.title}>No Products Found</Text>
+                    <Text
+                      style={[styles.title, { color: '#666', marginTop: -10 }]}
+                    >
+                      Try another category
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.stack}>
+                  <View style={{ justifyContent: 'space-between', gap: 8 }}>
+                    {[1, 2].map(index => (
+                      <View
+                        key={`empty-col1-${index}`}
+                        style={[
+                          styles.card,
+                          {
+                            height: SMALL_HEIGHT,
+                            backgroundColor: '#EFEFCA',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.title, { color: '#999' }]}>
+                          Empty
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={{ justifyContent: 'space-between', gap: 8 }}>
+                    {[1, 2].map(index => (
+                      <View
+                        key={`empty-col2-${index}`}
+                        style={[
+                          styles.card,
+                          {
+                            height: SMALL_HEIGHT,
+                            backgroundColor: '#EFEFCA',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.title, { color: '#999' }]}>
+                          Empty
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
             </View>
           )}
 
@@ -768,110 +977,112 @@ const HomeScreen1 = ({ navigation }: any) => {
             />
           </View>
 
-          <View
-            style={{
-              width: '100%',
-              height: heightPercentageToDP(30),
-              marginTop: 20,
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#fecf5d',
-            }}
-          >
-            <Image
-              source={require('../../assets/bg3x.png')}
-              style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
-            />
-
+          {/* Big Sale Section - Only show if there are products for current user type */}
+          {salesProduct.length > 0 && (
             <View
-              style={{ position: 'absolute', top: 10, alignItems: 'center' }}
+              style={{
+                width: '100%',
+                height: heightPercentageToDP(30),
+                marginTop: 20,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: '#fecf5d',
+              }}
             >
               <Image
-                source={require('../../assets/bigsales.png')}
-                style={{ width: 75, height: 65, resizeMode: 'cover' }}
+                source={require('../../assets/bg3x.png')}
+                style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
               />
-              <Text style={{ fontSize: 12, fontWeight: '700', marginTop: 15 }}>
-                {formatDate(salesProduct[0]?.start_date).slice(0, 13)} -{' '}
-                {formatDate(salesProduct[0]?.end_date).slice(0, 13)}
-              </Text>
-              <FlatList
-                data={salesProduct}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(item, index) => String(index)}
-                renderItem={item => {
-                  return (
-                    <TouchableOpacity
-                      style={{
-                        borderWidth: 1,
-                        marginLeft: 10,
-                        marginTop: heightPercentageToDP(2),
-                        borderColor: 'lightgrey',
-                        borderRadius: 8,
-                      }}
-                      onPress={() =>
-                        navigation.navigate('ProductDetails', {
-                          productId: item?.item?.product?.id,
-                        })
-                      }
-                    >
-                      <View
+
+              <View
+                style={{ position: 'absolute', top: 10, alignItems: 'center' }}
+              >
+                <Image
+                  source={require('../../assets/bigsales.png')}
+                  style={{ width: 75, height: 65, resizeMode: 'cover' }}
+                />
+                <Text style={{ fontSize: 12, fontWeight: '700', marginTop: 15 }}>
+                  {formatDate(salesProduct[0]?.start_date).slice(0, 13)} -{' '}
+                  {formatDate(salesProduct[0]?.end_date).slice(0, 13)}
+                </Text>
+                <FlatList
+                  data={salesProduct}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={(item, index) => String(index)}
+                  renderItem={item => {
+                    return (
+                      <TouchableOpacity
                         style={{
+                          borderWidth: 1,
+                          marginLeft: 10,
+                          marginTop: heightPercentageToDP(2),
+                          borderColor: 'lightgrey',
                           borderRadius: 8,
-                          alignItems: 'center',
-                          backgroundColor: '#FFEEBC',
-                          width: '100%',
-                          height: '100%',
-                          //   marginLeft: 10,
-                          //
                         }}
+                        onPress={() =>
+                          navigation.navigate('ProductDetails', {
+                            productId: item?.item?.product?.id,
+                          })
+                        }
                       >
                         <View
                           style={{
-                            backgroundColor: '#FFFFFF',
-                            width: 70,
-                            height: 17,
                             borderRadius: 8,
-                            justifyContent: 'center',
+                            alignItems: 'center',
+                            backgroundColor: '#FFEEBC',
+                            width: '100%',
+                            height: '100%',
                           }}
                         >
-                          <Text
+                          <View
                             style={{
-                              fontSize: 10,
-                              fontWeight: '700',
-                              alignSelf: 'center',
+                              backgroundColor: '#FFFFFF',
+                              width: 70,
+                              height: 17,
+                              borderRadius: 8,
+                              justifyContent: 'center',
                             }}
                           >
-                            Upto {item?.item?.percentage}% Off
-                          </Text>
+                            <Text
+                              style={{
+                                fontSize: 8,
+                                fontWeight: '700',
+                                alignSelf: 'center',
+                                padding: 2,
+                              }}
+                            >
+                              Upto {item?.item?.percentage}% Off
+                            </Text>
+                          </View>
+                          <Image
+                            resizeMode="contain"
+                            source={{
+                              uri: Image_url + item?.item?.product?.front_image,
+                            }}
+                            style={{
+                              width: 70,
+                              height: 80,
+                              resizeMode: 'cover',
+                              marginTop: 5,
+                              borderRadius: 8,
+                            }}
+                          />
                         </View>
-                        <Image
-                          resizeMode="contain"
-                          source={{
-                            uri: Image_url + item?.item?.product?.front_image,
-                          }}
-                          style={{
-                            width: 70,
-                            height: 80,
-                            resizeMode: 'cover',
-                            marginTop: 5,
-                            borderRadius: 8,
-                          }}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Lowest Prices Ever - horizontal small cards */}
           <View
             style={{
               width: '100%',
-              height: heightPercentageToDP(35),
-              marginTop: heightPercentageToDP(1),
+              // height: heightPercentageToDP(35),
+              marginVertical: heightPercentageToDP(0),
               justifyContent: 'center',
               alignItems: 'center',
             }}
@@ -1408,7 +1619,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 100,
     resizeMode: 'cover',
-    top: 10,
+    top: 20,
     borderRadius: 12,
   },
 
@@ -1421,13 +1632,13 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '500',
     color: '#2E2E2E',
     width: '90%',
     textAlign: 'center',
-    height: 40,
-    textAlignVertical: 'center',
+    // height: 40,
+    // textAlignVertical: 'center',
     fontFamily: Fonts.Anciza_Medium_Italic,
   },
 
@@ -1515,7 +1726,7 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '500',
     marginVertical: heightPercentageToDP(1),
   },
 

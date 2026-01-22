@@ -19,18 +19,20 @@ import { Image_url, UserService } from '../../service/ApiService';
 import Toast from 'react-native-toast-message';
 import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
-import EmailModal from '../../components/EmailModal'
+import EmailModal from '../../components/EmailModal';
 import { Colors } from '../../constant';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type EventDetail = {
   image?: string;
   event_date?: string;
   capacity?: number;
+  remaining_seats?: number;
   address?: string;
   title?: string;
   description?: string;
+  agenda?: string;
 };
-
 
 const EventDetails = ({ navigation, route }: any) => {
   const viewRef = useRef<any>(null);
@@ -41,7 +43,8 @@ const EventDetails = ({ navigation, route }: any) => {
   const [isDescriptionTruncatable, setIsDescriptionTruncatable] = React.useState(false);
   const [isBottomSheetVisible, setBottomSheetVisible] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState(0);
-  
+  const [isLoading, setIsLoading] = useState(false);
+
   const onDescriptionTextLayout = React.useCallback((e: any) => {
     const lines = e?.nativeEvent?.lines || [];
     if (lines.length > 5 && !isDescriptionTruncatable) {
@@ -50,23 +53,16 @@ const EventDetails = ({ navigation, route }: any) => {
   }, [isDescriptionTruncatable]);
 
   useEffect(() => {
-    //console.log('Event ID from navigation params:', eventid);
     EventDetail(eventid);
-  }, [])
+  }, []);
 
   const EventDetail = async (id: string) => {
     try {
-
       const res = await UserService.eventupdate(id);
-
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { message, event } = res.data;
-        //console.log("EventList response data:", res.data);
         Toast.show({ type: "success", text1: message });
-        setEventDetails(event)
-
-        //console.log("eventdetail", event)
-
+        setEventDetails(event);
       } else {
         Toast.show({
           type: "error",
@@ -82,17 +78,36 @@ const EventDetails = ({ navigation, route }: any) => {
     }
   };
 
-  const handleSeatSelect = (num) => {
+  // Function to handle seat selection
+  const handleSeatSelect = (num: number) => {
     setSelectedSeats(num);
+  };
+
+  // Function to confirm registration and show email modal
+  const handleConfirmRegistration = () => {
+    if (selectedSeats === 0) {
+      Toast.show({
+        type: "error",
+        text1: "Please select number of seats",
+      });
+      return;
+    }
+
+    // Check if enough seats are available
+    if (eventDetails?.remaining_seats && selectedSeats > eventDetails.remaining_seats) {
+      Toast.show({
+        type: "error",
+        text1: `Only ${eventDetails.remaining_seats} seats available`,
+      });
+      return;
+    }
+
     setBottomSheetVisible(false);
-    // Prepare emails array
     setModalVisible(true);
   };
 
-  const eventDate = new Date(eventDetails?.event_date);
+  const eventDate = new Date(eventDetails?.event_date || '');
   const today = new Date();
-
-  // Compare only dates (ignore time)
   const eventDay = new Date(
     eventDate.getFullYear(),
     eventDate.getMonth(),
@@ -103,34 +118,53 @@ const EventDetails = ({ navigation, route }: any) => {
     today.getMonth(),
     today.getDate()
   );
-
-  // Show button if today <= event date
   const canRegister = todayDay.getTime() <= eventDay.getTime();
 
-  // Step 2: submit emails
-  const handleSubmitEmails = async (emails) => {
-    showLoader();
+  // Submit emails to API
+  const handleSubmitEmails = async (emails: string[]) => {
+    if (emails.length !== selectedSeats) {
+      Toast.show({
+        type: "error",
+        text1: `Please enter exactly ${selectedSeats} email${selectedSeats > 1 ? 's' : ''}`,
+      });
+      return;
+    }
+
+    setIsLoading(true);
     try {
       const res = await UserService.eventsRegister({ emails }, eventid);
       if (res?.data?.success) {
         Toast.show({ type: "success", text1: "Registration successful!" });
+        setModalVisible(false);
+        setSelectedSeats(0);
+        // Refresh event details to update remaining seats
+        EventDetail(eventid);
         navigation.navigate("BookingSuccess");
       } else {
-        console.log("eventerror", res?.data)
-        Toast.show({ type: "error", text1: res?.data?.message || "Failed to register" });
+        Toast.show({
+          type: "error",
+          text1: res?.data?.message || "Failed to register"
+        });
       }
-    } catch (error) {
-      console.log("eventerror1", JSON.stringify(error))
-
-      Toast.show({ type: "error", text1: "Something went wrong!" });
+    } catch (error: any) {
+      console.log("Registration error:", JSON.stringify(error));
+      Toast.show({
+        type: "error",
+        text1: error?.response?.data?.message || "Something went wrong!"
+      });
     } finally {
-      hideLoader();
+      setIsLoading(false);
     }
   };
 
+  // Open bottom sheet with reset
+  const openSeatSelection = () => {
+    setSelectedSeats(0);
+    setBottomSheetVisible(true);
+  };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View ref={viewRef} style={styles.card}>
         <View style={styles.headerRow}>
           <TouchableOpacity
@@ -139,7 +173,7 @@ const EventDetails = ({ navigation, route }: any) => {
           >
             <Image source={require('../../assets/Png/back.png')} style={{ width: 20, height: 20 }} />
           </TouchableOpacity>
-          <Text style={styles.screenTitle}>Tea Tasting Masterclass</Text>
+          <Text style={styles.screenTitle}>Event Details</Text>
           <View style={{ width: 36 }} />
         </View>
 
@@ -150,50 +184,36 @@ const EventDetails = ({ navigation, route }: any) => {
         />
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.metaRow}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <View style={styles.metaItem}>
               <Image
                 source={require('../../assets/Png/clock.png')}
-                style={{ width: 15, height: 15 }}
+                style={styles.metaIcon}
               />
               <Text style={styles.metaText}>{formatDate(eventDetails?.event_date)}</Text>
             </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+            <View style={styles.metaItem}>
               <Image
                 source={require('../../assets/Png/office-chair2.png')}
-                style={{ width: 15, height: 15 }}
+                style={styles.metaIcon}
               />
-              <Text style={styles.metaText}>{eventDetails?.remaining_seats} Seats Left</Text>
+              <Text style={styles.metaText}>
+                {eventDetails?.remaining_seats || 0} Seats Left
+              </Text>
             </View>
           </View>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              width: '90%',
-              marginTop: '5%'
-            }}
-          >
+
+          <View style={styles.addressContainer}>
             <Image
               source={require('../../assets/Png/location.png')}
-              style={{ width: 15, height: 15 }}
+              style={styles.addressIcon}
             />
             <Text style={styles.address}>
               {eventDetails?.address}
             </Text>
           </View>
-          <Text style={[styles.excerpt, { fontWeight: "bold", fontSize: 16, marginBottom: 10, marginTop: 20 }]} >{eventDetails?.title}</Text>
+
+          <Text style={styles.eventTitle}>{eventDetails?.title}</Text>
+
           <Text
             style={styles.excerpt}
             numberOfLines={isDescriptionExpanded ? undefined : 5}
@@ -201,152 +221,162 @@ const EventDetails = ({ navigation, route }: any) => {
           >
             {eventDetails?.description}
           </Text>
-          {isDescriptionTruncatable ? (
-            <Text
-              style={{ color: '#7aa33d' }}
-              onPress={() => setIsDescriptionExpanded(prev => !prev)}
-            >
-              {isDescriptionExpanded ? 'Read Less' : 'Read More'}
-            </Text>
-          ) : null}
+
+          {isDescriptionTruncatable && (
+            <TouchableOpacity onPress={() => setIsDescriptionExpanded(prev => !prev)}>
+              <Text style={styles.readMoreText}>
+                {isDescriptionExpanded ? 'Read Less' : 'Read More'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <Text style={styles.agendaTitle}>Agenda</Text>
 
           {eventDetails?.agenda
-            ?.split(',')           // Split the string by comma
-            .map(item => item.trim()) // Remove extra spaces
+            ?.split(',')
+            .map(item => item.trim())
             .map((item, index) => (
-              <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4, alignContent: "center" }}>
+              <View key={index} style={styles.agendaItem}>
                 <Image
                   source={require('../../assets/Png/check.png')}
-                  style={{ width: 15, height: 15, justifyContent: 'center' }}
+                  style={styles.checkIcon}
                 />
-
-                <Text style={{ fontSize: 16, justifyContent: 'center', top: -3, left: 10 }}>{item}</Text>
+                <Text style={styles.agendaText}>{item}</Text>
               </View>
-            ))
-          }
+            ))}
 
-          {canRegister ? <TouchableOpacity
-            style={styles.registerBtn}
-            onPress={() => setBottomSheetVisible(true)}
-          >
-            <Text style={styles.registerText}>Register Now</Text>
-          </TouchableOpacity> : null}
+          {canRegister && (
+            <TouchableOpacity
+              style={styles.registerBtn}
+              onPress={openSeatSelection}
+              disabled={!eventDetails?.remaining_seats || eventDetails.remaining_seats === 0}
+            >
+              <Text style={styles.registerText}>
+                {eventDetails?.remaining_seats === 0
+                  ? 'Sold Out'
+                  : 'Register Now'
+                }
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
 
-      {/* ✅ Bottom Sheet for Selecting Seats */}
+      {/* Bottom Sheet for Seat Selection */}
       <Modal
         visible={isBottomSheetVisible}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setBottomSheetVisible(false)}
       >
+        {/* Outer overlay - closes when clicked */}
         <TouchableWithoutFeedback onPress={() => setBottomSheetVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} />
-        </TouchableWithoutFeedback>
+          <View style={styles.bottomSheetOverlay}>
+            {/* Inner content - prevents closing when clicked inside */}
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={styles.bottomSheetContent}>
+                <View style={styles.bottomSheetHandle} />
 
-        <View
-          style={{
-            backgroundColor: '#fff',
-            padding: 20,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            minHeight: 180,
-            justifyContent: 'flex-start',
-          }}
-        >
-          <View style={{ alignItems: 'center', marginBottom: 10 }}>
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: '#ccc',
-                borderRadius: 2,
-              }}
-            />
-          </View>
-
-          <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>
-            Select Number of Seats
-          </Text>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-around',
-              marginVertical: 10,
-            }}
-          >
-            {[1, 2, 3, 4, 5].map((num) => (
-              <TouchableOpacity
-                key={num}
-                style={{
-                  padding: 10,
-                  borderWidth: 1,
-                  borderColor: selectedSeats === num ? '#7aa33d' : '#ccc',
-                  borderRadius: 8,
-                  backgroundColor: selectedSeats === num ? '#e6f4d9' : '#fff',
-                  minWidth: 50,
-                  alignItems: 'center',
-                }}
-                onPress={() => handleSeatSelect(num)}
-              >
-                <Text style={{ color: selectedSeats === num ? '#7aa33d' : '#000' }}>
-                  {num}
+                <Text style={styles.bottomSheetTitle}>
+                  Select Number of Seats
                 </Text>
-              </TouchableOpacity>
-            ))}
+
+                <Text style={styles.availableSeatsText}>
+                  Available seats: {eventDetails?.remaining_seats || 0}
+                </Text>
+
+                <View style={styles.seatsContainer}>
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.seatButton,
+                        selectedSeats === num && styles.selectedSeatButton
+                      ]}
+                      onPress={() => handleSeatSelect(num)}
+                      disabled={num > (eventDetails?.remaining_seats || 0)}
+                    >
+                      <Text style={[
+                        styles.seatText,
+                        selectedSeats === num && styles.selectedSeatText,
+                        num > (eventDetails?.remaining_seats || 0) && styles.disabledSeatText
+                      ]}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.confirmRegistrationButton,
+                    selectedSeats === 0 && styles.disabledConfirmButton
+                  ]}
+                  onPress={handleConfirmRegistration}
+                  disabled={selectedSeats === 0}
+                >
+                  <Text style={styles.confirmRegistrationText}>
+                    {selectedSeats > 0
+                      ? `Confirm Registration (${selectedSeats} seat${selectedSeats > 1 ? 's' : ''})`
+                      : 'Select seats to continue'
+                    }
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-
-          <TouchableOpacity
-            style={{
-              backgroundColor: '#7aa33d',
-              borderRadius: 8,
-              paddingVertical: 14,
-              marginTop: 10,
-              alignItems: 'center',
-            }}
-            onPress={handleSeatSelect}
-          >
-
-            <Text style={{ color: '#fff', fontSize: 16 }}>Confirm Registration</Text>
-
-          </TouchableOpacity>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
-
-      {/* Modal: enter emails */}
+      {/* Email Modal */}
       <EmailModal
         visible={isModalVisible}
         onClose={() => setModalVisible(false)}
         seatCount={selectedSeats}
-        onSubmit={(emails) => handleSubmitEmails(emails)}
+        onSubmit={handleSubmitEmails}
+        isLoading={isLoading}
       />
 
-    </View>
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#7aa33d" />
+        </View>
+      )}
+    </SafeAreaView>
   );
 };
 
 export default EventDetails;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, },
-  scroll: { padding: 16, paddingBottom: 120 },
-  card: { backgroundColor: '#fff' },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
+  },
+  scroll: {
+    padding: 16,
+    paddingBottom: 120
+  },
+  card: {
+    backgroundColor: '#fff'
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    width: '90%',
-    alignSelf: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
     marginVertical: 15
-
   },
-  backBtn: { padding: 8, marginRight: 8 },
-  screenTitle: { flex: 1, textAlign: 'center', fontWeight: '600' },
+  backBtn: {
+    padding: 8
+  },
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center'
+  },
   hero: {
     width: '90%',
     height: 205,
@@ -359,77 +389,170 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  metaText: { color: '#8b8b8b', fontSize: 12, marginLeft: 8 },
-  address: { color: '#4a4a4a', marginLeft: 10, },
-  excerpt: { color: '#333', marginBottom: 12, marginTop: '2%' },
-  agendaTitle: { fontWeight: '600', marginBottom: 8, marginTop: '5%' },
-  agendaItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  bullet: { marginRight: 8 },
-  agendaText: { color: '#333', marginLeft: 10 },
-  registerBtn: {
-    marginTop: '10%',
-    backgroundColor: Colors.button[100],
-    paddingVertical: 14,
-    borderRadius: 27,
-    alignItems: 'center',
-  },
-  registerText: { color: '#222', fontWeight: '600' },
-  fab: {
-    position: 'absolute',
-    right: 18,
-    bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#7aa33d',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 6,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderRadius: 27,
-    padding: 16,
-    maxHeight: '90%',
-    width: '95%',
-    alignSelf: 'center',
-    bottom: 20,
-  },
-  modalHandle: {
-    width: 48,
-    height: 6,
-    backgroundColor: '#000',
-    borderRadius: 4,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  quantityRow: {
+  metaItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  metaIcon: {
+    width: 15,
+    height: 15
+  },
+  metaText: {
+    color: '#8b8b8b',
+    fontSize: 12,
+    marginLeft: 8
+  },
+  addressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '90%',
+    marginTop: 20
+  },
+  addressIcon: {
+    width: 15,
+    height: 15
+  },
+  address: {
+    color: '#4a4a4a',
+    marginLeft: 10,
+    flex: 1
+  },
+  eventTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 10,
+    marginTop: 20
+  },
+  excerpt: {
+    color: '#333',
     marginBottom: 12,
+    marginTop: 8
   },
-  inputLabel: { fontSize: 13, color: '#333', marginBottom: 6, marginTop: 8 },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.text[400],
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 6,
+  readMoreText: {
+    color: '#7aa33d',
+    marginBottom: 16
   },
-  confirmBtn: {
-    marginTop: 12,
+  agendaTitle: {
+    fontWeight: '600',
+    marginBottom: 12,
+    marginTop: 20,
+    fontSize: 16
+  },
+  agendaItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8
+  },
+  checkIcon: {
+    width: 15,
+    height: 15,
+    marginTop: 2
+  },
+  agendaText: {
+    fontSize: 14,
+    marginLeft: 10,
+    flex: 1
+  },
+  registerBtn: {
+    marginTop: 30,
     backgroundColor: Colors.button[100],
     paddingVertical: 14,
-    borderRadius: 24,
+    borderRadius: 27,
     alignItems: 'center',
   },
-  confirmText: { color: '#222', fontWeight: '600' },
+  registerText: {
+    color: '#222',
+    fontWeight: '600',
+    fontSize: 16
+  },
+  // Bottom Sheet Styles
+  bottomSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)'
+  },
+  bottomSheetContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: '50%'
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ccc',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  availableSeatsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20
+  },
+  seatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 10,
+  },
+  seatButton: {
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  selectedSeatButton: {
+    borderColor: '#7aa33d',
+    backgroundColor: '#e6f4d9',
+  },
+  seatText: {
+    fontSize: 16,
+    color: '#000'
+  },
+  selectedSeatText: {
+    color: '#7aa33d',
+    fontWeight: '600'
+  },
+  disabledSeatText: {
+    color: '#ccc'
+  },
+  confirmRegistrationButton: {
+    backgroundColor: '#7aa33d',
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  disabledConfirmButton: {
+    backgroundColor: '#ccc'
+  },
+  confirmRegistrationText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  }
 });

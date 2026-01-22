@@ -1,4 +1,4 @@
-import React, { useState, memo, useCallback } from "react";
+import React, { useState, memo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,22 +10,24 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Alert,
-} from "react-native";
+} from 'react-native';
+import { Colors } from '../constant';
 
 const EmailInput = memo(({ index, value, onChange }) => (
   <TextInput
     value={value}
-    onChangeText={(text) => onChange(text, index)}
+    onChangeText={text => onChange(text, index)}
     placeholderTextColor={Colors.text[200]}
     placeholder={`Email for Seat ${index + 1}`}
     keyboardType="email-address"
     autoCapitalize="none"
     style={{
       borderWidth: 1,
-      borderColor: "#ccc",
+      borderColor: '#ccc',
       borderRadius: 8,
-      padding: 10,
-      marginVertical: 5,
+      padding: 12,
+      marginVertical: 6,
+      fontSize: 14,
     }}
   />
 ));
@@ -35,26 +37,29 @@ const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
   const [loading, setLoading] = useState(false);
 
   // reset when seatCount changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (seatCount > 0) {
-      setEmails(Array(seatCount).fill(""));
+      setEmails(Array(seatCount).fill(''));
     }
   }, [seatCount]);
 
   const handleEmailChange = useCallback((text, index) => {
-    setEmails((prev) => {
+    setEmails(prev => {
       const updated = [...prev];
       updated[index] = text;
       return updated;
     });
   }, []);
 
-  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isValidEmail = email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleSubmit = async () => {
     for (let i = 0; i < emails.length; i++) {
       if (!isValidEmail(emails[i])) {
-        Alert.alert("Invalid Email", `Please enter a valid email for seat ${i + 1}`);
+        Alert.alert(
+          'Invalid Email',
+          `Please enter a valid email for seat ${i + 1}`,
+        );
         return;
       }
     }
@@ -65,57 +70,99 @@ const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            backgroundColor: "rgba(0,0,0,0.4)",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              padding: 20,
-              marginHorizontal: 20,
-              borderRadius: 10,
-              maxHeight: "80%",
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 10 }}>
-              Enter Emails for {seatCount} Seats
-            </Text>
-
-            <ScrollView keyboardShouldPersistTaps="handled">
-              {emails.map((email, index) => (
-                <EmailInput
-                  key={index}
-                  index={index}
-                  value={email}
-                  onChange={handleEmailChange}
-                />
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={onClose}
+    >
+      {/* Outer overlay - closes modal when clicked */}
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          {/* Inner content - prevents closing when clicked inside */}
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View
               style={{
-                backgroundColor: "#7aa33d",
-                borderRadius: 8,
-                paddingVertical: 14,
-                marginTop: 10,
-                alignItems: "center",
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
-              onPress={handleSubmit}
-              disabled={loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={{ color: "#fff", fontSize: 16 }}>Submit Emails</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+              <View
+                style={{
+                  backgroundColor: '#fff',
+                  padding: 20,
+                  marginHorizontal: 20,
+                  borderRadius: 12,
+                  maxHeight: '80%',
+                  width: '90%',
+                  elevation: 5,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 3.84,
+                }}
+              >
+                {/* Header with title and close button */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 15,
+                  }}
+                >
+                  <Text style={{ fontSize: 18, fontWeight: '600' }}>
+                    Enter Emails for {seatCount} Seat{seatCount > 1 ? 's' : ''}
+                  </Text>
+                  <TouchableOpacity onPress={onClose} disabled={loading}>
+                    <Text
+                      style={{ fontSize: 28, color: '#999', fontWeight: '200' }}
+                    >
+                      ×
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  style={{ maxHeight: 300 }}
+                >
+                  {emails.map((email, index) => (
+                    <EmailInput
+                      key={index}
+                      index={index}
+                      value={email}
+                      onChange={handleEmailChange}
+                    />
+                  ))}
+                </ScrollView>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#7aa33d',
+                    borderRadius: 8,
+                    paddingVertical: 14,
+                    marginTop: 15,
+                    alignItems: 'center',
+                  }}
+                  onPress={handleSubmit}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text
+                      style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}
+                    >
+                      Submit Emails
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
     </Modal>

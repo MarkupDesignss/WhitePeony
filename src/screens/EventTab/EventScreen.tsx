@@ -199,7 +199,11 @@ const EventScreen = ({ navigation }: any) => {
       }}
       activeOpacity={0.8}
     >
-      <Image source={{ uri: Image_url + item.image }} style={[styles.upCard]} />
+      <Image
+        resizeMode="cover"
+        source={{ uri: Image_url + item.image }}
+        style={[styles.upCard]}
+      />
       {/* <TouchableOpacity style={styles.bookmarkBtn}>
         <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 16, height: 16, alignItems: 'center', alignSelf: 'center' }} />
       </TouchableOpacity> */}
@@ -532,9 +536,10 @@ const EventScreen = ({ navigation }: any) => {
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+
               }}
             >
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', }}>
                 Events Near You
               </Text>
               <TouchableOpacity onPress={() => setNearbyModalVisible(false)}>
@@ -603,9 +608,9 @@ const styles = StyleSheet.create({
   seeMore: { color: '#AEB254' },
   upCard: {
     width: '100%',
-    height: 175,
+    height: '50%',
     borderRadius: 12,
-    alignSelf: 'center',
+    // alignSelf: 'center',
   },
   upBadgeRow: {
     flexDirection: 'row',

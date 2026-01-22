@@ -1,5 +1,3 @@
-/* ================== FINAL LoginModal.tsx ================== */
-
 import React, {
   useCallback,
   useContext,
@@ -37,6 +35,7 @@ interface AuthModalProps {
   onClose: () => void;
   onGoogleLogin?: () => void;
   onFacebookLogin?: () => void;
+  onSuccess?: (userData: any) => void; // Add this prop
 }
 
 const EMPTY_OTP = ['', '', '', '', '', ''];
@@ -47,6 +46,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
   onClose,
   onGoogleLogin,
   onFacebookLogin,
+  onSuccess, // Add this
 }) => {
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [otp, setOtp] = useState<string[]>(EMPTY_OTP);
@@ -56,7 +56,8 @@ const LoginModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
 
   const { showLoader, hideLoader } = CommonLoader();
-  const { setUserData, setIsLoggedIn } = useContext<UserData>(UserDataContext);
+  const { setUserData, setIsLoggedIn, setUserType } =
+    useContext<UserData>(UserDataContext);
   const { syncCartAfterLogin } = useCart();
 
   const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -163,7 +164,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  /* ================= VERIFY OTP ================= */
+  /* ================= VERIFY OTP - UPDATED ================= */
   const verifyOtp = async () => {
     const enteredOtp = otp.join('');
     if (enteredOtp.length !== 6) {
@@ -183,16 +184,28 @@ const LoginModal: React.FC<AuthModalProps> = ({
       if (res?.data?.success && res?.data?.user) {
         const user = res.data.user;
         const token = res.data.access_token;
+        const userType = user?.type; // Get user type from response
 
-        await LocalStorage.save('@login', true);
+        // Store all user data
+        await LocalStorage.save('@login', 'true');
         await LocalStorage.save('@user', user);
         await LocalStorage.save('@token', token);
+        await LocalStorage.save('@userType', userType); // Store user type
 
+        // Update context
         setUserData(user);
-        setIsLoggedIn(true);
+        setIsLoggedIn('true');
+        setUserType(userType); // Set user type in context
+
         syncCartAfterLogin?.();
 
         Toast.show({ type: 'success', text1: res.data.message });
+
+        // Call onSuccess callback if provided
+        if (onSuccess) {
+          onSuccess(user);
+        }
+
         onClose();
       } else {
         setError(
@@ -203,7 +216,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
       hideLoader();
       setError(
         err?.response?.data?.message ||
-        'Invalid or expired OTP. Please try again.',
+          'Invalid or expired OTP. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -341,7 +354,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     style={[
                       styles.loginButton,
                       loading && { opacity: 0.7 },
-                      { marginBottom: 30 }, // <-- extra space below
+                      { marginBottom: 30 },
                     ]}
                     onPress={verifyOtp}
                     disabled={loading}
@@ -352,7 +365,6 @@ const LoginModal: React.FC<AuthModalProps> = ({
                       <Text style={styles.loginText}>Verify</Text>
                     )}
                   </TouchableOpacity>
-
                 </>
               )}
             </View>

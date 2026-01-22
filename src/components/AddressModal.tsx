@@ -91,7 +91,6 @@ const AddressModal: React.FC<AddressModalProps> = ({
       });
     }
   };
-
   const handleAddressSelect = (address: Address | null) => {
     console.log('Selected address:', address);
     if (address) {
@@ -100,9 +99,13 @@ const AddressModal: React.FC<AddressModalProps> = ({
       onClose && onClose();
       return;
     }
-    // Add New flow → open details modal
-    setSelectedAddress(address);
-    setShowAddressDetail(true);
+    // Add New flow → close this modal first, then open details modal
+    onClose && onClose();
+    // Set a small timeout to ensure modal is closed before opening new one
+    setTimeout(() => {
+      setSelectedAddress(null);
+      setShowAddressDetail(true);
+    }, 100);
   };
 
   const DeleteAlert = async id => {
@@ -149,109 +152,120 @@ const AddressModal: React.FC<AddressModalProps> = ({
     }
   };
 
+  const handleAddressDetailClose = () => {
+    setShowAddressDetail(false);
+    // If needed, you can reopen the address selection modal here
+    // But usually, the address detail modal should be independent
+  };
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.header}>Select Address</Text>
+    <>
+      <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        onRequestClose={onClose}
+      >
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.overlay}>
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalContainer}>
+                <Text style={styles.header}>Select Address</Text>
 
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => handleAddressSelect(null)}
-            >
-              <Image source={Images.plus1} style={{ width: 15, height: 15 }} />
-              <Text style={styles.addText}> Add New Address</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => handleAddressSelect(null)}
+                >
+                  <Image source={Images.plus1} style={{ width: 15, height: 15 }} />
+                  <Text style={styles.addText}> Add New Address</Text>
+                </TouchableOpacity>
 
-            <ScrollView style={{ maxHeight: 300, marginTop: 15 }}>
-              {addressList && addressList.length > 0 ? (
-                addressList.map(addr => (
-                  <TouchableOpacity
-                    key={addr.id}
-                    style={styles.addressCard}
-                    // onLongPress={() => {
-                    //     setSelectedAddress(addr);
-                    //     setShowAddressDetail(true);
-                    // }}
-                    onPress={() => handleAddressSelect(addr)} // ✅ Send address to parent
-                  >
+                <ScrollView style={{ maxHeight: 300, marginTop: 15 }}>
+                  {addressList && addressList.length > 0 ? (
+                    addressList.map(addr => (
+                      <TouchableOpacity
+                        key={addr.id}
+                        style={styles.addressCard}
+                        // onLongPress={() => {
+                        //     setSelectedAddress(addr);
+                        //     setShowAddressDetail(true);
+                        // }}
+                        onPress={() => handleAddressSelect(addr)} // ✅ Send address to parent
+                      >
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#D9D9D9',
+                            height: 40,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row' }}>
+                            <Image
+                              source={Images.home}
+                              style={{ width: 18, height: 18 }}
+                            />
+                            <Text style={styles.addressLabel}>
+                              {addr.address_type}
+                            </Text>
+                          </View>
+                          {/* <TouchableOpacity onPress={() => DeleteAlert(addr.id)}> */}
+                          <TouchableOpacity
+                            onPress={() => {
+                              setSelectedAddress(addr);
+                              setShowAddressDetail(true);
+                            }}
+                          >
+                            <Image
+                              source={Images.clock}
+                              style={{ width: 20, height: 20 }}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                        <View style={{ marginTop: 10 }}>
+                          <Text style={styles.addressName}>{addr.name}</Text>
+                          <Text style={styles.addressLine}>
+                            {addr.full_address}
+                          </Text>
+                          <Text style={styles.addressLine}>{addr.phone}</Text>
+                          <Text style={styles.addressLine}>{addr.postal_code}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
                     <View
                       style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        borderBottomWidth: 1,
-                        borderBottomColor: '#D9D9D9',
-                        height: 40,
                         alignItems: 'center',
+                        justifyContent: 'center',
+                        height: 200,
                       }}
                     >
-                      <View style={{ flexDirection: 'row' }}>
-                        <Image
-                          source={Images.home}
-                          style={{ width: 18, height: 18 }}
-                        />
-                        <Text style={styles.addressLabel}>
-                          {addr.address_type}
-                        </Text>
-                      </View>
-                      {/* <TouchableOpacity onPress={() => DeleteAlert(addr.id)}> */}
-                      <TouchableOpacity
-                        onPress={() => {
-                          setSelectedAddress(addr);
-                          setShowAddressDetail(true);
-                        }}
-                      >
-                        <Image
-                          source={Images.clock}
-                          style={{ width: 20, height: 20 }}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={{ marginTop: 10 }}>
-                      <Text style={styles.addressName}>{addr.name}</Text>
-                      <Text style={styles.addressLine}>
-                        {addr.full_address}
+                      <Text style={{ color: '#999', fontSize: 16 }}>
+                        No data found
                       </Text>
-                      <Text style={styles.addressLine}>{addr.phone}</Text>
-                      <Text style={styles.addressLine}>{addr.postal_code}</Text>
                     </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View
-                  style={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: 200,
-                  }}
-                >
-                  <Text style={{ color: '#999', fontSize: 16 }}>
-                    No data found
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
+                  )}
+                </ScrollView>
 
-            <AddressDetailModal
-              isVisible={showAddressDetail}
-              onClose={() => setShowAddressDetail(false)}
-              addresses={selectedAddress}
-              onAddressUpdated={Addresses}
-            />
-
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeText}>Close</Text>
-            </TouchableOpacity>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                  <Text style={styles.closeText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Address Detail Modal - rendered separately */}
+      <AddressDetailModal
+        isVisible={showAddressDetail}
+        onClose={handleAddressDetailClose}
+        addresses={selectedAddress}
+        onAddressUpdated={Addresses}
+      />
+    </>
   );
 };
 
