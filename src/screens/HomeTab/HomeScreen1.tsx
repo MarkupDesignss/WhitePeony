@@ -1809,7 +1809,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                         source={
                           isWishlisted(item.id)
                             ? require('../../assets/heart.png') // Filled heart (wishlisted)
-                            : require('../../assets/Png/heart1.png') // Outline heart (not wishlisted)
+                            : require('../../assets/Png/heart-1.png') // Outline heart (not wishlisted)
                         }
                         style={{
                           position: 'absolute',
