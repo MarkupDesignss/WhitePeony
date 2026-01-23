@@ -21,6 +21,7 @@ import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
 import { widthPercentageToDP } from '../../constant/dimentions';
 import { Colors, Images } from '../../constant';
+import { SafeAreaView } from 'react-native-safe-area-context';
 const { width } = Dimensions.get('window');
 
 const getTimeAgo = (dateString?: string) => {
@@ -63,8 +64,6 @@ const ArticleScreen = ({ navigation }: any) => {
       hideLoader();
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { message, data } = res.data;
-        // console.log("aitcle response data:", res.data);
-        //Toast.show({ type: "success", text1: message });
         setsampleArticle(data || []);
       } else {
         Toast.show({
@@ -104,14 +103,11 @@ const ArticleScreen = ({ navigation }: any) => {
               {formatDate(item.updated_at)}
             </Text>
           </View>
-          {/* <TouchableOpacity style={styles.bookmarkBtn}>
-            <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 16, height: 16, alignItems: 'center', alignSelf: 'center' }} />
-          </TouchableOpacity> */}
         </View>
         <View style={styles.upTitleWrap}>
-          <Text numberOfLines={2} style={styles.upTitleWhite}>
+          {/* <Text numberOfLines={2} style={styles.upTitleWhite}>
             {item.content}
-          </Text>
+          </Text> */}
         </View>
       </ImageBackground>
     </TouchableOpacity>
@@ -135,12 +131,14 @@ const ArticleScreen = ({ navigation }: any) => {
             <View style={styles.nearBody}>
               <Text numberOfLines={2} style={styles.nearTitle}>
                 {' '}
-                {item.content}{' '}
+                {item.title}{' '}
               </Text>
-              {/* <View style={{ backgroundColor: Colors.button[100], width: 25, height: 25, borderRadius: 10, alignSelf: "center", justifyContent: 'center' }}>
-                <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 15, height: 15, alignSelf: 'center' }} />
-              </View> */}
+
             </View>
+            <Text numberOfLines={1.75} style={{ color: 'black', marginTop: 3, fontSize: 12 }}>
+              {' '}
+              {item.content}{' '}
+            </Text>
             <View
               style={{
                 flexDirection: 'row',
@@ -185,18 +183,30 @@ const ArticleScreen = ({ navigation }: any) => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar
         barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'}
       />
 
-      <View style={{ backgroundColor: '#FFFFF', height: 160 }}>
+      {/* Header with Back Button */}
+      <View style={styles.headerContainer}>
         <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Image
+              source={require('../../assets/Png/back.png')} // Adjust path as needed
+              style={styles.backIcon}
+            />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Articles</Text>
+          <View style={styles.headerRightPlaceholder} />
         </View>
+
         <View style={styles.searchRow}>
           <TextInput
-            placeholder="Search Products...."
+            placeholder="Search Articles...."
             placeholderTextColor={Colors.text[200]}
             style={styles.searchInput}
           />
@@ -208,6 +218,7 @@ const ArticleScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
       </View>
+
       {/* Just For You modal */}
       <Modal visible={justForYouModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
@@ -338,7 +349,7 @@ const ArticleScreen = ({ navigation }: any) => {
           />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -350,16 +361,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginTop: StatusBar.currentHeight,
   },
+  headerContainer: {
+    backgroundColor: '#FFFFF',
+    height: 160,
+  },
   header: {
     height: 80,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
+  backIcon: {
+    width: 24,
+    height: 24,
+    tintColor: Colors.button[100], // Optional: adjust color
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
+  },
+  headerRightPlaceholder: {
+    width: 40, // Same as backButton for symmetry
+  },
   searchRow: {
     flexDirection: 'row',
     paddingHorizontal: 12,
     alignItems: 'center',
+    marginTop: 10,
   },
   searchInput: {
     flex: 1,

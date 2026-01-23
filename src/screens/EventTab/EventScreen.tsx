@@ -24,6 +24,7 @@ import Geolocation from 'react-native-geolocation-service';
 import { check, request, RESULTS, PERMISSIONS } from 'react-native-permissions';
 import { widthPercentageToDP } from '../../constant/dimentions';
 import { Colors, Images } from '../../constant';
+import { SafeAreaView } from 'react-native-safe-area-context';
 const { width } = Dimensions.get('window');
 
 const EventScreen = ({ navigation }: any) => {
@@ -89,7 +90,7 @@ const EventScreen = ({ navigation }: any) => {
           );
         }
       } else if (status === RESULTS.BLOCKED) {
-        // Don’t open settings — just show message
+        // Don't open settings — just show message
         Alert.alert(
           'Permission Blocked',
           'You have permanently denied location permission. Please enable it later in settings if you change your mind.',
@@ -184,29 +185,27 @@ const EventScreen = ({ navigation }: any) => {
     }
   };
 
-  const renderUpcoming = ({ item }: { item: any }) => (
+  const renderUpcomingModal = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={{
         borderWidth: 1,
         borderRadius: 12,
         borderColor: Colors.text[400],
         padding: 10,
-        marginLeft: 5,
+        marginBottom: 12, // Add margin bottom for spacing
+        marginHorizontal: 5,
       }}
       onPress={() => {
-        navigation.navigate('EventDetails', { event: item.id }),
-          setUpcomingModalVisible(false);
+        navigation.navigate('EventDetails', { event: item.id });
+        setUpcomingModalVisible(false);
       }}
       activeOpacity={0.8}
     >
       <Image
         resizeMode="cover"
         source={{ uri: Image_url + item.image }}
-        style={[styles.upCard]}
+        style={[styles.upCardModal]} // Use separate style for modal
       />
-      {/* <TouchableOpacity style={styles.bookmarkBtn}>
-        <Image source={require('../../assets/Png/bookmark.png')} style={{ width: 16, height: 16, alignItems: 'center', alignSelf: 'center' }} />
-      </TouchableOpacity> */}
 
       <View style={styles.upBadgeRow}>
         <View style={styles.readBadge}>
@@ -249,12 +248,12 @@ const EventScreen = ({ navigation }: any) => {
     </TouchableOpacity>
   );
 
-  const renderNear = ({ item }: { item: any }) => (
+  const renderNearModal = ({ item }: { item: any }) => (
     <TouchableOpacity
-      style={styles.nearCard}
+      style={[styles.nearCard, { marginBottom: 10 }]} // Add margin bottom
       onPress={() => {
-        navigation.navigate('EventDetails', { event: item.id }),
-          setNearbyModalVisible(false);
+        navigation.navigate('EventDetails', { event: item.id });
+        setNearbyModalVisible(false);
       }}
       activeOpacity={0.8}
     >
@@ -306,29 +305,36 @@ const EventScreen = ({ navigation }: any) => {
           <Text style={styles.nearDate}>{formatDate(item.event_date)}</Text>
         </View>
       </View>
-
-      <TouchableOpacity
-        style={{
-          backgroundColor: Colors.button[100],
-          borderRadius: 12,
-          width: 25,
-          height: 25,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Image
-          source={require('../../assets/Png/bookmark.png')}
-          style={{ width: 15, height: 15, alignSelf: 'center' }}
-        />
-      </TouchableOpacity>
     </TouchableOpacity>
   );
+  // Helper function to filter out past events
+  const filterUpcomingEvents = (events: any[]) => {
+    if (!events || events.length === 0) return [];
 
+    const currentDate = new Date();
+
+    return events.filter(event => {
+      if (!event || !event.event_date) return false;
+
+      try {
+        // Parse event date
+        const eventDate = new Date(event.event_date);
+
+        // Check if event date is today or in the future
+        return eventDate >= currentDate;
+      } catch (error) {
+        console.warn('Error parsing date for event:', event.id, error);
+        return false; // Exclude events with invalid dates
+      }
+    });
+  };
+
+  // --- Search helpers ---
   // --- Search helpers ---
   const performLocalSearch = (query: string) => {
     const q = query.toLowerCase();
-    const combined = [...sampleEvents, ...NearbyEvents];
+    // Combine and filter upcoming events only
+    const combined = [...filterUpcomingEvents(sampleEvents), ...filterUpcomingEvents(NearbyEvents)];
     const uniqueMap = new Map<string, any>();
     combined.forEach((it: any) => {
       if (!it || !it.id) return;
@@ -371,15 +377,27 @@ const EventScreen = ({ navigation }: any) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar
         barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'}
       />
 
-      <View style={{ backgroundColor: '#FFFFF', height: 140 }}>
+      {/* Header with Back Button */}
+      <View style={styles.headerContainer}>
         <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Image
+              source={require('../../assets/Png/back.png')} // Adjust path as needed
+              style={styles.backIcon}
+            />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Events</Text>
+          <View style={styles.headerRightPlaceholder} />
         </View>
+
         <View style={styles.searchRow}>
           <TextInput
             placeholder="Search events..."
@@ -417,9 +435,13 @@ const EventScreen = ({ navigation }: any) => {
       </View>
 
       <FlatList
-        data={searchQuery.trim() ? searchResults : NearbyEvents}
+        data={
+          searchQuery.trim()
+            ? searchResults
+            : filterUpcomingEvents(NearbyEvents)
+        }
         keyExtractor={i => String(i.id)}
-        renderItem={renderNear}
+        renderItem={renderNearModal}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
         ListHeaderComponent={() => (
@@ -455,9 +477,9 @@ const EventScreen = ({ navigation }: any) => {
               <>
                 <View style={{ marginTop: 10 }}>
                   <FlatList
-                    data={sampleEvents}
+                    data={filterUpcomingEvents(sampleEvents)} // Filter past events
                     keyExtractor={i => String(i.id)}
-                    renderItem={renderUpcoming}
+                    renderItem={renderUpcomingModal}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ paddingLeft: 12 }}
@@ -468,8 +490,9 @@ const EventScreen = ({ navigation }: any) => {
                   <Text style={styles.sectionTitle}>Events Near You</Text>
                   <TouchableOpacity
                     onPress={() => {
-                      NearbyEvents.length == 0
-                        ? Alert.alert('', 'No Event Found')
+                      const upcomingNearby = filterUpcomingEvents(NearbyEvents);
+                      upcomingNearby.length == 0
+                        ? Alert.alert('', 'No Upcoming Event Found')
                         : setNearbyModalVisible(true);
                     }}
                   >
@@ -500,16 +523,11 @@ const EventScreen = ({ navigation }: any) => {
       />
 
       {/* Upcoming events modal */}
+   
       <Modal visible={upcomingModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
+            <View style={modalStyles.modalHeader}>
               <Text style={{ fontSize: 18, fontWeight: '700' }}>
                 Upcoming Events
               </Text>
@@ -519,11 +537,27 @@ const EventScreen = ({ navigation }: any) => {
             </View>
 
             <FlatList
-              data={sampleEvents}
+              data={filterUpcomingEvents(sampleEvents)} // Filter past events here
               keyExtractor={i => String(i.id)}
-              renderItem={renderUpcoming}
+              renderItem={renderUpcomingModal}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingTop: 12 }}
+              contentContainerStyle={{
+                paddingHorizontal: 12,
+                paddingBottom: 20,
+                paddingTop: 10,
+              }}
+              style={{ flex: 1 }}
+              initialNumToRender={5}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={false}
+              ListEmptyComponent={() => (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 }}>
+                  <Text style={{ color: '#666', fontSize: 16 }}>
+                    No upcoming events
+                  </Text>
+                </View>
+              )}
             />
           </View>
         </View>
@@ -533,13 +567,7 @@ const EventScreen = ({ navigation }: any) => {
       <Modal visible={nearbyModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
+            <View style={modalStyles.modalHeader}>
               <Text style={{ fontSize: 18, fontWeight: '700' }}>
                 Events Near You
               </Text>
@@ -550,14 +578,23 @@ const EventScreen = ({ navigation }: any) => {
             <FlatList
               data={NearbyEvents}
               keyExtractor={i => String(i.id)}
-              renderItem={renderNear}
+              renderItem={renderNearModal} // Use the updated render function
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingTop: 12 }}
+              contentContainerStyle={{
+                paddingHorizontal: 12,
+                paddingBottom: 20,
+                paddingTop: 10,
+              }}
+              style={{ flex: 1 }}
+              initialNumToRender={5}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={false}
             />
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -567,14 +604,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  headerContainer: {
+    backgroundColor: '#FFFFF',
+    height: 140,
   },
   header: {
     height: 80,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
+  backIcon: {
+    width: 24,
+    height: 24,
+    tintColor: Colors.button[100], // Optional: adjust color
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
+  },
+  headerRightPlaceholder: {
+    width: 40, // Same as backButton for symmetry
+  },
+  upCardModal: {
+    width: '100%',
+    height: 150, // Fixed height for modal cards
+    borderRadius: 12,
+  },
   searchRow: {
     flexDirection: 'row',
     paddingHorizontal: 12,
@@ -689,9 +755,18 @@ const modalStyles = StyleSheet.create({
   },
   content: {
     backgroundColor: '#fff',
-    padding: 15,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
-    maxHeight: '80%',
+    height: Dimensions.get('window').height * 0.8, // Use exact height
+    width: '100%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEAEA',
   },
 });

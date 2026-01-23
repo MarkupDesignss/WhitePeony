@@ -13,15 +13,18 @@ export interface WishlistContextValue {
   removeFromWishlist: (id: WishlistItemId) => Promise<void> | void;
   toggleWishlist: (id: WishlistItemId) => Promise<void> | void;
   clearWishlist: () => void;
+  refreshWishlistFromServer: () => Promise<void>;
 }
 
+// Define default value
 const defaultValue: WishlistContextValue = {
   wishlistIds: [],
   isWishlisted: () => false,
-  addToWishlist: () => { },
-  removeFromWishlist: () => { },
-  toggleWishlist: () => { },
+  addToWishlist: async () => { },
+  removeFromWishlist: async () => { },
+  toggleWishlist: async () => { },
   clearWishlist: () => { },
+  refreshWishlistFromServer: async () => { },
 };
 
 export const WishlistContext = createContext<WishlistContextValue>(defaultValue);
@@ -34,41 +37,92 @@ const STORAGE_KEY = '@wishlist_ids';
 
 export const WishlistProvider: React.FC<Props> = ({ children }) => {
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
-  const [wishlistId, setWishlistId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { isLoggedIn } = useContext<UserData>(UserDataContext);
 
-
+  // Load wishlist from storage
   useEffect(() => {
-    (async () => {
+    loadWishlistFromStorage();
+  }, []);
+
+  // Load server wishlist when logged in
+  useEffect(() => {
+    if (isLoggedIn) {
+      refreshWishlistFromServer();
+    }
+  }, [isLoggedIn]);
+
+  const loadWishlistFromStorage = async () => {
+    try {
       const stored = await LocalStorage.read(STORAGE_KEY);
       if (Array.isArray(stored)) {
         setWishlistIds(stored.map(String));
       }
+    } catch (error) {
+      console.log('Error loading wishlist from storage:', error);
+    }
+  };
 
-      // Only fetch from API when logged in
-      if (isLoggedIn) {
-        try {
-          const res = await UserService.wishlist();
-          const apiWishlist = res?.data?.wishlist;
-          if (apiWishlist) {
-            setWishlistId(String(apiWishlist.id));
-            const items = Array.isArray(apiWishlist.items) ? apiWishlist.items : [];
-            const ids = items
-              .map((it: any) => it?.product_id)
-              .filter((v: any) => v !== undefined && v !== null)
-              .map((v: any) => String(v));
-            setWishlistIds(ids);
-          }
-        } catch (e) {
-          // ignore fetch errors; fallback to local storage
+  const saveWishlistToStorage = async (ids: string[]) => {
+    try {
+      await LocalStorage.save(STORAGE_KEY, ids);
+    } catch (error) {
+      console.log('Error saving wishlist to storage:', error);
+    }
+  };
+
+  const refreshWishlistFromServer = async () => {
+    if (!isLoggedIn) return;
+
+    try {
+      setIsLoading(true);
+      const res = await UserService.wishlist();
+
+      console.log('Wishlist API response:', {
+        status: res.status,
+        data: res.data
+      });
+
+      if (res?.data?.success) {
+        const wishlistData = res.data.data || res.data.wishlist;
+
+        // Handle different response formats
+        let productIds: string[] = [];
+
+        if (Array.isArray(wishlistData)) {
+          // If response is an array of products
+          productIds = wishlistData
+            .map((item: any) => item?.id || item?.product_id || item?.product?.id)
+            .filter(Boolean)
+            .map(String);
+        } else if (wishlistData?.items && Array.isArray(wishlistData.items)) {
+          // If response has nested items array
+          productIds = wishlistData.items
+            .map((item: any) => item?.product_id || item?.product?.id)
+            .filter(Boolean)
+            .map(String);
         }
-      }
-    })();
-  }, [isLoggedIn]);
 
-  useEffect(() => {
-    LocalStorage.save(STORAGE_KEY, wishlistIds);
-  }, [wishlistIds]);
+        console.log('Extracted product IDs:', productIds);
+        setWishlistIds(productIds);
+        saveWishlistToStorage(productIds);
+      }
+    } catch (error: any) {
+      console.log('Error refreshing wishlist:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to load wishlist',
+        text2: error.response?.data?.message || 'Please try again'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const isWishlisted = useCallback(
     (id: WishlistItemId) => wishlistIds.includes(String(id)),
@@ -77,55 +131,107 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
 
   const addToWishlist = useCallback(async (id: WishlistItemId) => {
     const key = String(id);
-    // optimistic update
-    setWishlistIds(prev => (prev.includes(key) ? prev : [...prev, key]));
+
+    // Check if already in wishlist
+    if (wishlistIds.includes(key)) {
+      return;
+    }
+
+    // Optimistic update
+    const newWishlist = [...wishlistIds, key];
+    setWishlistIds(newWishlist);
+    saveWishlistToStorage(newWishlist);
+
+    // API call for logged-in users
     if (isLoggedIn) {
       try {
-        await UserService.wishlistadd({ product_id: id });
-      } catch (e) {
-        console.log('Add to wishlist error', JSON.stringify(e));
-        // rollback on failure
-        setWishlistIds(prev => prev.filter(x => x !== key));
-        Toast.show({ type: 'error', text1: 'Failed to add to wishlist' });
+        console.log('Adding to wishlist:', { product_id: id });
+        const res = await UserService.wishlistadd({ product_id: id });
+
+        if (res?.data?.success) {
+          Toast.show({
+            type: 'success',
+            text1: 'Added to wishlist',
+          });
+        } else {
+          throw new Error('Failed to add to wishlist');
+        }
+      } catch (error: any) {
+        // Rollback on failure
+        const rollbackWishlist = wishlistIds.filter(x => x !== key);
+        setWishlistIds(rollbackWishlist);
+        saveWishlistToStorage(rollbackWishlist);
+
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to add to wishlist',
+          text2: error.response?.data?.message || 'Please try again'
+        });
       }
+    } else {
+      // For non-logged in users
+      Toast.show({
+        type: 'success',
+        text1: 'Added to wishlist',
+      });
     }
-  }, [isLoggedIn]);
+  }, [wishlistIds, isLoggedIn]);
 
   const removeFromWishlist = useCallback(async (id: WishlistItemId) => {
     const key = String(id);
-    // optimistic update
-    setWishlistIds(prev => prev.filter(x => x !== key));
+
+    // Optimistic update
+    const newWishlist = wishlistIds.filter(x => x !== key);
+    setWishlistIds(newWishlist);
+    saveWishlistToStorage(newWishlist);
+
+    // API call for logged-in users
     if (isLoggedIn) {
       try {
-        if (wishlistId) {
-          await UserService.wishlistDelete(key);
+        console.log('Removing from wishlist:', { product_id: id });
+        const res = await UserService.wishlistDelete(id);
+
+        if (res?.data?.success) {
+          Toast.show({
+            type: 'success',
+            text1: 'Removed from wishlist',
+          });
         } else {
-          // If wishlistId missing, re-fetch once and retry
-          const res = await UserService.wishlist();
-          const apiWishlist = res?.data?.wishlist;
-          if (apiWishlist?.id) {
-            setWishlistId(String(apiWishlist.id));
-            await UserService.wishlistDelete(key);
-          }
+          throw new Error('Failed to remove from wishlist');
         }
-      } catch (e) {
-        // rollback on failure
-        setWishlistIds(prev => (prev.includes(key) ? prev : [...prev, key]));
-        Toast.show({ type: 'error', text1: 'Failed to remove from wishlist' });
+      } catch (error: any) {
+        // Rollback on failure
+        const rollbackWishlist = [...wishlistIds, key];
+        setWishlistIds(rollbackWishlist);
+        saveWishlistToStorage(rollbackWishlist);
+
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to remove from wishlist',
+          text2: error.response?.data?.message || 'Please try again'
+        });
       }
+    } else {
+      // For non-logged in users
+      Toast.show({
+        type: 'success',
+        text1: 'Removed from wishlist',
+      });
     }
-  }, [isLoggedIn, wishlistId]);
+  }, [wishlistIds, isLoggedIn]);
 
   const toggleWishlist = useCallback(async (id: WishlistItemId) => {
-    const key = String(id);
-    if (wishlistIds.includes(key)) {
-      await removeFromWishlist(key);
+    if (isWishlisted(id)) {
+      await removeFromWishlist(id);
     } else {
-      await addToWishlist(key);
+      await addToWishlist(id);
     }
-  }, [wishlistIds, addToWishlist, removeFromWishlist]);
+  }, [isWishlisted, addToWishlist, removeFromWishlist]);
 
-  const clearWishlist = useCallback(() => setWishlistIds([]), []);
+  const clearWishlist = useCallback(() => {
+    setWishlistIds([]);
+    saveWishlistToStorage([]);
+  }, []);
 
   const value = useMemo<WishlistContextValue>(
     () => ({
@@ -135,12 +241,12 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
       removeFromWishlist,
       toggleWishlist,
       clearWishlist,
+      refreshWishlistFromServer,
     }),
-    [wishlistIds, isWishlisted, addToWishlist, removeFromWishlist, toggleWishlist, clearWishlist],
+    [wishlistIds, isWishlisted, addToWishlist, removeFromWishlist, toggleWishlist, clearWishlist]
   );
 
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>;
 };
 
 export default WishlistProvider;
-

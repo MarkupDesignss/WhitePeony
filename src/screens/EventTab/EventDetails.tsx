@@ -355,8 +355,8 @@ const EventDetails = ({ navigation, route }: any) => {
         )}
       </View>
 
-      {/* Bottom Sheet for Seat Selection - Only show if event is not passed */}
-      {eventDetails && !isEventPassed && (
+      {/* Bottom Sheet for Seat Selection - Only show if event is not passed AND not loading */}
+      {eventDetails && !isEventPassed && !isLoading && (
         <Modal
           visible={isBottomSheetVisible}
           animationType="slide"
@@ -436,11 +436,7 @@ const EventDetails = ({ navigation, route }: any) => {
         isLoading={isLoading}
       />
 
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#7aa33d" />
-        </View>
-      )}
+      {/* REMOVED DUPLICATE LOADING OVERLAY */}
     </SafeAreaView>
   );
 };
@@ -663,15 +659,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

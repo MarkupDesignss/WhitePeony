@@ -630,17 +630,51 @@ export const UserService = {
     return APIKit.get(`search?q=${word}`, apiHeaders);
   },
 
-  wishlistadd: async (payload: any) => {
-    const token = await LocalStorage.read('@token');
-    const apiHeaders = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    };
-    // console.log('payload', payload)
-    return APIKit.post(`wishlist/add`, payload, apiHeaders);
-  },
+ // Replace these three methods in your UserService object:
+
+wishlistadd: async (payload: { product_id: string | number }) => {
+  const token = await LocalStorage.read('@token');
+  const apiHeaders = {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  };
+  // Convert product_id to number for the API
+  const numericPayload = {
+    product_id: Number(payload.product_id)
+  };
+  console.log('Wishlist add payload:', numericPayload);
+  return APIKit.post(`wishlist/add`, numericPayload, apiHeaders);
+},
+
+wishlist: async () => {
+  const token = await LocalStorage.read('@token');
+  const apiHeaders = {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  };
+  return APIKit.get(`wishlist`, apiHeaders);
+},
+
+wishlistDelete: async (productId: string | number) => {
+  const token = await LocalStorage.read('@token');
+  const apiHeaders = {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  };
+  // Send as DELETE with data payload
+  const numericProductId = Number(productId);
+  console.log('Wishlist delete payload:', { product_id: numericProductId });
+  return APIKit.delete(`wishlist/delete`, {
+    ...apiHeaders,
+    data: { product_id: numericProductId }
+  });
+},
 
   wishlist: async () => {
     const token = await LocalStorage.read('@token');

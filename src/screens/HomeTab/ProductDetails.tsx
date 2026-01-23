@@ -56,31 +56,28 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   );
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [displayPrice, setDisplayPrice] = useState<any>('0');
+  const [actualPrice, setActualPrice] = useState<any>('0');
   const [displayUnit, setDisplayUnit] = useState<string>('');
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [isInCart, setIsInCart] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
-
   useEffect(() => {
-    try {
-      if (!productData) return;
-      const variantId = selectedVariant?.id ?? null;
+    // When variants load, check if first variant is in cart
+    if (variants.length > 0 && productData) {
+      const firstVariant = variants[0];
       const present = Array.isArray(cart)
         ? cart.some((c: any) => {
             const cartProductId = c.product_id ?? c.id;
             const cartVariantId = c.variant_id ?? null;
             return (
               Number(cartProductId) === Number(productData.id) &&
-              String(cartVariantId) === String(variantId)
+              String(cartVariantId) === String(firstVariant.id)
             );
           })
         : false;
-      // also respect locally set productData.is_cart to prevent flicker
-      setIsInCart(Boolean(present || productData?.is_cart));
-    } catch (e) {
-      console.log('isInCart sync error', e);
+      setIsInCart(Boolean(present));
     }
-  }, [cart, selectedVariant, productData?.id]);
+  }, [variants, productData, cart]);
 
   // Load a product by id and set up state (images, variants, related products, reviews)
   const loadProduct = async (productId: any) => {
@@ -122,11 +119,12 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
 
           const variant0 = allVariants.length ? allVariants[0] : null;
           const price = variant0?.price || first.main_price || '0';
+          const actualPrice = variant0?.actual_price ?? variant0?.price ?? '0';
           const unit = variant0?.unit || '';
           const normalized = { ...first, images: allImages, price, unit };
-
           setProductData(normalized);
           setDisplayPrice(price);
+          setActualPrice(actualPrice);
           setDisplayUnit(unit);
 
           // fetch related products using first category if available
@@ -286,10 +284,15 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       }));
       setWeightItems(items);
       setVariants(productData.variants);
+
       if (items.length) {
-        setWeightValue('0');
-        setDisplayPrice(items[0].price ?? productData.price ?? '0');
-        setDisplayUnit(items[0].unit ?? productData.unit ?? '');
+        setSelectedIndex(0); // Set initial index to 0
+        const firstVariant = productData.variants[0];
+        setWeightValue(firstVariant.id);
+        setDisplayPrice(firstVariant.price ?? productData.main_price ?? '0');
+        setActualPrice(firstVariant.actual_price ?? firstVariant.price ?? '0');
+        setDisplayUnit(firstVariant.unit ?? productData.unit ?? '');
+        setSelectedVariant(firstVariant);
       }
     }
   }, [productData]);
@@ -377,10 +380,9 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }
 
     try {
-      await addToCart(productData.id, selectedVariant?.id);
-      // mark in-cart immediately without waiting for API flag
+      // Pass the selected variant id
+      await addToCart(productData.id, selectedVariant?.id || null);
       setProductData((prev: any) => (prev ? { ...prev, is_cart: true } : prev));
-      // Show success message
       Toast.show({
         type: 'success',
         text1: 'Added to cart successfully!',
@@ -392,7 +394,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       } else {
         Toast.show({
           type: 'error',
-          text1: error || 'Something went wrong!',
+          text1: error?.message || 'Something went wrong!',
         });
       }
     }
@@ -429,6 +431,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }
   };
 
+  // Replace existing cart button with new component
   // Replace existing cart button with new component
   const CartButton = () => {
     if (productData?.stock_quantity === 0) {
@@ -669,9 +672,19 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             </Text>
           </Text>
         </View>
-
-        <Text style={styles.price}>{Math.round(displayPrice)}€ </Text>
-
+        <Text style={styles.price}>{Math.round(actualPrice)}€ </Text>
+        {actualPrice !== displayPrice && (
+          <Text
+            style={{
+              ...styles.price,
+              fontSize: 12,
+              textDecorationLine: 'line-through',
+              color: '#999',
+            }}
+          >
+            {Math.round(displayPrice)}€{' '}
+          </Text>
+        )}
         <View style={{ marginTop: heightPercentageToDP(2) }}>
           <Text style={{ fontWeight: '600', fontSize: 12 }}>
             Select an Unit
@@ -687,20 +700,39 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           >
             {weightItems.map((item, index) => {
               const isSelected = selectedIndex === index;
+              const variant = variants[index];
 
               return (
                 <TouchableOpacity
                   key={item.value}
                   activeOpacity={0.8}
                   onPress={() => {
-                    const v = variants[index];
-                    if (v) {
+                    if (variant) {
                       setSelectedIndex(index);
+                      // Get prices from the variant, not from item
                       setDisplayPrice(
-                        v.price ?? productData.price ?? displayPrice,
+                        variant.price || productData?.main_price || '0',
                       );
-                      setDisplayUnit(v.unit ?? productData.unit ?? displayUnit);
-                      setSelectedVariant(v);
+                      setActualPrice(
+                        variant.actual_price || variant.price || '0',
+                      );
+                      setDisplayUnit(variant.unit || productData?.unit || '');
+                      setSelectedVariant(variant);
+                      setWeightValue(variant.id);
+
+                      // Check if this specific variant is in cart
+                      const present = Array.isArray(cart)
+                        ? cart.some((c: any) => {
+                            const cartProductId = c.product_id ?? c.id;
+                            const cartVariantId = c.variant_id ?? null;
+                            return (
+                              Number(cartProductId) ===
+                                Number(productData?.id) &&
+                              String(cartVariantId) === String(variant.id)
+                            );
+                          })
+                        : false;
+                      setIsInCart(Boolean(present));
                     }
                   }}
                   style={{

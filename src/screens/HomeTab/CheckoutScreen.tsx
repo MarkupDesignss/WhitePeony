@@ -51,6 +51,7 @@ type CartItem = {
   product_name?: string;
   variant_sku?: string;
   total_price?: number;
+  actual_price?: number; // Add this line
   quantity: number;
   variants?: { variant_id?: number | string }[];
   variant_id?: number | string;
@@ -70,8 +71,13 @@ type Address = {
 };
 
 const CheckoutScreen = ({ navigation }: { navigation: any }) => {
-  const { addToCart, removeFromCart, getCartDetails, syncCartAfterLogin, cart } =
-    useCart();
+  const {
+    addToCart,
+    removeFromCart,
+    getCartDetails,
+    syncCartAfterLogin,
+    cart,
+  } = useCart();
   const [modalVisible, setModalVisible] = useState(false);
   const [modalAddress, setModalAddress] = useState(false);
   const [modalAddressADD, setmodalAddressADD] = useState(false);
@@ -82,7 +88,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const [cartData, setApiCartData] = useState<any>({
     items: [],
     total_amount: 0,
-    id: null
+    id: null,
   });
   const [cartid, setcartid] = useState<any>(null);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
@@ -140,7 +146,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       await Promise.all([
         fetchWishlist(),
         Getshiping(),
-        GetCartDetails() // Fetch cart on initial load
+        GetCartDetails(), // Fetch cart on initial load
       ]);
     };
 
@@ -222,74 +228,110 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     );
   };
 
- const renderShipmentItem = ({ item }: { item: CartItem }) => (
-  <Swipeable
-    renderRightActions={() => renderRightActions(item)}
-    overshootRight={false}
-  >
-    <View style={styles.shipmentItemCard}>
-      <Image
-        source={{ uri: Image_url + item.front_image }}
-        style={styles.shipmentImage}
-      />
+  const renderShipmentItem = ({ item }: { item: CartItem }) => {
+    // Convert prices to numbers for comparison
+    const actualPriceNum = parseFloat(item.actual_price || "0");
+    const totalPriceNum = parseFloat(item.total_price || "0");
+    const hasDiscount = totalPriceNum > actualPriceNum;
 
-      <View
-        style={{
-          width: widthPercentageToDP(65),
-          left: widthPercentageToDP(5),
-        }}
+    return (
+      <Swipeable
+        renderRightActions={() => renderRightActions(item)}
+        overshootRight={false}
       >
-        <Text style={styles.shipmentName}>{item.product_name || item.name}</Text>
-        <Text style={styles.shipmentWeight}>{item?.unit || null}</Text>
+        <View style={styles.shipmentItemCard}>
+          <Image
+            source={{ uri: Image_url + item.front_image }}
+            style={styles.shipmentImage}
+          />
 
-        <TouchableOpacity
-          onPress={() => moveToWishlist(item.id)}
-          style={styles.moveToWishlistBtn}
-        >
-          <Text style={styles.moveToWishlistText}>Move to wishlist</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.shipmentPrice}>{item?.total_price} €</Text>
-
-        <View style={styles.qtyControlContainer}>
-          <TouchableOpacity
-            onPress={() => UpdateCart(item, -1)}
-            disabled={item.quantity <= 1}
-            style={styles.qtyBtn}
+          <View
+            style={{
+              width: widthPercentageToDP(65),
+              left: widthPercentageToDP(5),
+            }}
           >
-            <Image
-              source={require('../../assets/Png/minus.png')}
-              style={{ width: 20, height: 20 }}
-            />
-          </TouchableOpacity>
+            <Text style={styles.shipmentName}>
+              {item.product_name || item.name}
+            </Text>
+            <Text style={styles.shipmentWeight}>{item?.unit || null}</Text>
 
-          <Text style={styles.qtyText}>{item.quantity}</Text>
+            <TouchableOpacity
+              onPress={() => moveToWishlist(item.id)}
+              style={styles.moveToWishlistBtn}
+            >
+              <Text style={styles.moveToWishlistText}>Move to wishlist</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => UpdateCart(item, +1)}
-            style={styles.qtyBtn}
-          >
-            <Image
-              source={require('../../assets/Png/add.png')}
-              style={{ width: 20, height: 20 }}
-            />
-          </TouchableOpacity>
+            {/* Price display - show discount if available */}
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}
+            >
+              {/* Discounted price (actual price) */}
+              <Text style={styles.shipmentActualPrice}>
+                {actualPriceNum.toFixed(2)} €
+              </Text>
+
+              {/* Original price with strikethrough if discount exists */}
+              {hasDiscount && (
+                <>
+                  <Text style={styles.shipmentOriginalPrice}>
+                    {totalPriceNum.toFixed(2)} €
+                  </Text>
+                  {/* Show savings amount */}
+                  <Text style={styles.savingsText}>
+                    Save {(totalPriceNum - actualPriceNum).toFixed(2)} €
+                  </Text>
+                </>
+              )}
+            </View>
+
+            <View style={styles.qtyControlContainer}>
+              <TouchableOpacity
+                onPress={() => UpdateCart(item, -1)}
+                disabled={item.quantity <= 1}
+                style={styles.qtyBtn}
+              >
+                <Image
+                  source={require('../../assets/Png/minus.png')}
+                  style={{ width: 20, height: 20 }}
+                />
+              </TouchableOpacity>
+
+              <Text style={styles.qtyText}>{item.quantity}</Text>
+
+              <TouchableOpacity
+                onPress={() => UpdateCart(item, +1)}
+                style={styles.qtyBtn}
+              >
+                <Image
+                  source={require('../../assets/Png/add.png')}
+                  style={{ width: 20, height: 20 }}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </View>
-    </View>
-  </Swipeable>
-);
+      </Swipeable>
+    );
+  };
 
   const renderSuggestionItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       onPress={() =>
-        navigation.navigate('ProductDetails', { productId: item.product_id || item.id })
+        navigation.navigate('ProductDetails', {
+          productId: item.product_id || item.id,
+        })
       }
       activeOpacity={0.8}
     >
       <View style={styles.suggestionCard}>
         <Image
-          source={item.image ? { uri: Image_url + item.image } : require('../../assets/Png/product.png')}
+          source={
+            item.image
+              ? { uri: Image_url + item.image }
+              : require('../../assets/Png/product.png')
+          }
           style={styles.suggestionImage}
         />
         <Text style={styles.suggestionName} numberOfLines={1}>
@@ -323,7 +365,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             );
           })}
         </View>
-        <Text style={styles.suggestionPrice}>{item?.variants?.[0]?.unit || item?.unit}</Text>
+        <Text style={styles.suggestionPrice}>
+          {item?.variants?.[0]?.unit || item?.unit}
+        </Text>
         <Text style={[styles.suggestionPrice, { color: '#000' }]}>
           {item?.variants?.[0]?.price || item?.price} €
         </Text>
@@ -407,60 +451,80 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const GetCartDetails = async () => {
     try {
       setLoadingCart(true);
-      console.log('Fetching cart details...');
       const res = await UserService.viewCart();
-      console.log('Cart API response:', res?.status, res?.data);
 
       if (res && res.data) {
-        // The API returns: { success: true, cart: { items: [], total_amount: 0, id: ... } }
         const cartDataFromResponse = res.data.cart || res.data;
 
-        // Ensure we have a proper structure
+        // Process items with proper price handling
+        const processedItems = (cartDataFromResponse?.items || []).map(item => {
+          // Extract variant information if available
+          const variant = item.variants?.[0] || {};
+
+          // Determine actual price (discounted price)
+          let actualPrice = variant.actual_price || item.actual_price || variant.price || item.total_price;
+
+          // Determine display price (original price)
+          let displayPrice = variant.price || item.total_price;
+
+          // If there's a percentage discount, calculate the original price
+          if (variant.percentage && parseFloat(variant.percentage) > 0) {
+            // Calculate original price from discounted price and percentage
+            const discountPercent = parseFloat(variant.percentage);
+            actualPrice = variant.price; // This is the discounted price from API
+            displayPrice = (parseFloat(actualPrice) * 100) / (100 - discountPercent);
+          }
+
+          return {
+            ...item,
+            actual_price: actualPrice,
+            total_price: displayPrice, // This becomes the original/original price
+            unit: variant.unit || item.unit,
+            variant_id: variant.id || item.variant_id
+          };
+        });
+
+        // Calculate totals with actual prices (discounted prices)
+        const discountedTotal = processedItems.reduce((sum, item) => {
+          const price = parseFloat(item.actual_price || 0) * (item.quantity || 1);
+          return sum + price;
+        }, 0);
+
+        // Calculate original total (before discounts)
+        const originalTotal = processedItems.reduce((sum, item) => {
+          const price = parseFloat(item.total_price || 0) * (item.quantity || 1);
+          return sum + price;
+        }, 0);
+
+        const totalSavings = originalTotal - discountedTotal;
+
         const processedCartData = {
-          items: cartDataFromResponse?.items || [],
-          total_amount: cartDataFromResponse?.total_amount || 0,
+          items: processedItems,
+          total_amount: discountedTotal, // Final amount to pay (after discounts)
+          subtotal_amount: originalTotal, // Original total before discounts
+          discounted_total: discountedTotal,
+          total_savings: totalSavings,
           id: cartDataFromResponse?.id || null,
-          // Include other cart properties if needed
-          ...cartDataFromResponse
         };
 
         setApiCartData(processedCartData);
         setcartid(processedCartData?.id);
 
-        console.log('Cart details set successfully:', {
-          itemCount: processedCartData.items?.length || 0,
-          totalAmount: processedCartData.total_amount || 0,
-          cartId: processedCartData.id
+        console.log('Cart prices calculated:', {
+          discountedTotal,
+          originalTotal,
+          totalSavings
         });
-
       } else {
-        console.log('No cart data in response');
         setApiCartData({ items: [], total_amount: 0, id: null });
       }
     } catch (err: any) {
-      console.log('Cart error details:', {
-        message: err?.message,
-        response: err?.response?.data,
-        status: err?.response?.status
+      console.log('GetCartDetails error', JSON.stringify(err));
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || 'Failed to fetch cart',
       });
-
-      if (err?.response?.status === 401) {
-        Toast.show({
-          type: 'error',
-          text1: 'Session expired',
-          text2: 'Please login again'
-        });
-      } else if (err?.response?.status === 404) {
-        // Cart might be empty
-        setApiCartData({ items: [], total_amount: 0, id: null });
-        console.log('Cart is empty or not found');
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Failed to load cart',
-          text2: 'Please try again'
-        });
-      }
+      setApiCartData({ items: [], total_amount: 0, id: null });
     } finally {
       setLoadingCart(false);
       hideLoader();
@@ -559,7 +623,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       console.log('PlaceOrder error', JSON.stringify(err));
       Toast.show({
         type: 'error',
-        text1: err?.response?.data?.message || 'Failed to place order'
+        text1: err?.response?.data?.message || 'Failed to place order',
       });
     } finally {
       hideLoader();
@@ -581,7 +645,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             <Text style={styles.headerTitle}>Checkout</Text>
             {cartData?.items?.length > 0 && (
               <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{cartData.items.length}</Text>
+                <Text style={styles.cartBadgeText}>
+                  {cartData.items.length}
+                </Text>
               </View>
             )}
           </View>
@@ -905,6 +971,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               </TouchableWithoutFeedback>
             </Modal>
 
+
             {/* Bill details */}
             {cartData && (
               <View
@@ -918,13 +985,32 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               >
                 <Text style={styles.billTitle}>Bill details</Text>
 
+                {/* Subtotal (original prices) */}
                 <View style={styles.billRow}>
-                  <Text style={styles.billLabel}>Total</Text>
+                  <Text style={styles.billLabel}>Subtotal ({cartData.items.length} items)</Text>
                   <Text style={styles.billValue}>
-                    {cartData?.total_amount ?? 0} €
+                    {cartData?.subtotal_amount?.toFixed(2) || "0.00"} €
                   </Text>
                 </View>
 
+                {/* Total savings from discounts */}
+                {cartData?.total_savings && cartData.total_savings > 0 && (
+                  <View style={styles.billRow}>
+                    <Text style={[styles.billLabel, { color: '#5DA53B' }]}>
+                      Total Savings
+                    </Text>
+                    <Text
+                      style={[
+                        styles.billValue,
+                        { color: '#5DA53B', fontWeight: '600' },
+                      ]}
+                    >
+                      -{cartData.total_savings.toFixed(2)} €
+                    </Text>
+                  </View>
+                )}
+
+                {/* Coupon discount if applied */}
                 {appliedPromo && (
                   <View style={styles.billRow}>
                     <View
@@ -958,6 +1044,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   </View>
                 )}
 
+                {/* Delivery charges */}
                 <View style={styles.billRow}>
                   <Text style={[styles.billLabel, { fontWeight: '500' }]}>
                     Delivery Charges
@@ -981,6 +1068,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   }}
                 ></View>
 
+                {/* Grand total */}
                 <View style={styles.billRow}>
                   <Text
                     style={[
@@ -997,14 +1085,12 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     ]}
                   >
                     {(
-                      Number(cartData?.total_amount ?? 0) - discountAmount
-                    ).toFixed(2)}{' '}
-                    €
+                      (cartData?.discounted_total || 0) - discountAmount
+                    ).toFixed(2)} €
                   </Text>
                 </View>
               </View>
             )}
-
             {/* Delivery address */}
             <View style={styles.deliveryAddressCard}>
               <View style={{ alignSelf: 'center', flexDirection: 'row' }}>
@@ -1531,6 +1617,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     marginLeft: 10,
+  },
+  shipmentActualPrice: {
+    marginTop: 4,
+    fontWeight: '600',
+    fontSize: 14,
+    color: '#111',
+  },
+
+  shipmentOriginalPrice: {
+    fontSize: 12,
+    color: '#999',
+    textDecorationLine: 'line-through',
+    marginLeft: 8,
   },
 
   billTitle: {

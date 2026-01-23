@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   ImageBackground,
   Alert,
+  RefreshControl
 } from 'react-native';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
@@ -24,7 +25,7 @@ import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
-import { WishlistContext } from '../../context';
+import { WishlistContext, WishlistContextValue } from '../../context';
 import Toast from 'react-native-toast-message';
 import LinearGradient from 'react-native-linear-gradient';
 import { UserData, UserDataContext } from '../../context/userDataContext';
@@ -44,8 +45,13 @@ const HomeScreen1 = ({ navigation }: any) => {
   const { setUserData, isLoggedIn, userType } =
     useContext<UserData>(UserDataContext);
 
-  const { toggleWishlist, isWishlisted, removeFromWishlist, wishlistIds } =
-    React.useContext(WishlistContext);
+  const {
+    toggleWishlist,
+    isWishlisted,
+    removeFromWishlist,
+    addToWishlist, // Add this
+    wishlistIds,
+  } = useContext(WishlistContext);
   const [category, setApiCateProducts] = useState([]);
   const [categoryProduct, setcategoryProduct] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
@@ -60,7 +66,7 @@ const HomeScreen1 = ({ navigation }: any) => {
   const [Promotional, setPromotional] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoadingCategory, setIsLoadingCategory] = useState(false);
-
+  const [refreshing, setRefreshing] = useState(false);
   const { showLoader, hideLoader } = CommonLoader();
   const topPadding =
     Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0;
@@ -72,6 +78,13 @@ const HomeScreen1 = ({ navigation }: any) => {
     const index = Math.round(offsetX / (WISHLIST_CARD_WIDTH + 12));
     setActiveRec(index);
   };
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    refreshAllData();
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
 
   // Helper function to get current product type
   const getCurrentProductType = () => {
@@ -154,14 +167,19 @@ const HomeScreen1 = ({ navigation }: any) => {
       return removeDuplicateBanners(b2cBanners);
     }
 
-    // If userType is null or undefined (logged in but no specific type), 
+    // If userType is null or undefined (logged in but no specific type),
     // combine both b2c and b2b banners
     if (currentType === null || currentType === undefined) {
       console.log('User logged in but no specific type, combining all banners');
       const b2cBanners = data?.b2c || [];
       const b2bBanners = data?.b2b || [];
 
-      console.log('Combining banners - b2c:', b2cBanners.length, 'b2b:', b2bBanners.length);
+      console.log(
+        'Combining banners - b2c:',
+        b2cBanners.length,
+        'b2b:',
+        b2bBanners.length,
+      );
 
       // Combine all banners
       const allBanners = [...b2cBanners, ...b2bBanners];
@@ -181,7 +199,6 @@ const HomeScreen1 = ({ navigation }: any) => {
     return removeDuplicateBanners(typeBanners);
   };
 
-
   const removeDuplicateBanners = (banners: any[]) => {
     if (!Array.isArray(banners) || banners.length === 0) return [];
 
@@ -196,8 +213,10 @@ const HomeScreen1 = ({ navigation }: any) => {
         banner?.id,
         banner?.image_url,
         banner?.product_id,
-        banner?.title
-      ].filter(Boolean).join('|');
+        banner?.title,
+      ]
+        .filter(Boolean)
+        .join('|');
 
       // If we haven't seen this combination, add it to unique banners
       if (combinationKey && !seenCombinations.has(combinationKey)) {
@@ -259,7 +278,17 @@ const HomeScreen1 = ({ navigation }: any) => {
       };
     }, [userType, isLoggedIn]), // Dependencies
   );
+  // Inside your HomeScreen1 component, add these logs:
 
+  useEffect(() => {
+    console.log('Wishlist debug:', {
+      isLoggedIn,
+      wishlistitemLength: wishlistitem?.length,
+      wishlistitemData: JSON.stringify(wishlistitem, null, 2),
+      wishlistIds: Array.isArray(wishlistIds) ? wishlistIds.length : 0,
+      wishlistIdsData: wishlistIds
+    });
+  }, [wishlistitem, wishlistIds, isLoggedIn]);
   // update wishlist items depending on login state (server vs local)
   useEffect(() => {
     if (isLoggedIn) {
@@ -279,7 +308,10 @@ const HomeScreen1 = ({ navigation }: any) => {
       const res = await UserService.header();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         // Log raw data for debugging
-        console.log('Raw header data:', JSON.stringify(res?.data?.data, null, 2));
+        console.log(
+          'Raw header data:',
+          JSON.stringify(res?.data?.data, null, 2),
+        );
 
         // Use helper function to get appropriate banners
         const banners = getPromotionalBanners(res?.data?.data || {});
@@ -325,6 +357,13 @@ const HomeScreen1 = ({ navigation }: any) => {
         hideLoader();
         const fetchedProducts = res?.data?.data || [];
         const filteredProducts = filterProductsByType(fetchedProducts);
+
+        // Add debugging
+        console.log('Category ID:', categoryId);
+        console.log('Fetched products:', fetchedProducts.length);
+        console.log('Filtered products:', filteredProducts.length);
+        console.log('Filtered products data:', filteredProducts);
+
         setcategoryProduct(filteredProducts);
         await featuredproduct();
       }
@@ -435,25 +474,76 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
+  // In your fetchServerWishlist function
   const fetchServerWishlist = async () => {
     try {
       showLoader();
       const res = await UserService.wishlist();
-      const apiItems = res?.data?.data || [];
-      hideLoader();
 
-      // Filter wishlist items by product type
-      const filteredWishlist = filterProductsByType(apiItems);
-      setwishlistitem(filteredWishlist);
-    } catch (e) {
-      hideLoader();
-      const error = e as any;
-      if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
+      console.log('Wishlist API Response:', {
+        status: res.status,
+        data: res.data,
+        success: res.data?.success,
+        message: res.data?.message,
+      });
+
+      if (res?.data?.success) {
+        const apiItems = res.data?.data || [];
+
+        console.log('Raw wishlist items:', {
+          totalItems: apiItems.length,
+          items: apiItems.map((item: any) => ({
+            id: item?.id,
+            name: item?.name,
+            product_type: item?.product_type
+          }))
+        });
+
+        // Filter products by type
+        const filteredWishlist = filterProductsByType(apiItems);
+
+        console.log('Filtered wishlist:', {
+          count: filteredWishlist.length,
+          items: filteredWishlist.map((item: any) => ({
+            id: item?.id,
+            name: item?.name,
+            front_image: item?.front_image
+          }))
+        });
+
+        setwishlistitem([...filteredWishlist]);
       }
+      hideLoader();
+    } catch (e: any) {
+      hideLoader();
+      console.log('Wishlist fetch error:', e);
+    }
+  };
+  const refreshWishlist = async () => {
+    if (isLoggedIn) {
+      await fetchServerWishlist();
+    } else {
+      // For local wishlist, ensure it's an array
+      const localWishlist = Array.isArray(wishlistIds)
+        ? wishlistIds.map(id => ({ id }))
+        : [];
+      setwishlistitem(localWishlist);
     }
   };
 
+  // Call this function when adding/removing from wishlist
+  const handleWishlistToggle = async (productId: number) => {
+    if (isWishlisted(productId)) {
+      await removeFromWishlist(productId);
+    } else {
+      await addToWishlist(productId);
+    }
+
+    // Refresh wishlist after toggle
+    setTimeout(() => {
+      refreshWishlist();
+    }, 500);
+  };
   const OrderList = async () => {
     try {
       showLoader();
@@ -499,17 +589,18 @@ const HomeScreen1 = ({ navigation }: any) => {
   };
 
   // PromotionalBanner component
-  const PromotionalBanner: React.FC<{ promotional: any[]; navigation: any }> = ({
-    promotional = [] as any[],
-    navigation,
-  }) => {
+  const PromotionalBanner: React.FC<{
+    promotional: any[];
+    navigation: any;
+  }> = ({ promotional = [] as any[], navigation }) => {
     if (!promotional.length) return null;
 
     return (
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''}`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
+              }`}
             style={styles.page}
           >
             <Image
@@ -549,7 +640,6 @@ const HomeScreen1 = ({ navigation }: any) => {
       </View>
     );
   };
-
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFF0' }}>
@@ -595,6 +685,14 @@ const HomeScreen1 = ({ navigation }: any) => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={{ backgroundColor: '#FFFFF0' }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#2E2E2E']}
+            tintColor="#2E2E2E"
+          />
+        }
       >
         {/* Search Bar */}
         <TouchableOpacity onPress={() => navigation.navigate('Searchpage')}>
@@ -712,7 +810,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               }}
             />
           </View>
-
           <View
             style={{
               borderWidth: 0.7,
@@ -722,8 +819,9 @@ const HomeScreen1 = ({ navigation }: any) => {
               marginTop: heightPercentageToDP(-2.2),
             }}
           />
-
           {/* Categories Grid */}
+          {/* Categories Grid */}
+          // Update the Categories Grid section with this code:
           {isLoadingCategory ? (
             <View style={styles.container}>
               <View style={[styles.row, { justifyContent: 'center' }]}>
@@ -743,122 +841,83 @@ const HomeScreen1 = ({ navigation }: any) => {
                 </View>
               </View>
             </View>
-          ) : categoryProduct.length !== 0 ? (
+          ) : Array.isArray(categoryProduct) && categoryProduct.length > 0 ? (
             <View style={styles.container}>
-              <View style={styles.row}>
-                {categoryProduct.length > 0 ? (
-                  <LinearGradient
-                    colors={['#EFEFCA', '#E2E689']}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
-                    style={{ flex: 1, borderRadius: 12 }}
-                  >
-                    <TouchableOpacity
-                      onPress={() =>
-                        navigation.navigate('ProductDetails', {
-                          productId: categoryProduct[0].id,
-                        })
-                      }
+              {/* Calculate available products count */}
+              {(() => {
+                const availableProducts = categoryProduct.filter(
+                  item => item && item.id && item.name,
+                );
+
+                // If no products available after filtering
+                if (availableProducts.length === 0) {
+                  return (
+                    <View
+                      style={{
+                        borderRadius: 12,
+                        backgroundColor: '#EFEFCA',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: BIG_HEIGHT,
+                        padding: 20,
+                      }}
                     >
-                      <View style={[styles.card, { height: BIG_HEIGHT }]}>
-                        <Text style={{ ...styles.title }}>All</Text>
-                        <Text
-                          numberOfLines={2}
-                          style={[
-                            styles.title,
-                            { color: '#000', marginTop: 8 },
-                          ]}
-                        >
-                          {categoryProduct[0].name}
-                        </Text>
-                        <View
-                          style={{
-                            borderRadius: 4,
-                            backgroundColor: '#5f621a',
-                            width: 40,
-                            alignSelf: 'center',
-                            marginTop: 10,
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontWeight: '700',
-                              fontSize: 12,
-                              alignSelf: 'center',
-                              color: '#fff',
-                              textDecorationLine: 'line-through',
-                              textAlignVertical: 'center',
-                            }}
-                          >
-                            {Math.round(
-                              categoryProduct[0]?.variants?.[0]?.price || 0,
-                            )}{' '}
-                            €
-                          </Text>
-                        </View>
-                        <View
-                          style={{
-                            borderRadius: 4,
-                            backgroundColor: '#E0CB54',
-                            width: 50,
-                            alignSelf: 'center',
-                            marginTop: 10,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontWeight: '700',
-                              fontSize: 12,
-                              alignSelf: 'center',
-                              padding: 5,
-                              color: '#000',
-                            }}
-                          >
-                            {Math.round(
-                              categoryProduct[0]?.variants?.[0]?.price || 0,
-                            )}{' '}
-                            €
-                          </Text>
-                        </View>
-                        <Image
-                          source={{
-                            uri:
-                              Image_url +
-                              (categoryProduct[0]?.front_image || ''),
-                          }}
-                          style={styles.imageBig}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                  </LinearGradient>
-                ) : (
-                  <View
-                    style={{
-                      flex: 1,
-                      borderRadius: 12,
-                      backgroundColor: '#EFEFCA',
-                    }}
-                  >
-                    <View style={[styles.card, { height: BIG_HEIGHT }]}>
-                      <Text style={styles.title}>No Products</Text>
                       <Text
                         style={[
                           styles.title,
-                          { color: '#666', marginTop: -10 },
+                          { fontSize: 16, marginBottom: 10 },
                         ]}
                       >
-                        Available
+                        No Products Found
+                      </Text>
+                      <Text
+                        style={[
+                          styles.title,
+                          { color: '#666', textAlign: 'center' },
+                        ]}
+                      >
+                        Try selecting a different category or check back later.
                       </Text>
                     </View>
-                  </View>
-                )}
+                  );
+                }
 
-                <View style={styles.stack}>
-                  <View style={{ justifyContent: 'space-between', gap: 8 }}>
-                    {categoryProduct.slice(1, 3).map((item, index) => (
+                // Function to get product at index safely
+                const getProductAt = (index: number) => {
+                  return availableProducts[index] || null;
+                };
+
+                // Count available products
+                const hasProduct1 = getProductAt(0) !== null;
+                const hasProduct2 = getProductAt(1) !== null;
+                const hasProduct3 = getProductAt(2) !== null;
+                const hasProduct4 = getProductAt(3) !== null;
+                const hasProduct5 = getProductAt(4) !== null;
+
+                // Calculate layout based on available products
+                const smallCardsCount = [
+                  hasProduct2,
+                  hasProduct3,
+                  hasProduct4,
+                  hasProduct5,
+                ].filter(Boolean).length;
+
+                let layoutHeight = BIG_HEIGHT;
+
+                // Adjust height based on number of small cards
+                if (smallCardsCount === 0 && hasProduct1) {
+                  // Only big card exists
+                  layoutHeight = BIG_HEIGHT;
+                } else if (smallCardsCount <= 2) {
+                  // Some small cards missing, reduce height
+                  layoutHeight = BIG_HEIGHT * 0.75;
+                }
+
+                return (
+                  <View style={[styles.row, { height: layoutHeight }]}>
+                    {/* Big Card (Only render if product exists) */}
+                    {hasProduct1 ? (
                       <LinearGradient
-                        key={`first-${item.id}-${index}`}
                         colors={['#EFEFCA', '#E2E689']}
                         start={{ x: 0.5, y: 0 }}
                         end={{ x: 0.5, y: 1 }}
@@ -867,167 +926,297 @@ const HomeScreen1 = ({ navigation }: any) => {
                         <TouchableOpacity
                           onPress={() =>
                             navigation.navigate('ProductDetails', {
-                              productId: item.id,
+                              productId: availableProducts[0].id,
                             })
                           }
                         >
-                          <View style={[styles.card, { height: SMALL_HEIGHT }]}>
-                            <Text numberOfLines={2} style={styles.title}>
-                              {item.name}
+                          <View style={[styles.card, { height: '100%' }]}>
+                            <Text style={{ ...styles.title }}>All</Text>
+                            <Text
+                              numberOfLines={2}
+                              style={[
+                                styles.title,
+                                { color: '#000', marginTop: 8 },
+                              ]}
+                            >
+                              {availableProducts[0]?.name || 'Product'}
                             </Text>
-                            <Image
-                              source={{ uri: Image_url + item.front_image }}
-                              style={styles.imageSmall}
-                            />
+                            {availableProducts[0]?.variants?.[0]?.price && (
+                              <>
+                                <View
+                                  style={{
+                                    borderRadius: 4,
+                                    backgroundColor: '#5f621a',
+                                    width: 40,
+                                    alignSelf: 'center',
+                                    marginTop: 10,
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontWeight: '700',
+                                      fontSize: 12,
+                                      alignSelf: 'center',
+                                      color: '#fff',
+                                      textDecorationLine: 'line-through',
+                                      textAlignVertical: 'center',
+                                    }}
+                                  >
+                                    {Math.round(
+                                      availableProducts[0]?.variants?.[0]
+                                        ?.price || 0,
+                                    )}{' '}
+                                    €
+                                  </Text>
+                                </View>
+                                <View
+                                  style={{
+                                    borderRadius: 4,
+                                    backgroundColor: '#E0CB54',
+                                    width: 50,
+                                    alignSelf: 'center',
+                                    marginTop: 10,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontWeight: '700',
+                                      fontSize: 12,
+                                      alignSelf: 'center',
+                                      padding: 5,
+                                      color: '#000',
+                                    }}
+                                  >
+                                    {Math.round(
+                                      availableProducts[0]?.variants?.[0]
+                                        ?.price || 0,
+                                    )}{' '}
+                                    €
+                                  </Text>
+                                </View>
+                              </>
+                            )}
+                            {availableProducts[0]?.front_image ? (
+                              <Image
+                                source={{
+                                  uri:
+                                    Image_url +
+                                    availableProducts[0]?.front_image,
+                                }}
+                                style={styles.imageBig}
+                              />
+                            ) : null}
                           </View>
                         </TouchableOpacity>
                       </LinearGradient>
-                    ))}
-
-                    {categoryProduct.length < 3 &&
-                      Array.from({
-                        length: 2 - Math.min(categoryProduct.length - 1, 2),
-                      }).map((_, index) => (
-                        <View
-                          key={`empty-first-${index}`}
-                          style={[
-                            styles.card,
-                            {
-                              height: SMALL_HEIGHT,
-                              backgroundColor: '#EFEFCA',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.title, { color: '#999' }]}>
-                            Empty
-                          </Text>
-                        </View>
-                      ))}
-                  </View>
-
-                  <View style={{ justifyContent: 'space-between', gap: 8 }}>
-                    {categoryProduct.slice(3, 5).map((item, index) => (
+                    ) : (
+                      // Empty big card placeholder
                       <LinearGradient
-                        key={`second-${item.id}-${index}`}
                         colors={['#EFEFCA', '#E2E689']}
                         start={{ x: 0.5, y: 0 }}
                         end={{ x: 0.5, y: 1 }}
-                        style={{ flex: 1, borderRadius: 12 }}
+                        style={{
+                          flex: 1,
+                          borderRadius: 12,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
                       >
-                        <TouchableOpacity
-                          onPress={() =>
-                            navigation.navigate('ProductDetails', {
-                              productId: item.id,
-                            })
-                          }
-                        >
-                          <View style={[styles.card, { height: SMALL_HEIGHT }]}>
-                            <Text numberOfLines={2} style={styles.title}>
-                              {item.name}
-                            </Text>
-                            <Image
-                              source={{ uri: Image_url + item.front_image }}
-                              style={styles.imageSmall}
-                            />
-                          </View>
-                        </TouchableOpacity>
+                        <Text style={styles.title}>No Product Available</Text>
                       </LinearGradient>
-                    ))}
+                    )}
 
-                    {categoryProduct.length < 5 &&
-                      Array.from({
-                        length: 2 - Math.max(categoryProduct.length - 3, 0),
-                      }).map((_, index) => (
-                        <View
-                          key={`empty-second-${index}`}
-                          style={[
-                            styles.card,
-                            {
-                              height: SMALL_HEIGHT,
-                              backgroundColor: '#EFEFCA',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.title, { color: '#999' }]}>
-                            Empty
-                          </Text>
-                        </View>
-                      ))}
+                    {/* Right side small cards */}
+                    <View style={styles.stack}>
+                      {/* First column */}
+                      <View
+                        style={{
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          flex: 1,
+                        }}
+                      >
+                        {hasProduct2 ? (
+                          <LinearGradient
+                            key={`first-${availableProducts[1].id}`}
+                            colors={['#EFEFCA', '#E2E689']}
+                            start={{ x: 0.5, y: 0 }}
+                            end={{ x: 0.5, y: 1 }}
+                            style={{ flex: 1, borderRadius: 12 }}
+                          >
+                            <TouchableOpacity
+                              onPress={() =>
+                                navigation.navigate('ProductDetails', {
+                                  productId: availableProducts[1].id,
+                                })
+                              }
+                              style={{ flex: 1 }}
+                            >
+                              <View style={[styles.card, { height: '100%' }]}>
+                                <Text numberOfLines={2} style={styles.title}>
+                                  {availableProducts[1].name}
+                                </Text>
+                                <Image
+                                  source={{
+                                    uri:
+                                      Image_url +
+                                      availableProducts[1].front_image,
+                                  }}
+                                  style={styles.imageSmall}
+                                />
+                              </View>
+                            </TouchableOpacity>
+                          </LinearGradient>
+                        ) : (
+                          <View style={{ flex: 1 }} /> // Empty space
+                        )}
+
+                        {hasProduct3 ? (
+                          <LinearGradient
+                            key={`second-${availableProducts[2].id}`}
+                            colors={['#EFEFCA', '#E2E689']}
+                            start={{ x: 0.5, y: 0 }}
+                            end={{ x: 0.5, y: 1 }}
+                            style={{ flex: 1, borderRadius: 12 }}
+                          >
+                            <TouchableOpacity
+                              onPress={() =>
+                                navigation.navigate('ProductDetails', {
+                                  productId: availableProducts[2].id,
+                                })
+                              }
+                              style={{ flex: 1 }}
+                            >
+                              <View style={[styles.card, { height: '100%' }]}>
+                                <Text numberOfLines={2} style={styles.title}>
+                                  {availableProducts[2].name}
+                                </Text>
+                                <Image
+                                  source={{
+                                    uri:
+                                      Image_url +
+                                      availableProducts[2].front_image,
+                                  }}
+                                  style={styles.imageSmall}
+                                />
+                              </View>
+                            </TouchableOpacity>
+                          </LinearGradient>
+                        ) : (
+                          <View style={{ flex: 1 }} /> // Empty space
+                        )}
+                      </View>
+
+                      {/* Second column */}
+                      <View
+                        style={{
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          flex: 1,
+                        }}
+                      >
+                        {hasProduct4 ? (
+                          <LinearGradient
+                            key={`third-${availableProducts[3].id}`}
+                            colors={['#EFEFCA', '#E2E689']}
+                            start={{ x: 0.5, y: 0 }}
+                            end={{ x: 0.5, y: 1 }}
+                            style={{ flex: 1, borderRadius: 12 }}
+                          >
+                            <TouchableOpacity
+                              onPress={() =>
+                                navigation.navigate('ProductDetails', {
+                                  productId: availableProducts[3].id,
+                                })
+                              }
+                              style={{ flex: 1 }}
+                            >
+                              <View style={[styles.card, { height: '100%' }]}>
+                                <Text numberOfLines={2} style={styles.title}>
+                                  {availableProducts[3].name}
+                                </Text>
+                                <Image
+                                  source={{
+                                    uri:
+                                      Image_url +
+                                      availableProducts[3].front_image,
+                                  }}
+                                  style={styles.imageSmall}
+                                />
+                              </View>
+                            </TouchableOpacity>
+                          </LinearGradient>
+                        ) : (
+                          <View style={{ flex: 1 }} /> // Empty space
+                        )}
+
+                        {hasProduct5 ? (
+                          <LinearGradient
+                            key={`fourth-${availableProducts[4].id}`}
+                            colors={['#EFEFCA', '#E2E689']}
+                            start={{ x: 0.5, y: 0 }}
+                            end={{ x: 0.5, y: 1 }}
+                            style={{ flex: 1, borderRadius: 12 }}
+                          >
+                            <TouchableOpacity
+                              onPress={() =>
+                                navigation.navigate('ProductDetails', {
+                                  productId: availableProducts[4].id,
+                                })
+                              }
+                              style={{ flex: 1 }}
+                            >
+                              <View style={[styles.card, { height: '100%' }]}>
+                                <Text numberOfLines={2} style={styles.title}>
+                                  {availableProducts[4].name}
+                                </Text>
+                                <Image
+                                  source={{
+                                    uri:
+                                      Image_url +
+                                      availableProducts[4].front_image,
+                                  }}
+                                  style={styles.imageSmall}
+                                />
+                              </View>
+                            </TouchableOpacity>
+                          </LinearGradient>
+                        ) : (
+                          <View style={{ flex: 1 }} /> // Empty space
+                        )}
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
+                );
+              })()}
             </View>
           ) : (
+            // No products at all
             <View style={styles.container}>
-              <View style={[styles.row, { justifyContent: 'center' }]}>
-                <View
-                  style={{
-                    flex: 1,
-                    borderRadius: 12,
-                    backgroundColor: '#EFEFCA',
-                  }}
+              <View
+                style={{
+                  borderRadius: 12,
+                  backgroundColor: '#EFEFCA',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  minHeight: BIG_HEIGHT,
+                  padding: 20,
+                }}
+              >
+                <Text
+                  style={[styles.title, { fontSize: 16, marginBottom: 10 }]}
                 >
-                  <View style={[styles.card, { height: BIG_HEIGHT }]}>
-                    <Text style={styles.title}>No Products Found</Text>
-                    <Text
-                      style={[styles.title, { color: '#666', marginTop: -10 }]}
-                    >
-                      Try another category
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.stack}>
-                  <View style={{ justifyContent: 'space-between', gap: 8 }}>
-                    {[1, 2].map(index => (
-                      <View
-                        key={`empty-col1-${index}`}
-                        style={[
-                          styles.card,
-                          {
-                            height: SMALL_HEIGHT,
-                            backgroundColor: '#EFEFCA',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.title, { color: '#999' }]}>
-                          Empty
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <View style={{ justifyContent: 'space-between', gap: 8 }}>
-                    {[1, 2].map(index => (
-                      <View
-                        key={`empty-col2-${index}`}
-                        style={[
-                          styles.card,
-                          {
-                            height: SMALL_HEIGHT,
-                            backgroundColor: '#EFEFCA',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.title, { color: '#999' }]}>
-                          Empty
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
+                  No Products Found
+                </Text>
+                <Text
+                  style={[styles.title, { color: '#666', textAlign: 'center' }]}
+                >
+                  Try selecting a different category or check back later.
+                </Text>
               </View>
             </View>
           )}
-
           {/* Frequently Bought */}
           <View
             style={{
@@ -1121,7 +1310,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               }}
             />
           </View>
-
           {/* Big Sale Section */}
           {salesProduct.length > 0 && (
             <View
@@ -1184,7 +1372,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                           <View
                             style={{
                               backgroundColor: '#FFFFFF',
-                              width: 70,
+
                               height: 17,
                               borderRadius: 8,
                               justifyContent: 'center',
@@ -1222,7 +1410,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               </View>
             </View>
           )}
-
           {/* Lowest Prices Ever */}
           <View
             style={{
@@ -1310,66 +1497,16 @@ const HomeScreen1 = ({ navigation }: any) => {
                             <Text style={{ color: '#008009' }}>▶</Text>{' '}
                           </Text>
                         </View>
-
                         <TouchableOpacity
-                          onPress={async () => {
-                            if (wished) {
-                              try {
-                                toggleWishlist(item.id);
-                                if (isLoggedIn) {
-                                  showLoader();
-                                  const res = await UserService.wishlistDelete(
-                                    item.id,
-                                  );
-                                  if (res?.status === HttpStatusCode.Ok) {
-                                    await removeFromWishlist(item.id);
-                                    Toast.show({
-                                      type: 'success',
-                                      text1: 'Removed from wishlist',
-                                    });
-                                  } else {
-                                    Toast.show({
-                                      type: 'error',
-                                      text1: 'Failed to remove from wishlist',
-                                    });
-                                  }
-                                  hideLoader();
-                                } else {
-                                  removeFromWishlist(item.id);
-                                  Toast.show({
-                                    type: 'success',
-                                    text1: 'Removed from wishlist',
-                                  });
-                                }
-                              } catch (err) {
-                                hideLoader();
-                                console.log('Wishlist remove error:', err);
-                                Toast.show({
-                                  type: 'error',
-                                  text1: 'Failed to remove from wishlist',
-                                });
-                              }
+                          activeOpacity={0.8}
+                          onPress={async e => {
+                            e.stopPropagation();
+                            if (isWishlisted(item.id)) {
+                              await removeFromWishlist(item.id);
                             } else {
-                              try {
-                                toggleWishlist(item.id);
-                                if (!isLoggedIn) {
-                                  Toast.show({
-                                    type: 'success',
-                                    text1: 'Added to wishlist',
-                                  });
-                                  return;
-                                }
-                              } catch (err) {
-                                hideLoader();
-                                console.log('Wishlist add error:', err);
-                                Toast.show({
-                                  type: 'error',
-                                  text1: 'Failed to add to wishlist',
-                                });
-                              }
+                              await addToWishlist(item.id);
                             }
                           }}
-                          activeOpacity={0.7}
                           style={{
                             position: 'absolute',
                             top: heightPercentageToDP(1.5),
@@ -1377,22 +1514,21 @@ const HomeScreen1 = ({ navigation }: any) => {
                             backgroundColor: Colors.button[100],
                             padding: 6,
                             borderRadius: 12,
-                            width: 20,
-                            height: 20,
+                            width: 28,
+                            height: 28,
                             justifyContent: 'center',
+                            alignItems: 'center',
                           }}
                         >
                           <Image
                             source={
-                              wished
-                                ? require('../../assets/Png/heart1.png')
-                                : require('../../assets/Png/heart-1.png')
+                              isWishlisted(item.id)
+                                ? require('../../assets/heart.png') // Filled heart
+                                : require('../../assets/Png/heart-1.png') // Outline heart
                             }
                             style={{
-                              position: 'absolute',
-                              width: 12,
-                              height: 12,
-                              alignSelf: 'center',
+                              width: 14,
+                              height: 14,
                               resizeMode: 'cover',
                             }}
                           />
@@ -1448,286 +1584,270 @@ const HomeScreen1 = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
           </View>
-
           {/* Your Wishlist */}
-          {wishlistitem?.length != 0 ? (
+          {/* Your Wishlist */}
+               {/* Your Wishlist */}
+          {wishlistitem && Array.isArray(wishlistitem) && wishlistitem.length > 0 ? (
             <View
               style={{
                 paddingHorizontal: widthPercentageToDP(3),
                 marginTop: heightPercentageToDP(2),
               }}
             >
-              <Text style={styles.sectionTitle}>Your Wishlist</Text>
+              <Text style={styles.sectionTitle}>Your Wishlist ({wishlistitem.length})</Text>
+
               <FlatList
                 data={wishlistitem}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                keyExtractor={item => item.id}
+                keyExtractor={(item, index) => `${item?.id}-${index}`}
                 contentContainerStyle={{ paddingVertical: 8 }}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate('ProductDetails', {
-                        productId: item.id,
-                      })
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.wishlistCard,
-                        { width: WISHLIST_CARD_WIDTH },
-                      ]}
+                extraData={wishlistitem}
+                renderItem={({ item, index }) => {
+                  console.log('Rendering wishlist item:', { index, id: item?.id, name: item?.name });
+
+                  if (!item) return null;
+
+                  return (
+                    <TouchableOpacity
+                      key={`${item.id}-${index}`}
+                      onPress={() =>
+                        navigation.navigate('ProductDetails', {
+                          productId: item?.id,
+                        })
+                      }
                     >
-                      <Image
-                        source={{ uri: Image_url + item?.front_image }}
-                        style={styles.wishlistImage}
-                      />
-                      <Text
-                        numberOfLines={2}
+                      <View
                         style={[
-                          styles.wishlistTitle,
-                          {
-                            fontWeight: '400',
-                            height: heightPercentageToDP(4),
-                          },
+                          styles.wishlistCard,
+                          { width: WISHLIST_CARD_WIDTH, marginRight: 12 },
                         ]}
                       >
-                        {item?.name}
-                      </Text>
-                      <View
-                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                      >
-                        <Text style={styles.smallPrice}>
-                          {Math.round(item?.variants[0]?.price)} €
-                        </Text>
-                        {item?.variants[0]?.price && (
-                          <Text style={styles.smallOldPrice}>
-                            {Math.round(item?.variants[0]?.price)} €
-                          </Text>
+                        {item?.front_image ? (
+                          <Image
+                            source={{ uri: Image_url + item.front_image }}
+                            style={styles.wishlistImage}
+                          />
+                        ) : (
+                          <View style={[styles.wishlistImage, { backgroundColor: '#EFEFCA', justifyContent: 'center', alignItems: 'center' }]}>
+                            <Text style={{ fontSize: 10 }}>No Image</Text>
+                          </View>
                         )}
-                      </View>
 
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={e => {
-                          e.stopPropagation();
-                          toggleWishlist(item.id);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: heightPercentageToDP(1.5),
-                          right: widthPercentageToDP(4),
-                          backgroundColor: Colors.button[100],
-                          padding: 6,
-                          borderRadius: 12,
-                          width: 28,
-                          height: 28,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Image
-                          source={require('../../assets/Png/heart1.png')}
-                          style={{ width: 14, height: 14, resizeMode: 'cover' }}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          ) : null}
-
-          <View
-            style={{
-              marginTop:
-                wishlistitem?.length == 0 ? heightPercentageToDP(3) : null,
-            }}
-          ></View>
-
-          {/* Promotional Banner */}
-
-          <PromotionalBanner promotional={Promotional} navigation={navigation} />
-
-          {/* Recommended For You */}
-          <View
-            style={{
-              paddingHorizontal: widthPercentageToDP(3),
-              marginTop: heightPercentageToDP(2),
-              marginBottom: heightPercentageToDP(4),
-            }}
-          >
-            <Text style={styles.sectionTitle}>Recommended For You</Text>
-            <FlatList
-              ref={recRef}
-              data={apiRecommend}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={item => item.id}
-              snapToInterval={WISHLIST_CARD_WIDTH + 12}
-              decelerationRate="fast"
-              contentContainerStyle={{ paddingVertical: 8 }}
-              onScroll={onRecommendedScroll}
-              renderItem={({ item }) => {
-                const wished = isWishlisted(item.id);
-
-                return (
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate('ProductDetails', {
-                        productId: item.id,
-                      })
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.wishlistCard,
-                        { width: WISHLIST_CARD_WIDTH },
-                      ]}
-                    >
-                      <Image
-                        source={{ uri: Image_url + item?.front_image }}
-                        style={styles.wishlistImage}
-                      />
-                      <Text
-                        numberOfLines={2}
-                        style={[
-                          styles.wishlistTitle,
-                          {
-                            fontWeight: '400',
-                            height: heightPercentageToDP(4),
-                          },
-                        ]}
-                      >
-                        {item?.name}
-                      </Text>
-                      <View
-                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                      >
-                        <Text style={styles.smallPrice}>
-                          {Math.round(item.variants[0]?.price)} €
+                        <Text
+                          numberOfLines={2}
+                          style={[
+                            styles.wishlistTitle,
+                            {
+                              fontWeight: '400',
+                              height: heightPercentageToDP(4),
+                              marginTop: 8,
+                            },
+                          ]}
+                        >
+                          {item?.name || 'Product'}
                         </Text>
-                        {item.variants[0]?.price && (
-                          <Text style={styles.smallOldPrice}>
-                            {Math.round(item.variants[0]?.price)} €
-                          </Text>
-                        )}
-                      </View>
 
-                      <TouchableOpacity
-                        onPress={async () => {
-                          if (wished) {
-                            try {
-                              toggleWishlist(item.id);
-                              if (isLoggedIn) {
-                                showLoader();
-                                const res = await UserService.wishlistDelete(
-                                  item.id,
-                                );
-                                if (res?.status === HttpStatusCode.Ok) {
-                                  await removeFromWishlist(item.id);
-                                  Toast.show({
-                                    type: 'success',
-                                    text1: 'Removed from wishlist',
-                                  });
-                                } else {
-                                  Toast.show({
-                                    type: 'error',
-                                    text1: 'Failed to remove from wishlist',
-                                  });
-                                }
-                                hideLoader();
-                              } else {
-                                removeFromWishlist(item.id);
-                                Toast.show({
-                                  type: 'success',
-                                  text1: 'Removed from wishlist',
-                                });
-                              }
-                            } catch (err) {
-                              hideLoader();
-                              console.log('Wishlist remove error:', err);
-                              Toast.show({
-                                type: 'error',
-                                text1: 'Failed to remove from wishlist',
-                              });
-                            }
-                          } else {
-                            try {
-                              toggleWishlist(item.id);
-                              if (!isLoggedIn) {
-                                Toast.show({
-                                  type: 'success',
-                                  text1: 'Added to wishlist',
-                                });
-                                return;
-                              }
-                            } catch (err) {
-                              hideLoader();
-                              console.log('Wishlist add error:', err);
-                              Toast.show({
-                                type: 'error',
-                                text1: 'Failed to add to wishlist',
-                              });
-                            }
-                          }
-                        }}
-                        activeOpacity={0.7}
-                        style={{
-                          position: 'absolute',
-                          top: heightPercentageToDP(1.5),
-                          right: widthPercentageToDP(4),
-                          backgroundColor: Colors.button[100],
-                          padding: 6,
-                          borderRadius: 12,
-                          width: 20,
-                          height: 20,
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Image
-                          source={
-                            wished
-                              ? require('../../assets/Png/heart1.png')
-                              : require('../../assets/Png/heart-1.png')
-                          }
+                        {item?.variants?.[0]?.price ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                            <Text style={styles.smallPrice}>
+                              {Math.round(item.variants[0].price)} €
+                            </Text>
+                            <Text style={styles.smallOldPrice}>
+                              {Math.round(item.variants[0].price)} €
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>Price not available</Text>
+                        )}
+
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={async e => {
+                            e.stopPropagation();
+                            console.log('Wishlist button pressed for:', item.id);
+                            await handleWishlistToggle(item.id);
+                          }}
                           style={{
                             position: 'absolute',
-                            width: 12,
-                            height: 12,
-                            alignSelf: 'center',
-                            resizeMode: 'cover',
+                            top: 8,
+                            right: 8,
+                            backgroundColor: Colors.button[100],
+                            padding: 6,
+                            borderRadius: 12,
+                            width: 28,
+                            height: 28,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            zIndex: 10,
                           }}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-
-            {/* Dots */}
-            <View style={styles.dotsContainer}>
-              {Array.isArray(apiRecommend) &&
-                apiRecommend.map((_, i) => (
-                  <View
-                    key={i}
-                    style={[styles.dot, activeRec === i && styles.activeDot]}
-                  />
-                ))}
+                        >
+                          <Image
+                            source={
+                              isWishlisted(item.id)
+                                ? require('../../assets/heart.png')
+                                : require('../../assets/Png/heart-1.png')
+                            }
+                            style={{ width: 14, height: 14, resizeMode: 'cover' }}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
             </View>
+          ) : (
+            <View style={{ paddingHorizontal: widthPercentageToDP(3), marginTop: heightPercentageToDP(2) }}>
+              <Text style={styles.sectionTitle}>Your Wishlist (0)</Text>
+              <View style={{ padding: 20, alignItems: 'center', backgroundColor: '#F9F9F9', borderRadius: 10 }}>
+                <Text>No items in your wishlist</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('CategoryScreen')}>
+                  <Text style={{ color: '#2E2E2E', marginTop: 10 }}>Browse Products →</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        <View
+          style={{
+            marginTop:
+              wishlistitem?.length == 0 ? heightPercentageToDP(3) : null,
+          }}
+        ></View>
+        {/* Promotional Banner */}
+        <PromotionalBanner
+          promotional={Promotional}
+          navigation={navigation}
+        />
+        {/* Recommended For You */}
+        <View
+          style={{
+            paddingHorizontal: widthPercentageToDP(3),
+            marginTop: heightPercentageToDP(2),
+            marginBottom: heightPercentageToDP(4),
+          }}
+        >
+          <Text style={styles.sectionTitle}>Recommended For You</Text>
+          <FlatList
+            ref={recRef}
+            data={apiRecommend}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={item => item.id}
+            snapToInterval={WISHLIST_CARD_WIDTH + 12}
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingVertical: 8 }}
+            onScroll={onRecommendedScroll}
+            renderItem={({ item }) => {
+              const wished = isWishlisted(item.id);
+
+              return (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('ProductDetails', {
+                      productId: item.id,
+                    })
+                  }
+                >
+                  <View
+                    style={[
+                      styles.wishlistCard,
+                      { width: WISHLIST_CARD_WIDTH },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: Image_url + item?.front_image }}
+                      style={styles.wishlistImage}
+                    />
+                    <Text
+                      numberOfLines={2}
+                      style={[
+                        styles.wishlistTitle,
+                        {
+                          fontWeight: '400',
+                          height: heightPercentageToDP(4),
+                        },
+                      ]}
+                    >
+                      {item?.name}
+                    </Text>
+                    <View
+                      style={{ flexDirection: 'row', alignItems: 'center' }}
+                    >
+                      <Text style={styles.smallPrice}>
+                        {Math.round(item.variants[0]?.price)} €
+                      </Text>
+                      {item.variants[0]?.price && (
+                        <Text style={styles.smallOldPrice}>
+                          {Math.round(item.variants[0]?.price)} €
+                        </Text>
+                      )}
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={async () => {
+                        if (isWishlisted(item.id)) {
+                          await removeFromWishlist(item.id);
+                        } else {
+                          await addToWishlist(item.id);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                      style={{
+                        position: 'absolute',
+                        top: heightPercentageToDP(1.5),
+                        right: widthPercentageToDP(4),
+                        backgroundColor: Colors.button[100],
+                        padding: 6,
+                        borderRadius: 12,
+                        width: 20,
+                        height: 20,
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Image
+                        source={
+                          isWishlisted(item.id)
+                            ? require('../../assets/heart.png') // Filled heart (wishlisted)
+                            : require('../../assets/Png/heart1.png') // Outline heart (not wishlisted)
+                        }
+                        style={{
+                          position: 'absolute',
+                          width: 12,
+                          height: 12,
+                          alignSelf: 'center',
+                          resizeMode: 'cover',
+                        }}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+
+          {/* Dots */}
+          <View style={styles.dotsContainer}>
+            {Array.isArray(apiRecommend) &&
+              apiRecommend.map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, activeRec === i && styles.activeDot]}
+                />
+              ))}
           </View>
         </View>
+      </View>
 
-        <LoginModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          onGoogleLogin={() => Alert.alert('Google Login')}
-          onFacebookLogin={() => Alert.alert('Facebook Login')}
-          phoneNumber="email or phone number"
-        />
-      </ScrollView>
-    </SafeAreaView>
+      <LoginModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onGoogleLogin={() => Alert.alert('Google Login')}
+        onFacebookLogin={() => Alert.alert('Facebook Login')}
+        phoneNumber="email or phone number"
+      />
+    </ScrollView>
+    </SafeAreaView >
   );
 };
 
@@ -1896,7 +2016,7 @@ const styles = StyleSheet.create({
     // height: 130,
     borderRadius: 10,
     marginRight: 12,
-    padding:8,
+    padding: 8,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#236FE3',

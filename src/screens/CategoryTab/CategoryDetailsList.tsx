@@ -11,6 +11,8 @@ import {
   Animated,
   TextInput,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useCart } from '../../context/CartContext'; // adjust import path if needed
 import { Image_url, UserService } from '../../service/ApiService'; // replace with your actual functions
@@ -99,12 +101,15 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     try {
       let response: any = [];
       if (mode === 'recommended') response = await UserService.recommended();
-      else if (mode === 'Best Sale') response = await UserService.mostsellingproduct();
+      else if (mode === 'Best Sale')
+        response = await UserService.mostsellingproduct();
       else if (mode === 'all') response = await UserService.product();
       else if (categoryId) {
         const hasFilter =
           filterParams &&
-          (filterParams.rating || filterParams.min_price || filterParams.max_price);
+          (filterParams.rating ||
+            filterParams.min_price ||
+            filterParams.max_price);
         if (hasFilter) {
           response = await UserService.FilterProducts({ ...filterParams });
         } else {
@@ -113,15 +118,19 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       }
 
       const payload = response?.data?.data ?? response?.data ?? response ?? [];
-      const productsArray = Array.isArray(payload) ? payload : payload?.data ?? [];
+      const productsArray = Array.isArray(payload)
+        ? payload
+        : payload?.data ?? [];
 
       // ✅ Filter products for product_type 'b2c' only
       const b2cProducts = productsArray.filter(
-        (p: any) => p.product_type === 'b2c'
+        (p: any) => p.product_type === 'b2c',
       );
 
       if (b2cProducts.length) {
-        const cartIds = new Set(cart.map((c: any) => String(c.id || c.product_id)));
+        const cartIds = new Set(
+          cart.map((c: any) => String(c.id || c.product_id)),
+        );
         const updatedProducts = b2cProducts.map((p: any) => {
           const pid = String(p.id ?? p.product_id ?? p.productId ?? '');
           return {
@@ -140,7 +149,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       hideLoader();
     }
   };
-
 
   // 🧠 Fetch products initially (once when page loads)
   useEffect(() => {
@@ -281,8 +289,8 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             {item?.variants[0]?.weight
               ? `- ${item?.variants[0]?.weight}`
               : item?.variants[0]?.unit
-                ? `- ${item?.variants[0]?.unit}`
-                : ''}
+              ? `- ${item?.variants[0]?.unit}`
+              : ''}
           </Text>
 
           {item.stock_quantity === 0 ? (
@@ -291,7 +299,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             <TouchableOpacity
               onPress={() =>
                 item.is_cart === 'true'
-                  ? console.log('Navigate to Cart')
+                  ? navigation.navigate('CheckoutScreen') // Navigate to cart screen
                   : handleAddToCart(item)
               }
               style={styles.filterBtn}
@@ -309,6 +317,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <LinearGradient colors={['#F3F3F3', '#FFFFFF']} style={styles.container}>
+        {/* In your return statement, modify the header section */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -320,11 +329,22 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{categoryTitle}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('CheckoutScreen')}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CheckoutScreen')}
+            style={{ position: 'relative' }}
+          >
             <Image
               source={require('../../assets/Png/order.png')}
               style={styles.icon}
             />
+            {/* Cart Badge */}
+            {cart.length > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>
+                  {cart.length > 99 ? '99+' : cart.length}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
         <View style={styles.headerRight}>
@@ -368,187 +388,316 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         />{' '}
         {/* Filter Modal */}
         {/* Filter Modal */}
+        {/* Filter Modal */}
         <Modal visible={filterVisible} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              {/* Header with title and close icon */}
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Filters</Text>
-                <TouchableOpacity onPress={() => setFilterVisible(false)}>
-                  <Image
-                    source={require('../../assets/Png/close.png')}
-                    style={styles.closeIcon}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ marginVertical: 10 }}>
-                <Text style={{ fontWeight: '600', marginBottom: 4 }}>Rating</Text>
-                <View style={{ flexDirection: 'row', marginBottom: 12 }}>
-                  {[5, 4, 3, 2, 1].map(r => (
-                    <TouchableOpacity
-                      key={r}
-                      style={{
-                        backgroundColor:
-                          filterRating == String(r) ? '#AEB254' : '#eee',
-                        borderRadius: 12,
-                        padding: 8,
-                        marginRight: 8,
-                      }}
-                      onPress={() => setFilterRating(String(r))}
-                    >
-                      <Text style={{ fontWeight: '600' }}>{r}★</Text>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setFilterVisible(false)}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ flex: 1, justifyContent: 'flex-end' }}
+            >
+              <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+                <View style={styles.modalContent}>
+                  {/* Header with title and close icon */}
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Filters</Text>
+                    <TouchableOpacity onPress={() => setFilterVisible(false)}>
+                      <Image
+                        source={require('../../assets/Png/close.png')}
+                        style={styles.closeIcon}
+                      />
                     </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={{ fontWeight: '600', marginBottom: 4 }}>
-                  Min Price
-                </Text>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: 12,
-                  }}
-                >
-                  <Text>€</Text>
-                  <TextInput
+                  </View>
+
+                  <View style={{ marginVertical: 10 }}>
+                    <Text style={{ fontWeight: '600', marginBottom: 4 }}>
+                      Rating
+                    </Text>
+                    <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                      {[5, 4, 3, 2, 1].map(r => (
+                        <TouchableOpacity
+                          key={r}
+                          style={{
+                            backgroundColor:
+                              filterRating == String(r) ? '#AEB254' : '#eee',
+                            borderRadius: 12,
+                            padding: 8,
+                            marginRight: 8,
+                          }}
+                          onPress={() => setFilterRating(String(r))}
+                        >
+                          <Text style={{ fontWeight: '600' }}>{r}★</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <Text style={{ fontWeight: '600', marginBottom: 4 }}>
+                      Min Price
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 12,
+                      }}
+                    >
+                      <Text>€</Text>
+                      <TextInput
+                        style={{
+                          borderWidth: 1,
+                          borderColor: '#ccc',
+                          borderRadius: 8,
+                          padding: 10,
+                          marginLeft: 6,
+                          width: 100,
+                        }}
+                        keyboardType="numeric"
+                        placeholderTextColor={Colors.text[200]}
+                        value={filterMinPrice}
+                        onChangeText={text => {
+                          // Allow only numbers
+                          const numericValue = text.replace(/[^0-9]/g, '');
+                          setFilterMinPrice(numericValue);
+
+                          // Validate min <= max if both are set
+                          if (
+                            filterMaxPrice &&
+                            numericValue &&
+                            Number(numericValue) > Number(filterMaxPrice)
+                          ) {
+                            Toast.show({
+                              type: 'error',
+                              text1:
+                                'Min price cannot be greater than max price',
+                            });
+                          }
+                        }}
+                        placeholder="Min"
+                      />
+                    </View>
+                    <Text style={{ fontWeight: '600', marginBottom: 4 }}>
+                      Max Price
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 12,
+                      }}
+                    >
+                      <Text>€</Text>
+                      <TextInput
+                        style={{
+                          borderWidth: 1,
+                          borderColor: '#ccc',
+                          borderRadius: 8,
+                          padding: 10,
+                          marginLeft: 6,
+                          width: 100,
+                        }}
+                        keyboardType="numeric"
+                        placeholderTextColor={Colors.text[200]}
+                        value={filterMaxPrice}
+                        onChangeText={text => {
+                          // Allow only numbers
+                          const numericValue = text.replace(/[^0-9]/g, '');
+                          setFilterMaxPrice(numericValue);
+
+                          // Validate max >= min if both are set
+                          if (
+                            filterMinPrice &&
+                            numericValue &&
+                            Number(numericValue) < Number(filterMinPrice)
+                          ) {
+                            Toast.show({
+                              type: 'error',
+                              text1: 'Max price cannot be less than min price',
+                            });
+                          }
+                        }}
+                        placeholder="Max"
+                      />
+                    </View>
+
+                    {/* Validation Error Message */}
+                    {filterMinPrice &&
+                      filterMaxPrice &&
+                      Number(filterMinPrice) > Number(filterMaxPrice) && (
+                        <Text
+                          style={{
+                            color: 'red',
+                            fontSize: 12,
+                            marginBottom: 10,
+                          }}
+                        >
+                          Min price cannot be greater than max price
+                        </Text>
+                      )}
+                  </View>
+
+                  <View
                     style={{
-                      borderWidth: 1,
-                      borderColor: '#ccc',
-                      borderRadius: 8,
-                      padding: 6,
-                      marginLeft: 6,
-                      width: 80,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
                     }}
-                    keyboardType="numeric"
-                    placeholderTextColor={Colors.text[200]}
-                    value={filterMinPrice}
-                    onChangeText={setFilterMinPrice}
-                    placeholder="Min"
-                  />
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.modalButton,
+                        { flex: 1, marginRight: 8, backgroundColor: '#f5f5f5' },
+                      ]}
+                      onPress={async () => {
+                        setFilterVisible(false);
+                        setFilterRating('');
+                        setFilterMinPrice('');
+                        setFilterMaxPrice('');
+                        await fetchProducts();
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.modalButtonText,
+                          { textAlign: 'center', color: '#333' },
+                        ]}
+                      >
+                        Reset
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.modalButton,
+                        {
+                          flex: 1,
+                          marginLeft: 8,
+                          backgroundColor: '#AEB254',
+                          opacity:
+                            filterMinPrice &&
+                            filterMaxPrice &&
+                            Number(filterMinPrice) > Number(filterMaxPrice)
+                              ? 0.5
+                              : 1,
+                        },
+                      ]}
+                      onPress={async () => {
+                        // Validate before applying
+                        if (
+                          filterMinPrice &&
+                          filterMaxPrice &&
+                          Number(filterMinPrice) > Number(filterMaxPrice)
+                        ) {
+                          Toast.show({
+                            type: 'error',
+                            text1: 'Please fix price range before applying',
+                          });
+                          return;
+                        }
+
+                        setFilterVisible(false);
+                        await fetchProducts({
+                          rating: filterRating,
+                          min_price: filterMinPrice,
+                          max_price: filterMaxPrice,
+                        });
+                      }}
+                      disabled={
+                        filterMinPrice &&
+                        filterMaxPrice &&
+                        Number(filterMinPrice) > Number(filterMaxPrice)
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.modalButtonText,
+                          {
+                            textAlign: 'center',
+                            color: '#fff',
+                          },
+                        ]}
+                      >
+                        Apply
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <Text style={{ fontWeight: '600', marginBottom: 4 }}>
-                  Max Price
-                </Text>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: 12,
-                  }}
-                >
-                  <Text>€</Text>
-                  <TextInput
-                    style={{
-                      borderWidth: 1,
-                      borderColor: '#ccc',
-                      borderRadius: 8,
-                      padding: 6,
-                      marginLeft: 6,
-                      width: 80,
-                    }}
-                    keyboardType="numeric"
-                    placeholderTextColor={Colors.text[200]}
-                    value={filterMaxPrice}
-                    onChangeText={setFilterMaxPrice}
-                    placeholder="Max"
-                  />
-                </View>
-              </View>
-              <View
-                style={{ flexDirection: 'row', justifyContent: 'space-between' }}
-              >
-                <TouchableOpacity
-                  style={[styles.modalClose, { flex: 1 }]}
-                  onPress={async () => {
-                    setFilterVisible(false);
-                    setFilterRating('');
-                    setFilterMinPrice('');
-                    setFilterMaxPrice('');
-                    await fetchProducts();
-                  }}
-                >
-                  <Text style={[styles.modalCloseText, { textAlign: 'center' }]}>
-                    Reset
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalClose, { flex: 1 }]}
-                  onPress={async () => {
-                    setFilterVisible(false);
-                    await fetchProducts({
-                      rating: filterRating,
-                      min_price: filterMinPrice,
-                      max_price: filterMaxPrice,
-                    });
-                  }}
-                >
-                  <Text style={[styles.modalCloseText, { textAlign: 'center' }]}>
-                    Apply
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
         </Modal>{' '}
         {/* Filter Modal */}
+        {/* Sort Modal */}
         <Modal visible={sortVisible} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Sort By</Text>
-                <TouchableOpacity onPress={() => setSortVisible(false)}>
-                  <Image
-                    source={require('../../assets/Png/close.png')}
-                    style={styles.closeIcon}
-                  />
-                </TouchableOpacity>
-              </View>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setSortVisible(false)}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ flex: 1, justifyContent: 'flex-end' }}
+            >
+              <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+                <View style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Sort By</Text>
+                    <TouchableOpacity onPress={() => setSortVisible(false)}>
+                      <Image
+                        source={require('../../assets/Png/close.png')}
+                        style={styles.closeIcon}
+                      />
+                    </TouchableOpacity>
+                  </View>
 
-              <TouchableOpacity
-                onPress={() => ApiSorting('id_asc')}
-                style={styles.sortOption}
-              >
-                <Text style={styles.sortOptionText}>Newest First</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => ApiSorting('id_asc')}
+                    style={styles.sortOption}
+                  >
+                    <Text style={styles.sortOptionText}>Newest First</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => ApiSorting('id_desc')}
-                style={styles.sortOption}
-              >
-                <Text style={styles.sortOptionText}>Oldest First</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => ApiSorting('id_desc')}
+                    style={styles.sortOption}
+                  >
+                    <Text style={styles.sortOptionText}>Oldest First</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => ApiSorting('price_desc')}
-                style={styles.sortOption}
-              >
-                <Text style={styles.sortOptionText}>Price: High to Low</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => ApiSorting('price_desc')}
+                    style={styles.sortOption}
+                  >
+                    <Text style={styles.sortOptionText}>
+                      Price: High to Low
+                    </Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => ApiSorting('price_asc')}
-                style={styles.sortOption}
-              >
-                <Text style={styles.sortOptionText}>Price: Low to High</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => ApiSorting('price_asc')}
+                    style={styles.sortOption}
+                  >
+                    <Text style={styles.sortOptionText}>
+                      Price: Low to High
+                    </Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => ApiSorting('id_asc')}
-                style={styles.sortOption}
-              >
-                <Text style={styles.sortOptionText}>Name: A to Z</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => ApiSorting('id_asc')}
+                    style={styles.sortOption}
+                  >
+                    <Text style={styles.sortOptionText}>Name: A to Z</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => ApiSorting('id_desc')}
-                style={styles.sortOption}
-              >
-                <Text style={styles.sortOptionText}>Name: Z to A</Text>
+                  <TouchableOpacity
+                    onPress={() => ApiSorting('id_desc')}
+                    style={styles.sortOption}
+                  >
+                    <Text style={styles.sortOptionText}>Name: Z to A</Text>
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
-            </View>
-          </View>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
         </Modal>
       </LinearGradient>
     </SafeAreaView>
@@ -635,6 +784,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EEE',
   },
+  modalButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  modalButtonText: {
+    fontWeight: '600',
+    fontSize: 16,
+  },
   sortText: { color: Colors.text[300] },
 
   list: {
@@ -644,6 +805,23 @@ const styles = StyleSheet.create({
   card: {
     width: widthPercentageToDP(45),
     // paddingHorizontal: 8,
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#AEB254',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   CategoryView: {
     width: 'auto',

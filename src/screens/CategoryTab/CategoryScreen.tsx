@@ -81,7 +81,7 @@ const CategoryScreen = ({ navigation }) => {
                 { color: Colors.text[200], textAlignVertical: 'center' },
               ]}
             >
-              Search Products....
+              Search Category....
             </Text>
             <TouchableOpacity style={styles.microphone}>
               <Image
