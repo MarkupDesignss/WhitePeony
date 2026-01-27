@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   ImageBackground,
   Alert,
-  RefreshControl
+  RefreshControl,
 } from 'react-native';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
@@ -46,11 +46,14 @@ const HomeScreen1 = ({ navigation }: any) => {
     useContext<UserData>(UserDataContext);
 
   const {
-    toggleWishlist,
-    isWishlisted,
-    removeFromWishlist,
-    addToWishlist, // Add this
-    wishlistIds,
+    wishlistItems, // Array of wishlist items
+    wishlistIds, // Array of wishlist IDs
+    isWishlisted, // Function to check if item is wishlisted
+    addToWishlist, // Function to add to wishlist
+    removeFromWishlist, // Function to remove from wishlist
+    toggleWishlist, // Function to toggle wishlist status
+    fetchWishlist, // Function to refresh wishlist
+    isLoading, // Loading state
   } = useContext(WishlistContext);
   const [category, setApiCateProducts] = useState([]);
   const [categoryProduct, setcategoryProduct] = useState([]);
@@ -60,7 +63,7 @@ const HomeScreen1 = ({ navigation }: any) => {
   const [FeaturesProduct, setFeaturesProduct] = useState([]);
   const [salesProduct, setsalesProduct] = useState([]);
   const [apiRecommend, setApiRecommend] = useState<any[]>();
-  const [wishlistitem, setwishlistitem] = useState<any[]>();
+
   const [orderitem, setorderitem] = useState<any[]>();
   const [lowestitem, setlowestitem] = useState<any[]>();
   const [Promotional, setPromotional] = useState<any[]>([]);
@@ -252,25 +255,32 @@ const HomeScreen1 = ({ navigation }: any) => {
       );
     });
   };
+  const refreshAllData = async () => {
+    try {
+      showLoader(); // Only show loader once
 
-  const refreshAllData = () => {
-    GetCategoryProducts();
-    bigsale();
-    RecommendProducts();
-    OrderList();
-    ApiSorting();
-    GetHeader();
+      // Execute all async operations in parallel or sequence
+      await Promise.all([
+        GetCategoryProducts(),
+        bigsale(),
+        RecommendProducts(),
+        OrderList(),
+        ApiSorting(),
+        GetHeader(),
+      ]);
+
+      await fetchWishlist();
+    } catch (error) {
+      console.log('Error refreshing data:', error);
+    } finally {
+      hideLoader(); // Hide loader once all operations complete
+    }
   };
 
   useFocusEffect(
     React.useCallback(() => {
       console.log('Home screen focused, refreshing data...');
       refreshAllData();
-
-      // Optional: Refresh wishlist data based on login state
-      if (isLoggedIn) {
-        fetchServerWishlist();
-      }
 
       // Optional: Return cleanup function
       return () => {
@@ -279,28 +289,89 @@ const HomeScreen1 = ({ navigation }: any) => {
     }, [userType, isLoggedIn]), // Dependencies
   );
   // Inside your HomeScreen1 component, add these logs:
+  // Replace your current useEffect debug logs with this more detailed version:
+
+  const getFormattedPrice = (price: any): string => {
+    if (price === null || price === undefined || price === '') {
+      return '0';
+    }
+
+    console.log(`getFormattedPrice input: "${price}" (type: ${typeof price})`);
+
+    try {
+      // Convert to string first
+      const priceStr = String(price).trim();
+
+      // Handle empty string
+      if (priceStr === '') return '0';
+
+      // Try to parse as float
+      let priceNum = parseFloat(priceStr);
+
+      // If parsing failed, try to extract numbers
+      if (isNaN(priceNum)) {
+        const matches = priceStr.match(/\d+(\.\d+)?/);
+        if (matches && matches[0]) {
+          priceNum = parseFloat(matches[0]);
+        } else {
+          return '0';
+        }
+      }
+
+      // Check if price seems too small (e.g., 3 instead of 30)
+      // If price is between 1-10 and original might be 10-100
+      if (priceNum > 0 && priceNum < 10) {
+        // Check if this might be a price that's been divided by 10
+        const possibleCorrectPrice = priceNum * 10;
+        console.log(
+          `Suspicious low price: ${priceNum}. Might be ${possibleCorrectPrice}?`,
+        );
+
+        // For now, return the price as is but with better formatting
+        return priceNum.toFixed(2).replace(/\.00$/, '');
+      }
+
+      // Normal price formatting
+      if (priceNum === Math.floor(priceNum)) {
+        return priceNum.toString(); // Integer price
+      } else {
+        return priceNum.toFixed(2); // Decimal price
+      }
+    } catch (error) {
+      console.log('Price formatting error:', error);
+      return '0';
+    }
+  };
+  useEffect(() => {
+    console.log('Wishlist Context Detailed Debug:', {
+      isLoggedIn,
+      userType,
+      wishlistItemsCount: wishlistItems?.length || 0,
+      isLoading,
+      sampleItem: wishlistItems?.[0]
+        ? {
+            id: wishlistItems[0]?.id,
+            name: wishlistItems[0]?.name,
+            product_type: wishlistItems[0]?.product_type,
+            front_image: wishlistItems[0]?.front_image,
+            variants: wishlistItems[0]?.variants,
+            // Check all possible properties
+            hasProductProperty: !!wishlistItems[0]?.product,
+            productId: wishlistItems[0]?.product?.id,
+            productName: wishlistItems[0]?.product?.name,
+            productFrontImage: wishlistItems[0]?.product?.front_image,
+          }
+        : null,
+    });
+  }, [wishlistItems, isLoggedIn, userType, isLoading]);
+
+  // update wishlist items depending on login state (server vs local)
 
   useEffect(() => {
-    console.log('Wishlist debug:', {
-      isLoggedIn,
-      wishlistitemLength: wishlistitem?.length,
-      wishlistitemData: JSON.stringify(wishlistitem, null, 2),
-      wishlistIds: Array.isArray(wishlistIds) ? wishlistIds.length : 0,
-      wishlistIdsData: wishlistIds
-    });
-  }, [wishlistitem, wishlistIds, isLoggedIn]);
-  // update wishlist items depending on login state (server vs local)
-  useEffect(() => {
-    if (isLoggedIn) {
-      fetchServerWishlist();
-    } else {
-      // For non-logged in users, use local wishlist
-      const localWishlist = Array.isArray(wishlistIds)
-        ? wishlistIds.map(id => ({ id }))
-        : [];
-      setwishlistitem(localWishlist);
-    }
-  }, [isLoggedIn, wishlistIds, userType]);
+    // The context already handles loading wishlist based on login state
+    // No need for local state management
+    console.log('Wishlist items updated:', wishlistItems.length);
+  }, [wishlistItems]);
 
   const GetHeader = async () => {
     try {
@@ -328,6 +399,115 @@ const HomeScreen1 = ({ navigation }: any) => {
       hideLoader();
     }
   };
+
+  // Add this function to get the correct price
+  const getCorrectPrice = (item: any) => {
+    if (!item) return null;
+
+    console.log('=== PRICE DEBUG ===');
+    console.log('Item:', item?.name || 'Unknown');
+    console.log('Full item structure:', JSON.stringify(item, null, 2));
+
+    // Check multiple possible price locations
+    const priceSources = [
+      // First variant's actual_price (discounted price)
+      {
+        source: 'variants[0].actual_price',
+        value: item?.variants?.[0]?.actual_price,
+      },
+      // First variant's price (original price)
+      { source: 'variants[0].price', value: item?.variants?.[0]?.price },
+      // Direct price property
+      { source: 'price', value: item?.price },
+      // Main price property
+      { source: 'main_price', value: item?.main_price },
+      // From product object if nested
+      {
+        source: 'product.variants[0].actual_price',
+        value: item?.product?.variants?.[0]?.actual_price,
+      },
+      {
+        source: 'product.variants[0].price',
+        value: item?.product?.variants?.[0]?.price,
+      },
+      { source: 'product.main_price', value: item?.product?.main_price },
+      // From originalItem
+      {
+        source: 'originalItem.product.variants[0].actual_price',
+        value: item?.originalItem?.product?.variants?.[0]?.actual_price,
+      },
+      {
+        source: 'originalItem.product.variants[0].price',
+        value: item?.originalItem?.product?.variants?.[0]?.price,
+      },
+      {
+        source: 'originalItem.product.main_price',
+        value: item?.originalItem?.product?.main_price,
+      },
+    ];
+
+    // Find the first valid price
+    for (const priceSource of priceSources) {
+      if (
+        priceSource.value !== undefined &&
+        priceSource.value !== null &&
+        priceSource.value !== ''
+      ) {
+        console.log(
+          `Found price in ${priceSource.source}: ${priceSource.value}`,
+        );
+
+        // Convert to number if it's a string
+        let priceValue = priceSource.value;
+        if (typeof priceValue === 'string') {
+          priceValue = parseFloat(priceValue);
+        }
+
+        // Check if price looks suspicious (100 when it should be 225/250)
+        if (priceValue === 100) {
+          console.log(
+            'WARNING: Price is 100 - checking if this is correct or should be variant price',
+          );
+          // Check if there are variants with higher prices
+          if (
+            item?.variants?.[0]?.actual_price &&
+            item.variants[0].actual_price > 100
+          ) {
+            console.log(
+              `Found higher variant price: ${item.variants[0].actual_price}, using that instead`,
+            );
+            return item.variants[0].actual_price;
+          }
+          if (item?.variants?.[0]?.price && item.variants[0].price > 100) {
+            console.log(
+              `Found higher variant price: ${item.variants[0].price}, using that instead`,
+            );
+            return item.variants[0].price;
+          }
+        }
+
+        return priceValue;
+      }
+    }
+
+    console.log('No valid price found in any source');
+    return null;
+  };
+
+  // Simple price formatter
+  const formatPrice = (price: any) => {
+    if (!price && price !== 0) return '0';
+
+    const priceNum = parseFloat(String(price));
+    if (isNaN(priceNum)) return '0';
+
+    // If price has decimals like 250.00, remove .00
+    if (priceNum === Math.floor(priceNum)) {
+      return priceNum.toString();
+    } else {
+      return priceNum.toFixed(2);
+    }
+  };
   const GetCategoryProducts = async () => {
     try {
       setIsLoadingCategory(true);
@@ -347,7 +527,9 @@ const HomeScreen1 = ({ navigation }: any) => {
       setIsLoadingCategory(false);
     }
   };
-
+  {
+    console.log('HEY', wishlistItems);
+  }
   const GetCategoryID = async (categoryId: any) => {
     try {
       setIsLoadingCategory(true);
@@ -474,76 +656,8 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
-  // In your fetchServerWishlist function
-  const fetchServerWishlist = async () => {
-    try {
-      showLoader();
-      const res = await UserService.wishlist();
-
-      console.log('Wishlist API Response:', {
-        status: res.status,
-        data: res.data,
-        success: res.data?.success,
-        message: res.data?.message,
-      });
-
-      if (res?.data?.success) {
-        const apiItems = res.data?.data || [];
-
-        console.log('Raw wishlist items:', {
-          totalItems: apiItems.length,
-          items: apiItems.map((item: any) => ({
-            id: item?.id,
-            name: item?.name,
-            product_type: item?.product_type
-          }))
-        });
-
-        // Filter products by type
-        const filteredWishlist = filterProductsByType(apiItems);
-
-        console.log('Filtered wishlist:', {
-          count: filteredWishlist.length,
-          items: filteredWishlist.map((item: any) => ({
-            id: item?.id,
-            name: item?.name,
-            front_image: item?.front_image
-          }))
-        });
-
-        setwishlistitem([...filteredWishlist]);
-      }
-      hideLoader();
-    } catch (e: any) {
-      hideLoader();
-      console.log('Wishlist fetch error:', e);
-    }
-  };
-  const refreshWishlist = async () => {
-    if (isLoggedIn) {
-      await fetchServerWishlist();
-    } else {
-      // For local wishlist, ensure it's an array
-      const localWishlist = Array.isArray(wishlistIds)
-        ? wishlistIds.map(id => ({ id }))
-        : [];
-      setwishlistitem(localWishlist);
-    }
-  };
-
   // Call this function when adding/removing from wishlist
-  const handleWishlistToggle = async (productId: number) => {
-    if (isWishlisted(productId)) {
-      await removeFromWishlist(productId);
-    } else {
-      await addToWishlist(productId);
-    }
 
-    // Refresh wishlist after toggle
-    setTimeout(() => {
-      refreshWishlist();
-    }, 500);
-  };
   const OrderList = async () => {
     try {
       showLoader();
@@ -599,8 +713,9 @@ const HomeScreen1 = ({ navigation }: any) => {
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
-              }`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${
+              item?.product_id || ''
+            }`}
             style={styles.page}
           >
             <Image
@@ -1442,8 +1557,105 @@ const HomeScreen1 = ({ navigation }: any) => {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={(item, index) => String(index)}
+                // In your HomeScreen1.tsx, replace the Lowest Prices Ever FlatList renderItem with this:
+
                 renderItem={({ item }) => {
                   const wished = isWishlisted(item.id);
+
+                  // Extract price information
+                  const getPriceInfo = (product: any) => {
+                    if (!product)
+                      return { discountedPrice: null, originalPrice: null };
+
+                    console.log('Price info for:', product?.name);
+
+                    // Get the discounted price (actual_price)
+                    let discountedPrice = null;
+                    if (
+                      product?.variants?.[0]?.actual_price !== undefined &&
+                      product?.variants?.[0]?.actual_price !== null
+                    ) {
+                      discountedPrice = product.variants[0].actual_price;
+                      console.log(
+                        '  Discounted price (actual_price):',
+                        discountedPrice,
+                      );
+                    }
+
+                    // Get the original price (price)
+                    let originalPrice = null;
+                    if (
+                      product?.variants?.[0]?.price !== undefined &&
+                      product?.variants?.[0]?.price !== null
+                    ) {
+                      originalPrice = product.variants[0].price;
+                      console.log('  Original price (price):', originalPrice);
+                    }
+
+                    // If no discounted price but we have main_price, use that as original
+                    if (
+                      !discountedPrice &&
+                      !originalPrice &&
+                      product?.main_price
+                    ) {
+                      originalPrice = product.main_price;
+                      console.log(
+                        '  Using main_price as original:',
+                        originalPrice,
+                      );
+                    }
+
+                    // If we have discounted price but no original, use main_price as original
+                    if (
+                      discountedPrice &&
+                      !originalPrice &&
+                      product?.main_price
+                    ) {
+                      originalPrice = product.main_price;
+                      console.log(
+                        '  Using main_price as original for discounted item:',
+                        originalPrice,
+                      );
+                    }
+
+                    return { discountedPrice, originalPrice };
+                  };
+
+                  const { discountedPrice, originalPrice } = getPriceInfo(item);
+
+                  // Format prices safely
+                  const formatPriceForDisplay = (price: any): string => {
+                    if (!price && price !== 0) return '';
+
+                    try {
+                      const priceNum = parseFloat(String(price));
+                      if (isNaN(priceNum)) return '';
+
+                      // If it's a whole number, don't show decimals
+                      if (priceNum === Math.floor(priceNum)) {
+                        return priceNum.toString();
+                      }
+                      return priceNum.toFixed(2);
+                    } catch (error) {
+                      console.log('Price formatting error:', error);
+                      return '';
+                    }
+                  };
+
+                  const displayDiscountedPrice =
+                    formatPriceForDisplay(discountedPrice);
+                  const displayOriginalPrice =
+                    formatPriceForDisplay(originalPrice);
+
+                  console.log('Final prices for display:', {
+                    name: item.name,
+                    discounted: displayDiscountedPrice,
+                    original: displayOriginalPrice,
+                    hasDiscount:
+                      discountedPrice &&
+                      originalPrice &&
+                      discountedPrice !== originalPrice,
+                  });
 
                   return (
                     <TouchableOpacity
@@ -1469,18 +1681,59 @@ const HomeScreen1 = ({ navigation }: any) => {
                         >
                           {item?.name}
                         </Text>
+
+                        {/* PRICE DISPLAY - Fixed with both prices */}
                         <View
-                          style={{ flexDirection: 'row', alignItems: 'center' }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginTop: 4,
+                            minHeight: 20,
+                          }}
                         >
-                          <Text style={styles.smallPrice}>
-                            {Math.round(item?.variants[0]?.price)} €
-                          </Text>
-                          {item?.variants[0]?.price && (
-                            <Text style={styles.smallOldPrice}>
-                              {Math.round(item?.variants[0]?.price)} €
+                          {/* Show discounted price if available */}
+                          {displayDiscountedPrice ? (
+                            <>
+                              <Text
+                                style={[
+                                  styles.smallPrice,
+                                  { color: '#2E2E2E', fontWeight: '700' },
+                                ]}
+                              >
+                                {displayDiscountedPrice} €
+                              </Text>
+
+                              {/* Show original price crossed out if different from discounted */}
+                              {displayOriginalPrice &&
+                                displayOriginalPrice !==
+                                  displayDiscountedPrice && (
+                                  <Text
+                                    style={[
+                                      styles.smallOldPrice,
+                                      { marginLeft: 8 },
+                                    ]}
+                                  >
+                                    {displayOriginalPrice} €
+                                  </Text>
+                                )}
+                            </>
+                          ) : /* Show only original price if no discount */
+                          displayOriginalPrice ? (
+                            <Text
+                              style={[
+                                styles.smallPrice,
+                                { color: '#2E2E2E', fontWeight: '700' },
+                              ]}
+                            >
+                              {displayOriginalPrice} €
+                            </Text>
+                          ) : (
+                            <Text style={{ fontSize: 12, color: '#666' }}>
+                              Price not available
                             </Text>
                           )}
                         </View>
+
                         <View
                           style={{
                             backgroundColor: '#EAE6B9',
@@ -1497,6 +1750,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             <Text style={{ color: '#008009' }}>▶</Text>{' '}
                           </Text>
                         </View>
+
                         <TouchableOpacity
                           activeOpacity={0.8}
                           onPress={async e => {
@@ -1523,8 +1777,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                           <Image
                             source={
                               isWishlisted(item.id)
-                                ? require('../../assets/heart.png') // Filled heart
-                                : require('../../assets/Png/heart-1.png') // Outline heart
+                                ? require('../../assets/heart.png')
+                                : require('../../assets/Png/heart-1.png')
                             }
                             style={{
                               width: 14,
@@ -1584,38 +1838,74 @@ const HomeScreen1 = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
           </View>
-          {/* Your Wishlist */}
-          {/* Your Wishlist */}
-               {/* Your Wishlist */}
-          {wishlistitem && Array.isArray(wishlistitem) && wishlistitem.length > 0 ? (
+          // Wishlist Section - Replace your current wishlist section with this
+          {wishlistItems && wishlistItems.length > 0 ? (
             <View
               style={{
                 paddingHorizontal: widthPercentageToDP(3),
                 marginTop: heightPercentageToDP(2),
               }}
             >
-              <Text style={styles.sectionTitle}>Your Wishlist ({wishlistitem.length})</Text>
+              <Text style={styles.sectionTitle}>
+                Your Wishlist ({wishlistItems.length})
+              </Text>
 
               <FlatList
-                data={wishlistitem}
+                data={wishlistItems}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                keyExtractor={(item, index) => `${item?.id}-${index}`}
+                keyExtractor={(item, index) => {
+                  // Use multiple possible ID sources
+
+                  const id = item?.id || item?.product_id || index.toString();
+
+                  return `wishlist-${id}-${index}`;
+                }}
                 contentContainerStyle={{ paddingVertical: 8 }}
-                extraData={wishlistitem}
                 renderItem={({ item, index }) => {
-                  console.log('Rendering wishlist item:', { index, id: item?.id, name: item?.name });
+                  console.log(`Rendering wishlist item ${index}:`, item);
 
                   if (!item) return null;
 
+                  // Extract data from the transformed item structure
+                  const productId = item?.id || item?.product_id;
+                  const productName = item?.name || 'Product';
+                  const price = item?.price || item?.main_price;
+
+                  // Get image - use the pre-transformed image URL first, then fallback
+                  let imageUri = item?.image;
+                  if (!imageUri && item?.front_image) {
+                    // Check if front_image already has full URL
+                    if (item.front_image.startsWith('http')) {
+                      imageUri = item.front_image;
+                    } else {
+                      imageUri = Image_url + item.front_image;
+                    }
+                  }
+
+                  // Also check originalItem for image
+                  if (!imageUri && item?.originalItem?.product?.front_image) {
+                    const frontImage = item.originalItem.product.front_image;
+                    if (frontImage.startsWith('http')) {
+                      imageUri = frontImage;
+                    } else {
+                      imageUri = Image_url + frontImage;
+                    }
+                  }
+
+                  // Check if wishlisted
+                  const wished = isWishlisted(item.id);
+                  const correctPrice = getCorrectPrice(item);
+
                   return (
                     <TouchableOpacity
-                      key={`${item.id}-${index}`}
-                      onPress={() =>
-                        navigation.navigate('ProductDetails', {
-                          productId: item?.id,
-                        })
-                      }
+                      onPress={() => {
+                        if (productId) {
+                          navigation.navigate('ProductDetails', {
+                            productId: productId,
+                          });
+                        }
+                      }}
                     >
                       <View
                         style={[
@@ -1623,17 +1913,36 @@ const HomeScreen1 = ({ navigation }: any) => {
                           { width: WISHLIST_CARD_WIDTH, marginRight: 12 },
                         ]}
                       >
-                        {item?.front_image ? (
+                        {/* Image with fallback */}
+                        {imageUri ? (
                           <Image
-                            source={{ uri: Image_url + item.front_image }}
+                            source={{ uri: imageUri }}
                             style={styles.wishlistImage}
+                            onError={e =>
+                              console.log(
+                                `Image load error for item ${index}:`,
+                                e.nativeEvent.error,
+                              )
+                            }
                           />
                         ) : (
-                          <View style={[styles.wishlistImage, { backgroundColor: '#EFEFCA', justifyContent: 'center', alignItems: 'center' }]}>
-                            <Text style={{ fontSize: 10 }}>No Image</Text>
+                          <View
+                            style={[
+                              styles.wishlistImage,
+                              {
+                                backgroundColor: '#EFEFCA',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                              },
+                            ]}
+                          >
+                            <Text style={{ fontSize: 10, color: '#666' }}>
+                              No Image
+                            </Text>
                           </View>
                         )}
 
+                        {/* Product Name */}
                         <Text
                           numberOfLines={2}
                           style={[
@@ -1645,28 +1954,41 @@ const HomeScreen1 = ({ navigation }: any) => {
                             },
                           ]}
                         >
-                          {item?.name || 'Product'}
+                          {productName}
                         </Text>
 
-                        {item?.variants?.[0]?.price ? (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                        {/* Price */}
+                        {correctPrice !== null ? (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 4,
+                            }}
+                          >
                             <Text style={styles.smallPrice}>
-                              {Math.round(item.variants[0].price)} €
-                            </Text>
-                            <Text style={styles.smallOldPrice}>
-                              {Math.round(item.variants[0].price)} €
+                              {formatPrice(correctPrice)} €
                             </Text>
                           </View>
                         ) : (
-                          <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>Price not available</Text>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: '#666',
+                              marginTop: 4,
+                            }}
+                          >
+                            Loading price...
+                          </Text>
                         )}
 
+                        {/* Wishlist Heart Button */}
                         <TouchableOpacity
                           activeOpacity={0.8}
                           onPress={async e => {
                             e.stopPropagation();
-                            console.log('Wishlist button pressed for:', item.id);
-                            await handleWishlistToggle(item.id);
+                            console.log('Toggling wishlist for:', productId);
+                            await toggleWishlist(productId);
                           }}
                           style={{
                             position: 'absolute',
@@ -1684,11 +2006,15 @@ const HomeScreen1 = ({ navigation }: any) => {
                         >
                           <Image
                             source={
-                              isWishlisted(item.id)
+                              wished
                                 ? require('../../assets/heart.png')
                                 : require('../../assets/Png/heart-1.png')
                             }
-                            style={{ width: 14, height: 14, resizeMode: 'cover' }}
+                            style={{
+                              width: 14,
+                              height: 14,
+                              resizeMode: 'cover',
+                            }}
                           />
                         </TouchableOpacity>
                       </View>
@@ -1698,156 +2024,176 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
             </View>
           ) : (
-            <View style={{ paddingHorizontal: widthPercentageToDP(3), marginTop: heightPercentageToDP(2) }}>
+            // Empty wishlist state
+            <View
+              style={{
+                paddingHorizontal: widthPercentageToDP(3),
+                marginTop: heightPercentageToDP(2),
+              }}
+            >
               <Text style={styles.sectionTitle}>Your Wishlist (0)</Text>
-              <View style={{ padding: 20, alignItems: 'center', backgroundColor: '#F9F9F9', borderRadius: 10 }}>
-                <Text>No items in your wishlist</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('CategoryScreen')}>
-                  <Text style={{ color: '#2E2E2E', marginTop: 10 }}>Browse Products →</Text>
+              <View
+                style={{
+                  padding: 20,
+                  alignItems: 'center',
+                  backgroundColor: '#F9F9F9',
+                  borderRadius: 10,
+                }}
+              >
+                <Text style={{ color: '#666', marginBottom: 10 }}>
+                  No items in your wishlist
+                </Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('CategoryScreen')}
+                  style={{
+                    backgroundColor: '#2E2E2E',
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>
+                    Browse Products →
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
-        <View
-          style={{
-            marginTop:
-              wishlistitem?.length == 0 ? heightPercentageToDP(3) : null,
-          }}
-        ></View>
-        {/* Promotional Banner */}
-        <PromotionalBanner
-          promotional={Promotional}
-          navigation={navigation}
-        />
-        {/* Recommended For You */}
-        <View
-          style={{
-            paddingHorizontal: widthPercentageToDP(3),
-            marginTop: heightPercentageToDP(2),
-            marginBottom: heightPercentageToDP(4),
-          }}
-        >
-          <Text style={styles.sectionTitle}>Recommended For You</Text>
-          <FlatList
-            ref={recRef}
-            data={apiRecommend}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={item => item.id}
-            snapToInterval={WISHLIST_CARD_WIDTH + 12}
-            decelerationRate="fast"
-            contentContainerStyle={{ paddingVertical: 8 }}
-            onScroll={onRecommendedScroll}
-            renderItem={({ item }) => {
-              const wished = isWishlisted(item.id);
+          {/* Promotional Banner */}
+          <PromotionalBanner
+            promotional={Promotional}
+            navigation={navigation}
+          />
+          {/* Recommended For You */}
+          <View
+            style={{
+              paddingHorizontal: widthPercentageToDP(3),
+              marginTop: heightPercentageToDP(2),
+              marginBottom: heightPercentageToDP(4),
+            }}
+          >
+            <Text style={styles.sectionTitle}>Recommended For You</Text>
+            <FlatList
+              ref={recRef}
+              data={apiRecommend}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={item => item.id}
+              snapToInterval={WISHLIST_CARD_WIDTH + 12}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingVertical: 8 }}
+              onScroll={onRecommendedScroll}
+              renderItem={({ item }) => {
+                const wished = isWishlisted(item.id);
+                const correctPrice = getCorrectPrice(item);
 
-              return (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate('ProductDetails', {
-                      productId: item.id,
-                    })
-                  }
-                >
-                  <View
-                    style={[
-                      styles.wishlistCard,
-                      { width: WISHLIST_CARD_WIDTH },
-                    ]}
+                return (
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('ProductDetails', {
+                        productId: item.id,
+                      })
+                    }
                   >
-                    <Image
-                      source={{ uri: Image_url + item?.front_image }}
-                      style={styles.wishlistImage}
-                    />
-                    <Text
-                      numberOfLines={2}
+                    <View
                       style={[
-                        styles.wishlistTitle,
-                        {
-                          fontWeight: '400',
-                          height: heightPercentageToDP(4),
-                        },
+                        styles.wishlistCard,
+                        { width: WISHLIST_CARD_WIDTH },
                       ]}
                     >
-                      {item?.name}
-                    </Text>
-                    <View
-                      style={{ flexDirection: 'row', alignItems: 'center' }}
-                    >
-                      <Text style={styles.smallPrice}>
-                        {Math.round(item.variants[0]?.price)} €
+                      <Image
+                        source={{ uri: Image_url + item?.front_image }}
+                        style={styles.wishlistImage}
+                      />
+                      <Text
+                        numberOfLines={2}
+                        style={[
+                          styles.wishlistTitle,
+                          {
+                            fontWeight: '400',
+                            height: heightPercentageToDP(4),
+                          },
+                        ]}
+                      >
+                        {item?.name}
                       </Text>
-                      {item.variants[0]?.price && (
-                        <Text style={styles.smallOldPrice}>
+                      <View
+                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                      >
+                        <Text style={styles.smallPrice}>
                           {Math.round(item.variants[0]?.price)} €
                         </Text>
-                      )}
-                    </View>
+                        {item.variants[0]?.price && (
+                          <Text style={styles.smallOldPrice}>
+                            {Math.round(item.variants[0]?.price)} €
+                          </Text>
+                        )}
+                      </View>
 
-                    <TouchableOpacity
-                      onPress={async () => {
-                        if (isWishlisted(item.id)) {
-                          await removeFromWishlist(item.id);
-                        } else {
-                          await addToWishlist(item.id);
-                        }
-                      }}
-                      activeOpacity={0.7}
-                      style={{
-                        position: 'absolute',
-                        top: heightPercentageToDP(1.5),
-                        right: widthPercentageToDP(4),
-                        backgroundColor: Colors.button[100],
-                        padding: 6,
-                        borderRadius: 12,
-                        width: 20,
-                        height: 20,
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Image
-                        source={
-                          isWishlisted(item.id)
-                            ? require('../../assets/heart.png') // Filled heart (wishlisted)
-                            : require('../../assets/Png/heart-1.png') // Outline heart (not wishlisted)
-                        }
+                      <TouchableOpacity
+                        onPress={async () => {
+                          if (isWishlisted(item.id)) {
+                            await removeFromWishlist(item.id);
+                          } else {
+                            await addToWishlist(item.id);
+                          }
+                        }}
+                        activeOpacity={0.7}
                         style={{
                           position: 'absolute',
-                          width: 12,
-                          height: 12,
-                          alignSelf: 'center',
-                          resizeMode: 'cover',
+                          top: heightPercentageToDP(1.5),
+                          right: widthPercentageToDP(4),
+                          backgroundColor: Colors.button[100],
+                          padding: 6,
+                          borderRadius: 12,
+                          width: 20,
+                          height: 20,
+                          justifyContent: 'center',
                         }}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
-          />
+                      >
+                        <Image
+                          source={
+                            isWishlisted(item.id)
+                              ? require('../../assets/heart.png') // Filled heart (wishlisted)
+                              : require('../../assets/Png/heart-1.png') // Outline heart (not wishlisted)
+                          }
+                          style={{
+                            position: 'absolute',
+                            width: 12,
+                            height: 12,
+                            alignSelf: 'center',
+                            resizeMode: 'cover',
+                          }}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
 
-          {/* Dots */}
-          <View style={styles.dotsContainer}>
-            {Array.isArray(apiRecommend) &&
-              apiRecommend.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, activeRec === i && styles.activeDot]}
-                />
-              ))}
+            {/* Dots */}
+            <View style={styles.dotsContainer}>
+              {Array.isArray(apiRecommend) &&
+                apiRecommend.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.dot, activeRec === i && styles.activeDot]}
+                  />
+                ))}
+            </View>
           </View>
         </View>
-      </View>
 
-      <LoginModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onGoogleLogin={() => Alert.alert('Google Login')}
-        onFacebookLogin={() => Alert.alert('Facebook Login')}
-        phoneNumber="email or phone number"
-      />
-    </ScrollView>
-    </SafeAreaView >
+        <LoginModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          onGoogleLogin={() => Alert.alert('Google Login')}
+          onFacebookLogin={() => Alert.alert('Facebook Login')}
+          phoneNumber="email or phone number"
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

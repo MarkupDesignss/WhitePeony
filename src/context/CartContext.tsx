@@ -16,8 +16,14 @@ export interface CartItem {
 
 interface CartContextType {
     cart: CartItem[];
-    addToCart: (productId: number, selectedVariant?: number | { id?: number }) => Promise<void>;
-    removeFromCart: (productId: number, variantId?: number | null) => Promise<void>;
+    addToCart: (
+        productId: number,
+        selectedVariant?: number | { id?: number },
+    ) => Promise<void>;
+    removeFromCart: (
+        productId: number,
+        variantId?: number | null,
+    ) => Promise<void>;
     getCartDetails: () => Promise<void>;
     syncCartAfterLogin: (userId: string) => Promise<void>;
     clearCart: () => Promise<void>;
@@ -27,7 +33,9 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
+    children,
+}) => {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     const [token, setToken] = useState<string | null>(null);
@@ -62,14 +70,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isLoggedIn = Boolean(token);
 
     // normalize selectedVariant param
-    const normalizeVariantId = (selectedVariant?: number | { id?: number } | null) => {
+    const normalizeVariantId = (
+        selectedVariant?: number | { id?: number } | null,
+    ) => {
         if (selectedVariant == null) return null;
         if (typeof selectedVariant === 'number') return selectedVariant;
         return selectedVariant.id ?? null;
     };
 
     // addToCart: uses API when logged in, otherwise stores locally
-    const addToCart = async (productId: number, selectedVariant?: number | { id?: number }) => {
+    const addToCart = async (
+        productId: number,
+        selectedVariant?: number | { id?: number },
+    ) => {
         try {
             const variantId = normalizeVariantId(selectedVariant);
             const payload = {
@@ -82,14 +95,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Guest: update local cart (merge by productId + variant)
                 setCart(prev => {
                     const existingIndex = prev.findIndex(
-                        p => p.id === productId && (p.variant_id || null) === (variantId || null)
+                        p =>
+                            p.id === productId &&
+                            (p.variant_id || null) === (variantId || null),
                     );
                     if (existingIndex !== -1) {
                         const copy = [...prev];
-                        copy[existingIndex] = { ...copy[existingIndex], quantity: copy[existingIndex].quantity + 1 };
+                        copy[existingIndex] = {
+                            ...copy[existingIndex],
+                            quantity: copy[existingIndex].quantity + 1,
+                        };
                         return copy;
                     }
-                    return [...prev, { id: productId, variant_id: variantId, quantity: 1 }];
+                    return [
+                        ...prev,
+                        { id: productId, variant_id: variantId, quantity: 1 },
+                    ];
                 });
                 Toast.show({ type: 'success', text1: 'Added to cart!' });
                 return;
@@ -107,17 +128,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     type: 'success',
                     text1: res.data?.message || 'Added to cart!',
                 });
-                console.log("addtocart responce", res?.data)
+                console.log('addtocart responce', res?.data);
             } else {
-                console.log('errorlist,', res?.data)
-                Toast.show({ type: 'error', text1: res?.data?.message || 'Failed to add to cart' });
+                console.log('errorlist,', res?.data);
+                Toast.show({
+                    type: 'error',
+                    text1: res?.data?.message || 'Failed to add to cart',
+                });
             }
         } catch (err: any) {
             hideLoader();
             console.log('addToCart error', JSON.stringify(err));
             Toast.show({
                 type: 'error',
-                text1: err?.response?.data?.message || 'Something went wrong! Please try again.',
+                text1:
+                    err?.response?.data?.message ||
+                    'Something went wrong! Please try again.',
             });
         }
     };
@@ -148,40 +174,106 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // removeFromCart: supports guest and logged-in removal
+    // removeFromCart: supports guest and logged-in removal with variant
     const removeFromCart = async (productId: number, variantId?: number | null) => {
+        console.log('removeFromCart called with:', { productId, variantId, isLoggedIn });
+
         try {
             if (!isLoggedIn) {
-                setCart(prev => prev.filter(item => !(item.id === productId && (item.variant_id || null) === (variantId || null))));
+                console.log('Guest user - removing from local cart');
+                setCart(prev => prev.filter(item =>
+                    !(item.id === productId && (item.variant_id || null) === (variantId || null))
+                ));
                 Toast.show({ type: 'success', text1: 'Removed from cart!' });
                 return;
             }
 
             showLoader();
-            // server expects cart item id or cart row id – if your API expects cart row id adjust accordingly.
-            // Here we assume productId is sufficient; change to the server's expected param if needed.
-            const res = await UserService.RemoveCart(productId);
-            hideLoader();
 
-            if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
-                Toast.show({
-                    type: 'success',
-                    text1: res.data?.message || 'Cart updated!',
-                });
-                await getCartDetails();
+            console.log('Logged-in user - checking variantId:', variantId);
+
+            if (variantId) {
+                try {
+                    console.log('Calling RemoveCartWithVariant API with:', { productId, variantId });
+                    const res = await UserService.RemoveCartWithVariant(productId, variantId);
+                    console.log('RemoveCartWithVariant response:', res?.status, res?.data);
+
+                    if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
+                        console.log('Variant-specific remove successful');
+                        Toast.show({
+                            type: 'success',
+                            text1: res.data?.message || 'Item removed from cart!',
+                        });
+                        await getCartDetails();
+                    } else {
+                        console.log('Variant API failed, trying fallback');
+                        // Fallback to regular remove if variant API fails
+                        const fallbackRes = await UserService.RemoveCart(productId);
+                        console.log('Fallback response:', fallbackRes?.status, fallbackRes?.data);
+
+                        if (fallbackRes && (fallbackRes.status === HttpStatusCode.Ok || fallbackRes.status === 200)) {
+                            Toast.show({
+                                type: 'success',
+                                text1: fallbackRes.data?.message || 'Cart updated!',
+                            });
+                            await getCartDetails();
+                        } else {
+                            Toast.show({ type: 'error', text1: 'Failed to remove item' });
+                        }
+                    }
+                } catch (variantError: any) {
+                    console.log('Variant-specific remove error:', variantError);
+                    console.log('Error response:', variantError?.response?.data);
+
+                    // Try fallback
+                    try {
+                        console.log('Trying fallback to regular RemoveCart');
+                        const fallbackRes = await UserService.RemoveCart(productId);
+                        if (fallbackRes && (fallbackRes.status === HttpStatusCode.Ok || fallbackRes.status === 200)) {
+                            Toast.show({
+                                type: 'success',
+                                text1: fallbackRes.data?.message || 'Cart updated!',
+                            });
+                            await getCartDetails();
+                        }
+                    } catch (fallbackError) {
+                        console.log('Fallback also failed:', fallbackError);
+                        Toast.show({
+                            type: 'error',
+                            text1: 'Failed to remove item from cart'
+                        });
+                    }
+                }
             } else {
-                Toast.show({ type: 'error', text1: 'Failed to update cart' });
+                // No variantId, use regular RemoveCart
+                console.log('No variantId, using regular RemoveCart');
+                const res = await UserService.RemoveCart(productId);
+                console.log('Regular RemoveCart response:', res?.status, res?.data);
+
+                if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
+                    Toast.show({
+                        type: 'success',
+                        text1: res.data?.message || 'Cart updated!',
+                    });
+                    await getCartDetails();
+                } else {
+                    Toast.show({ type: 'error', text1: 'Failed to update cart' });
+                }
             }
         } catch (err: any) {
             hideLoader();
-            console.log('removeFromCart error', err);
+            console.log('removeFromCart general error:', err);
+            console.log('Error response data:', err?.response?.data);
+            console.log('Error status:', err?.response?.status);
+
             Toast.show({
                 type: 'error',
                 text1: err?.response?.data?.message || 'Something went wrong! Please try again.',
             });
+        } finally {
+            hideLoader();
         }
     };
-
     // sync guest cart into user cart after login
     const syncCartAfterLogin = async (userIdParam: string) => {
         try {

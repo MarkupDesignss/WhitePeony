@@ -8,6 +8,7 @@ import {
   Image,
   Platform,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { Image_url, UserService } from '../../service/ApiService';
 import { WishlistContext } from '../../context/wishlistContext';
@@ -20,41 +21,82 @@ import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type DisplayWishlistItem = {
-  id: string; // product id as string (used as key)
+  id: string;
   wishlistItemId: string;
   name: string;
   price: string;
-  image?: string | null; // full URI
+  image?: string | null;
   isInCart?: boolean;
   price_numeric?: number;
-  product_id?: number; // numeric id for addToCart
+  product_id?: number;
   variants?: { variant_id?: number }[];
   average_rating?: number;
 };
 
 const WishlistScreen = ({ navigation }: { navigation: any }) => {
-  const { removeFromWishlist, wishlistIds } = React.useContext(WishlistContext);
+  const {
+    wishlistItems,
+    wishlistIds,
+    isWishlisted,
+    addToWishlist,
+    removeFromWishlist,
+    toggleWishlist,
+    fetchWishlist,
+    isLoading: wishlistLoading,
+  } = useContext(WishlistContext);
+
   const [items, setItems] = useState<DisplayWishlistItem[]>([]);
   const { isLoggedIn } = useContext<UserData>(UserDataContext);
   const { showLoader, hideLoader } = CommonLoader();
   const { cart, addToCart } = useCart();
+  const [refreshing, setRefreshing] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>({});
 
+  // Debug logging
   useEffect(() => {
+    console.log('=== WISHLIST SCREEN DEBUG ===');
+    console.log('isLoggedIn:', isLoggedIn);
+    console.log('wishlistIds:', wishlistIds);
+    console.log('wishlistItems count:', wishlistItems?.length);
+    console.log('wishlistItems sample:', wishlistItems?.[0]);
+    console.log('cart count:', cart?.length);
+
+    setDebugInfo({
+      isLoggedIn,
+      wishlistIdsCount: wishlistIds?.length || 0,
+      wishlistItemsCount: wishlistItems?.length || 0,
+      itemsCount: items.length,
+      firstItem: wishlistItems?.[0],
+      firstId: wishlistIds?.[0],
+    });
+  }, [isLoggedIn, wishlistIds, wishlistItems, items]);
+
+  // Load wishlist items when component mounts or when dependencies change
+  useEffect(() => {
+    console.log('useEffect triggered - loading wishlist');
     loadWishlistItems();
-  }, [isLoggedIn, wishlistIds]);
+  }, [isLoggedIn, wishlistIds, wishlistItems]);
 
   // Update items' cart status when cart changes
   useEffect(() => {
     if (!cart) return;
+    console.log('Cart updated, checking items in cart');
     setItems(currentItems =>
       currentItems.map(item => {
         const isInCart = cart.some(cartItem => String(cartItem.id) === item.id);
+        if (isInCart !== item.isInCart) {
+          console.log(
+            `Item ${item.id} cart status changed: ${item.isInCart} -> ${isInCart}`,
+          );
+        }
         return { ...item, isInCart };
       }),
     );
   }, [cart]);
 
   const loadWishlistItems = async () => {
+    console.log('loadWishlistItems called, isLoggedIn:', isLoggedIn);
+
     if (isLoggedIn) {
       await fetchServerWishlist();
     } else {
@@ -64,162 +106,389 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
   const fetchServerWishlist = async () => {
     try {
+      console.log('Fetching server wishlist...');
       showLoader();
       const res = await UserService.wishlist();
-      const apiItems = res?.data?.data || [];
-      console.log('Wishlist API items:', apiItems);
-      const mapped: DisplayWishlistItem[] = (
-        Array.isArray(apiItems) ? apiItems : []
-      ).map((p: any) => {
-        const productId = Number(p.product_id ?? p.id ?? p.productId ?? 0);
-        const front = p.front_image ?? p.image ?? null;
-        return {
-          id: String(productId || (p.id ?? p.product_id ?? p.product_id ?? '')),
-          wishlistItemId: String(
-            p.wishlist_item_id ?? p.id ?? p.product_id ?? '',
-          ),
-          name: p.name ?? p.product_name ?? p.product_name ?? '',
-          price: p.variants[0]?.price
-            ? `${p.variants[0]?.price} €`
-            : p.variants[0]?.price
-            ? `${p.variants[0]?.price} €`
-            : '0 €',
-          price_numeric: Number(
-            p.variants[0]?.price ?? p.variants[0]?.price ?? 0,
-          ),
-          image: front ? Image_url + front : null,
-          product_id: productId,
-          variants: p.variants ?? [],
-          average_rating: Number(p.average_rating ?? p.averageRating ?? 0),
-          isInCart: cart
-            ? cart.some((ci: any) => String(ci.id) === String(productId))
-            : false,
-        };
+      console.log('Server wishlist response:', {
+        status: res?.status,
+        dataLength: res?.data?.data?.length,
+        dataSample: res?.data?.data?.[0],
       });
-      hideLoader();
-      setItems(mapped);
-    } catch (e) {
-      hideLoader();
-      const error = e as any;
-      if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
-      } else {
-        Toast.show({ type: 'error', text1: 'Failed to load wishlist' });
+
+      const apiItems = res?.data?.data || [];
+
+      if (apiItems.length === 0) {
+        console.log(
+          'API returned empty array, checking wishlistIds:',
+          wishlistIds,
+        );
+        // Fallback to local if API returns empty but we have local items
+        if (wishlistIds && wishlistIds.length > 0) {
+          console.log('Falling back to local wishlist');
+          await loadLocalWishlist();
+          hideLoader();
+          return;
+        }
       }
+
+      const mapped: DisplayWishlistItem[] = apiItems.map(
+        (item: any, index: number) => {
+          console.log(`Processing API item ${index}:`, item);
+
+          // Try multiple possible ID sources
+          const productId =
+            item?.product?.id ||
+            item?.product_id ||
+            item?.id ||
+            item?.product?.product_id ||
+            wishlistIds?.[index] ||
+            `temp-${index}`;
+
+          const productName =
+            item?.product?.name ||
+            item?.name ||
+            item?.product_name ||
+            'Product';
+
+          // Get image
+          let imageUrl = null;
+          if (item?.product?.front_image) {
+            imageUrl = item.product.front_image.startsWith('http')
+              ? item.product.front_image
+              : Image_url + item.product.front_image;
+          } else if (item?.front_image) {
+            imageUrl = item.front_image.startsWith('http')
+              ? item.front_image
+              : Image_url + item.front_image;
+          } else if (item?.image) {
+            imageUrl = item.image.startsWith('http')
+              ? item.image
+              : Image_url + item.image;
+          }
+
+          // Get price
+          let price = '0 €';
+          let priceNumeric = 0;
+          const variants = item?.variants || item?.product?.variants || [];
+
+          if (variants.length > 0) {
+            const firstVariant = variants[0];
+            const variantPrice =
+              firstVariant?.actual_price ||
+              firstVariant?.price ||
+              firstVariant?.main_price;
+
+            if (variantPrice) {
+              priceNumeric = Number(variantPrice);
+              price = `${variantPrice} €`;
+            }
+          } else if (item?.price) {
+            priceNumeric = Number(item.price);
+            price = `${item.price} €`;
+          } else if (item?.product?.price) {
+            priceNumeric = Number(item.product.price);
+            price = `${item.product.price} €`;
+          }
+
+          return {
+            id: String(productId),
+            wishlistItemId: String(
+              item?.wishlist_item_id || item?.id || productId,
+            ),
+            name: productName,
+            price: price,
+            price_numeric: priceNumeric,
+            image: imageUrl,
+            product_id: Number(productId) || 0,
+            variants: variants,
+            average_rating: Number(item?.average_rating || item?.rating || 0),
+            isInCart: cart
+              ? cart.some(
+                  (cartItem: any) => String(cartItem.id) === String(productId),
+                )
+              : false,
+          };
+        },
+      );
+
+      console.log(`Mapped ${mapped.length} items from server`);
+      setItems(mapped);
+      hideLoader();
+    } catch (error: any) {
+      hideLoader();
+      console.error('Error fetching server wishlist:', error);
+
+      // Fallback to local on error
+      console.log('Falling back to local wishlist due to error');
+      await loadLocalWishlist();
+
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to load server wishlist',
+        text2: 'Showing local items instead',
+      });
     }
   };
 
   const loadLocalWishlist = async () => {
     try {
+      console.log('Loading local wishlist...');
+      console.log('wishlistItems:', wishlistItems);
+      console.log('wishlistIds:', wishlistIds);
+
       showLoader();
-      const localItems = wishlistIds || [];
-      const mapped: DisplayWishlistItem[] = localItems.map(id => {
-        const pid = Number(id);
-        return {
-          id: String(id),
-          wishlistItemId: String(id),
-          name: `Product ${id}`,
-          price: '0 €',
-          price_numeric: 0,
-          image: null,
-          product_id: pid,
-          variants: [],
-          average_rating: 0,
-          isInCart: cart
-            ? cart.some(cartItem => String(cartItem.id) === String(id))
-            : false,
-        };
-      });
-      hideLoader();
-      setItems(mapped);
-    } catch (e) {
-      hideLoader();
-      const error = e as any;
-      if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
-      } else {
-        Toast.show({ type: 'error', text1: 'Failed to load wishlist' });
-      }
-    }
-  };
 
-  const handleAddToBag = async (item: DisplayWishlistItem) => {
-    try {
-      const productId = item.product_id ?? Number(item.id);
-      const variantId = item.variants?.[0]?.variant_id ?? null;
-      await addToCart(productId, variantId);
+      let mapped: DisplayWishlistItem[] = [];
 
-      // refresh UI: if guest just mark item as in cart; for logged-in we've already synced cart in CartContext
-      if (!isLoggedIn) {
-        setItems(currentItems =>
-          currentItems.map(i =>
-            i.id === item.id ? { ...i, isInCart: true } : i,
-          ),
+      // First try to use wishlistItems from context
+      if (Array.isArray(wishlistItems) && wishlistItems.length > 0) {
+        console.log(
+          `Using wishlistItems array with ${wishlistItems.length} items`,
         );
+
+        mapped = wishlistItems.map((item: any, index: number) => {
+          console.log(`Processing wishlistItems item ${index}:`, item);
+
+          // Get product ID from transformed item
+          const productId =
+            item?.id ||
+            item?.product_id ||
+            wishlistIds?.[index] ||
+            item?.originalItem?.product?.id ||
+            `local-${index}`;
+
+          const productName =
+            item?.name ||
+            item?.originalItem?.product?.name ||
+            item?.product?.name ||
+            `Product ${productId}`;
+
+          // Get image - check multiple sources
+          let imageUrl = item?.image;
+          if (!imageUrl && item?.front_image) {
+            imageUrl = item.front_image.startsWith('http')
+              ? item.front_image
+              : Image_url + item.front_image;
+          }
+          if (!imageUrl && item?.originalItem?.product?.front_image) {
+            const frontImg = item.originalItem.product.front_image;
+            imageUrl = frontImg.startsWith('http')
+              ? frontImg
+              : Image_url + frontImg;
+          }
+
+          // Get price from transformed item
+          let price = '0 €';
+          let priceNumeric = 0;
+
+          if (item?.variants?.[0]?.actual_price) {
+            priceNumeric = Number(item.variants[0].actual_price);
+            price = `${item.variants[0].actual_price} €`;
+          } else if (item?.variants?.[0]?.price) {
+            priceNumeric = Number(item.variants[0].price);
+            price = `${item.variants[0].price} €`;
+          } else if (item?.price) {
+            priceNumeric = Number(item.price);
+            price = `${item.price} €`;
+          } else if (item?.main_price) {
+            priceNumeric = Number(item.main_price);
+            price = `${item.main_price} €`;
+          }
+
+          return {
+            id: String(productId),
+            wishlistItemId: String(productId),
+            name: productName,
+            price: price,
+            price_numeric: priceNumeric,
+            image: imageUrl,
+            product_id: Number(productId) || 0,
+            variants: item?.variants || [],
+            average_rating: Number(item?.average_rating || 0),
+            isInCart: cart
+              ? cart.some(
+                  (cartItem: any) => String(cartItem.id) === String(productId),
+                )
+              : false,
+          };
+        });
+      }
+      // If wishlistItems is empty but we have wishlistIds
+      else if (Array.isArray(wishlistIds) && wishlistIds.length > 0) {
+        console.log(`Using wishlistIds array with ${wishlistIds.length} IDs`);
+
+        mapped = wishlistIds.map((id: string, index: number) => {
+          return {
+            id: String(id),
+            wishlistItemId: String(id),
+            name: `Product ${id}`,
+            price: '0 €',
+            price_numeric: 0,
+            image: null,
+            product_id: Number(id) || 0,
+            variants: [],
+            average_rating: 0,
+            isInCart: cart
+              ? cart.some(cartItem => String(cartItem.id) === String(id))
+              : false,
+          };
+        });
+      }
+      // If both are empty but we have items in context state
+      else if (items.length > 0) {
+        console.log('Keeping existing items:', items.length);
+        // Keep current items
+        hideLoader();
+        return;
       }
 
-      Toast.show({ type: 'success', text1: 'Added to cart successfully' });
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
-      Toast.show({ type: 'error', text1: 'Failed to add to cart' });
+      console.log(`Loaded ${mapped.length} local items`);
+      setItems(mapped);
+      hideLoader();
+    } catch (error: any) {
+      hideLoader();
+      console.error('Error loading local wishlist:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to load wishlist',
+        text2: error.message || 'Please try again',
+      });
     }
   };
 
-  const handleRemove = async (productId: string) => {
+  const handleRemoveFromWishlist = async (productId: string) => {
     try {
       showLoader();
+      console.log('Removing from wishlist:', productId);
+
       if (isLoggedIn) {
         // Remove from server for logged-in users
         const res = await UserService.wishlistDelete(productId);
+        console.log('Server removal response:', {
+          status: res?.status,
+          data: res?.data,
+        });
+
         if (res?.status === HttpStatusCode.Ok) {
-          hideLoader();
+          // Remove from local state
           setItems(prev => prev.filter(i => i.id !== productId));
+
+          // Sync with context
           await removeFromWishlist(productId);
+
           Toast.show({
             type: 'success',
             text1: 'Removed from wishlist',
           });
         } else {
-          console.log('wishlist error', JSON.stringify(res?.data));
+          console.log('Wishlist delete error:', JSON.stringify(res?.data));
           Toast.show({
             type: 'error',
             text1: res?.data?.message || 'Failed to remove from wishlist',
           });
         }
       } else {
-        console.log('removeglobal', productId);
         // Remove locally for guests
         await removeFromWishlist(productId);
         setItems(prev => prev.filter(i => i.id !== productId));
+
         Toast.show({
           type: 'success',
           text1: 'Removed from wishlist',
         });
       }
-    } catch (err) {
+    } catch (error: any) {
       hideLoader();
-
-      console.log('Wishlist remove error:', JSON.stringify(err));
+      console.error('Wishlist remove error:', error);
       Toast.show({
         type: 'error',
         text1: 'Failed to remove from wishlist',
+        text2: error.message || 'Please try again',
+      });
+    } finally {
+      hideLoader();
+    }
+  };
+
+  const handleToggleWishlist = async (productId: string) => {
+    try {
+      await toggleWishlist(productId);
+      // The context will update wishlistItems, which will trigger useEffect
+    } catch (error: any) {
+      console.error('Error toggling wishlist:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update wishlist',
+        text2: 'Please try again',
       });
     }
   };
 
+  const onRefresh = async () => {
+    try {
+      setRefreshing(true);
+      console.log('Refreshing wishlist...');
+      await fetchWishlist(); // Refresh context data first
+      await loadWishlistItems(); // Then reload display items
+    } catch (error) {
+      console.error('Error refreshing wishlist:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const renderEmptyWishlist = () => (
+    <View style={styles.emptyContainer}>
+      <Image
+        source={require('../../assets/Png/heart-1.png')}
+        style={styles.emptyHeartIcon}
+      />
+      <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
+      <Text style={styles.emptySubtitle}>
+        Save your favorite items here to keep track of them
+      </Text>
+      <TouchableOpacity
+        style={styles.browseButton}
+        onPress={() => navigation.navigate('CategoryScreen')}
+      >
+        <Text style={styles.browseButtonText}>Browse Products</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderItem = ({ item }: { item: DisplayWishlistItem }) => (
     <View style={styles.card}>
+      {/* Product Image */}
       {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.productImage} />
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('ProductDetails', {
+              productId: item.product_id || item.id,
+            })
+          }
+        >
+          <Image source={{ uri: item.image }} style={styles.productImage} />
+        </TouchableOpacity>
       ) : (
         <View style={[styles.productImage, { backgroundColor: '#eee' }]} />
       )}
-      <View style={styles.details}>
-        <Text style={styles.productName}>{item.name}</Text>
 
-        <View style={{ flexDirection: 'row', marginTop: 0 }}>
+      {/* Product Details */}
+      <View style={styles.details}>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('ProductDetails', {
+              productId: item.product_id || item.id,
+            })
+          }
+        >
+          <Text style={styles.productName}>{item.name}</Text>
+        </TouchableOpacity>
+
+        {/* Star Rating */}
+        <View style={{ flexDirection: 'row', marginTop: 4 }}>
           {[1, 2, 3, 4, 5].map(r => {
-            const avg = item.average_rating ?? 0;
+            const avg = item.average_rating || 0;
             const isFull = avg >= r;
             const isHalf = avg >= r - 0.5 && avg < r;
             return (
@@ -246,39 +515,19 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
           })}
         </View>
 
+        {/* Price */}
         <Text style={styles.price}>{item.price}</Text>
 
+        {/* Remove Button Only */}
         <View style={styles.actionsRow}>
           <TouchableOpacity
-            style={[styles.addToBagBtn, item.isInCart && styles.goToCartBtn]}
+            style={styles.removeButton}
             activeOpacity={0.7}
-            onPress={() =>
-              item.isInCart
-                ? navigation.navigate('CheckoutScreen')
-                : handleAddToBag(item)
-            }
+            onPress={() => handleToggleWishlist(item.id)}
           >
             <Image
-              source={require('../../assets/Png/bag.png')}
-              style={{ width: 16, height: 16, marginRight: 5 }}
-            />
-            <Text
-              style={[
-                styles.addToBagText,
-                item.isInCart && styles.goToCartText,
-              ]}
-            >
-              {item.isInCart ? ' Go To Cart' : ' Add To Bag'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.favoriteBtn}
-            activeOpacity={0.7}
-            onPress={() => handleRemove(item.id)}
-          >
-            <Image
-              source={require('../../assets/Png/heart1.png')}
-              style={{ width: 16, height: 16 }}
+              source={require('../../assets/heart.png')}
+              style={{ width: 20, height: 20, tintColor: Colors.button[100] }}
             />
           </TouchableOpacity>
         </View>
@@ -288,6 +537,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation?.goBack()}
@@ -299,35 +549,41 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Wishlist</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('CheckoutScreen')}
-          style={styles.headerButton}
-        >
-          <Image
-            source={require('../../assets/Png/bag.png')}
-            style={{ width: 20, height: 20 }}
-          />
-        </TouchableOpacity>
+        {/* Removed the bag icon from header */}
+        <View style={styles.headerButton} />
       </View>
 
+      {/* Collection Label */}
       <View style={styles.collectionLabel}>
         <Image
           source={require('../../assets/Png/star-fill.png')}
           style={{ width: 20, height: 20 }}
         />
         <Text style={styles.collectionLabelText}>
-          {' '}
           My Collection ({items.length})
         </Text>
       </View>
 
-      <FlatList
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {/* Wishlist Items */}
+      {items.length === 0 ? (
+        renderEmptyWishlist()
+      ) : (
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#2E2E2E']}
+              tintColor="#2E2E2E"
+            />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -336,13 +592,15 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
-    top: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   headerButton: {
     padding: 4,
@@ -357,7 +615,7 @@ const styles = StyleSheet.create({
   },
   collectionLabel: {
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -373,70 +631,91 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     marginVertical: 8,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F5F5F5',
   },
   productImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
+    width: 80,
+    height: 80,
+    borderRadius: 12,
     marginRight: 16,
     resizeMode: 'cover',
+    backgroundColor: '#F9F9F9',
   },
   details: {
     flex: 1,
   },
   productName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#444',
+    color: '#333',
+    lineHeight: 20,
   },
   price: {
-    marginTop: 10,
-    fontSize: 14,
+    marginTop: 8,
+    fontSize: 16,
     fontWeight: '700',
     color: '#000',
   },
   actionsRow: {
     marginTop: 12,
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  addToBagBtn: {
-    flexDirection: 'row',
-    backgroundColor: Colors.button[100],
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  addToBagText: {
-    fontWeight: '600',
-    fontSize: 12,
-    color: '#5E6935',
-  },
-  favoriteBtn: {
-    padding: 6,
+  removeButton: {
+    padding: 10,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.button[100],
-    backgroundColor: Colors.button[100],
+    backgroundColor: '#FFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  goToCartBtn: {
-    backgroundColor: '#5E6935',
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 60,
   },
-  goToCartText: {
-    color: '#FFFFFF',
+  emptyHeartIcon: {
+    width: 80,
+    height: 80,
+    opacity: 0.3,
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  browseButton: {
+    backgroundColor: '#2E2E2E',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  browseButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 

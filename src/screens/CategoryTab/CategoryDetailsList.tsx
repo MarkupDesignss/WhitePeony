@@ -100,6 +100,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     showLoader();
     try {
       let response: any = [];
+
       if (mode === 'recommended') response = await UserService.recommended();
       else if (mode === 'Best Sale')
         response = await UserService.mostsellingproduct();
@@ -110,6 +111,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           (filterParams.rating ||
             filterParams.min_price ||
             filterParams.max_price);
+
         if (hasFilter) {
           response = await UserService.FilterProducts({ ...filterParams });
         } else {
@@ -117,34 +119,24 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         }
       }
 
+      // 🔍 FULL API RESPONSE
+      console.log('🔴 RAW API RESPONSE:', response?.data);
+
       const payload = response?.data?.data ?? response?.data ?? response ?? [];
+      console.log('🟡 PAYLOAD:', payload);
+
       const productsArray = Array.isArray(payload)
         ? payload
         : payload?.data ?? [];
 
-      // ✅ Filter products for product_type 'b2c' only
-      const b2cProducts = productsArray.filter(
-        (p: any) => p.product_type === 'b2c',
-      );
-
-      if (b2cProducts.length) {
-        const cartIds = new Set(
-          cart.map((c: any) => String(c.id || c.product_id)),
-        );
-        const updatedProducts = b2cProducts.map((p: any) => {
-          const pid = String(p.id ?? p.product_id ?? p.productId ?? '');
-          return {
-            ...p,
-            id: pid,
-            is_cart: cartIds.has(pid) ? 'true' : 'false',
-          };
-        });
-        setApiProducts(updatedProducts);
-      } else {
-        setApiProducts([]);
+      // 🔵 FIRST PRODUCT (MOST IMPORTANT)
+      if (productsArray.length > 0) {
+        console.log('🟢 FIRST PRODUCT:', productsArray[0]);
       }
-    } catch (err) {
-      console.log('Error fetching products:', err);
+
+      setApiProducts(productsArray); // ✅ IMPORTANT
+    } catch (error) {
+      console.log('❌ fetchProducts error:', error);
     } finally {
       hideLoader();
     }
@@ -243,9 +235,14 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         activeOpacity={0.8}
       >
         <ProductImageCarousel
-          images={item.images || [require('../../assets/Png/product.png')]}
+          images={[
+            {
+              uri: `https://www.markupdesigns.net/whitepeony/storage/${item.front_image}`,
+            },
+          ]}
           width={ITEM_WIDTH}
         />
+
         <View style={styles.cardBody}>
           <Text numberOfLines={1} style={styles.cardTitle}>
             {item.name}

@@ -465,8 +465,10 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
       <AddressModal
         visible={modalAddress}
         onClose={() => setModalAddress(false)}
-        onAddNew={() => {
-          setModalAddress(false), setmodalAddressADD(true);
+        onSelect={(address) => {
+          console.log('Selected address:', address);
+          // Handle selected address if needed
+          setModalAddress(false);
         }}
       />
     </SafeAreaView>

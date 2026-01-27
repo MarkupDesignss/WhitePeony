@@ -67,13 +67,13 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       const firstVariant = variants[0];
       const present = Array.isArray(cart)
         ? cart.some((c: any) => {
-            const cartProductId = c.product_id ?? c.id;
-            const cartVariantId = c.variant_id ?? null;
-            return (
-              Number(cartProductId) === Number(productData.id) &&
-              String(cartVariantId) === String(firstVariant.id)
-            );
-          })
+          const cartProductId = c.product_id ?? c.id;
+          const cartVariantId = c.variant_id ?? null;
+          return (
+            Number(cartProductId) === Number(productData.id) &&
+            String(cartVariantId) === String(firstVariant.id)
+          );
+        })
         : false;
       setIsInCart(Boolean(present));
     }
@@ -140,11 +140,11 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             const variantId = variant0?.id ?? null;
             const present = Array.isArray(cart)
               ? cart.some(
-                  (c: any) =>
-                    (c.id ?? c.product_id) === normalized.id &&
-                    (c.variant_id ?? c.variantId ?? null) ===
-                      (variantId || null),
-                )
+                (c: any) =>
+                  (c.id ?? c.product_id) === normalized.id &&
+                  (c.variant_id ?? c.variantId ?? null) ===
+                  (variantId || null),
+              )
               : false;
             setIsInCart(Boolean(present || normalized?.is_cart));
           } catch {
@@ -568,25 +568,29 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         contentContainerStyle={{ paddingHorizontal: 12 }}
       >
         {/* Image carousel with dots. Tap an image to open zoom modal */}
-        <View>
+        {/* Fixed Image Carousel */}
+        <View style={styles.carouselContainer}>
           <FlatList
-            ref={r => {
-              flatListRef.current = r;
-            }}
+            ref={flatListRef}
             data={productImages}
             keyExtractor={(_, i) => String(i)}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={e => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-              setActiveIndex(idx);
+            decelerationRate="fast"
+            snapToInterval={width} // This ensures proper pagination
+            snapToAlignment="start"
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.floor(e.nativeEvent.contentOffset.x / width);
+              if (idx >= 0 && idx < productImages.length) {
+                setActiveIndex(idx);
+              }
             }}
             renderItem={({ item, index }) => (
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => openZoom(index)}
-                style={{ width }}
+                style={{ width: width - 24 }} // Account for padding
                 onPressIn={() => {
                   setIsInteracting(true);
                   stopAutoplay();
@@ -597,43 +601,58 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   startAutoplay();
                 }}
               >
-                {/* Animated fade for image change */}
-                <Animated.View style={{ opacity: animOpacity }}>
-                  <Image
-                    source={resolveImageSource(item)}
-                    style={styles.heroImage}
-                    resizeMode="contain"
-                  />
-                </Animated.View>
+                <View style={styles.imageContainer}>
+                  <Animated.View style={[styles.animatedImageWrapper, { opacity: animOpacity }]}>
+                    <Image
+                      source={resolveImageSource(item)}
+                      style={styles.heroImage}
+                      resizeMode="contain"
+                    />
+                  </Animated.View>
+                </View>
               </TouchableOpacity>
             )}
+            getItemLayout={(data, index) => ({
+              length: width - 24,
+              offset: (width - 24) * index,
+              index,
+            })}
           />
-          {productImages && productImages.length ? (
-            <View style={styles.dotsRow}>
+
+          {/* Dots Indicator - Only show if more than 1 image */}
+          {productImages.length > 1 && (
+            <View style={styles.dotsContainer}>
               {productImages.map((_, i) => (
-                <View
+                <TouchableOpacity
                   key={i}
-                  style={[
-                    styles.dot,
-                    i === activeIndex ? styles.dotActive : undefined,
-                  ]}
-                />
+                  onPress={() => {
+                    if (flatListRef.current) {
+                      flatListRef.current.scrollToIndex({
+                        index: i,
+                        animated: true,
+                      });
+                      setActiveIndex(i);
+                    }
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.dot,
+                      i === activeIndex ? styles.dotActive : styles.dotInactive,
+                    ]}
+                  />
+                </TouchableOpacity>
               ))}
-            </View>
-          ) : (
-            <View
-              style={{
-                width,
-                height: HERO_HEIGHT,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#f6f6f6',
-              }}
-            >
-              <Text style={{ color: '#999' }}>No images available</Text>
             </View>
           )}
         </View>
+
+        {/* No Images Placeholder */}
+        {(!productImages || productImages.length === 0) && (
+          <View style={styles.noImageContainer}>
+            <Text style={styles.noImageText}>No images available</Text>
+          </View>
+        )}
 
         {/* Zoom viewer using react-native-image-viewing */}
         <ImageView
@@ -723,14 +742,14 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                       // Check if this specific variant is in cart
                       const present = Array.isArray(cart)
                         ? cart.some((c: any) => {
-                            const cartProductId = c.product_id ?? c.id;
-                            const cartVariantId = c.variant_id ?? null;
-                            return (
-                              Number(cartProductId) ===
-                                Number(productData?.id) &&
-                              String(cartVariantId) === String(variant.id)
-                            );
-                          })
+                          const cartProductId = c.product_id ?? c.id;
+                          const cartVariantId = c.variant_id ?? null;
+                          return (
+                            Number(cartProductId) ===
+                            Number(productData?.id) &&
+                            String(cartVariantId) === String(variant.id)
+                          );
+                        })
                         : false;
                       setIsInCart(Boolean(present));
                     }
@@ -1014,10 +1033,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     marginTop: '5%',
   },
-  heroImage: {
-    width: width,
-    height: HERO_HEIGHT,
-  },
+
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1222,14 +1238,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    marginHorizontal: 4,
-  },
-  dotActive: { backgroundColor: '#fff' },
+
+
 
   cartButton: {
     backgroundColor: Colors.button[100],
@@ -1268,4 +1278,78 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
     alignItems: 'center',
   },
+
+  carouselContainer: {
+    width: '100%',
+    height: HERO_HEIGHT,
+    marginTop: 10,
+    position: 'relative',
+  },
+
+  imageContainer: {
+    width: width - 24, // Account for padding
+    height: HERO_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  animatedImageWrapper: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: '100%',
+    maxHeight: '100%',
+  },
+
+  dotsContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+
+  dotActive: {
+    backgroundColor: Colors.button[100],
+    width: 20,
+  },
+
+  dotInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  },
+
+  noImageContainer: {
+    width: width - 24,
+    height: HERO_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f6f6f6',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+
+  noImageText: {
+    color: '#999',
+    fontSize: 14,
+  },
+
 });

@@ -464,6 +464,23 @@ export const UserService = {
     return APIKit.delete(`cart/product/${removeid}`, apiHeaders);
   },
 
+  // ADD THIS NEW METHOD FOR REMOVING CART ITEM WITH VARIANT
+  RemoveCartWithVariant: async (productId: number, variantId: number) => {
+    const token = await LocalStorage.read('@token');
+    const apiHeaders = {
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    };
+    // Construct the URL with product ID and variant ID query parameter
+    return APIKit.delete(
+      `cart/product/${productId}?variant_id=${variantId}`,
+      apiHeaders,
+    );
+  },
+
   deleteaddresses: async (removeid: number) => {
     const token = await LocalStorage.read('@token');
     const apiHeaders = {
@@ -630,52 +647,24 @@ export const UserService = {
     return APIKit.get(`search?q=${word}`, apiHeaders);
   },
 
- // Replace these three methods in your UserService object:
+  // Add these methods to your UserService object:
 
-wishlistadd: async (payload: { product_id: string | number }) => {
-  const token = await LocalStorage.read('@token');
-  const apiHeaders = {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  };
-  // Convert product_id to number for the API
-  const numericPayload = {
-    product_id: Number(payload.product_id)
-  };
-  console.log('Wishlist add payload:', numericPayload);
-  return APIKit.post(`wishlist/add`, numericPayload, apiHeaders);
-},
+  wishlistadd: async (payload: { product_id: string | number }) => {
+    const token = await LocalStorage.read('@token');
+    const apiHeaders = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    };
+    const numericPayload = {
+      product_id: Number(payload.product_id),
+    };
+    console.log('Wishlist add payload:', numericPayload);
+    return APIKit.post(`wishlist/add`, numericPayload, apiHeaders);
+  },
 
-wishlist: async () => {
-  const token = await LocalStorage.read('@token');
-  const apiHeaders = {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  };
-  return APIKit.get(`wishlist`, apiHeaders);
-},
-
-wishlistDelete: async (productId: string | number) => {
-  const token = await LocalStorage.read('@token');
-  const apiHeaders = {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  };
-  // Send as DELETE with data payload
-  const numericProductId = Number(productId);
-  console.log('Wishlist delete payload:', { product_id: numericProductId });
-  return APIKit.delete(`wishlist/delete`, {
-    ...apiHeaders,
-    data: { product_id: numericProductId }
-  });
-},
-
+  // Update the wishlist function in UserService.ts
   wishlist: async () => {
     const token = await LocalStorage.read('@token');
     const apiHeaders = {
@@ -684,7 +673,18 @@ wishlistDelete: async (productId: string | number) => {
         Authorization: `Bearer ${token}`,
       },
     };
-    return APIKit.get(`wishlist`, apiHeaders);
+    console.log('Fetching wishlist from:', STAGING_API_URL + 'wishlist');
+
+    try {
+      const response = await APIKit.get('wishlist', apiHeaders);
+      console.log('Wishlist API Response:', response.data);
+
+      // Return the data part of the response
+      return response.data;
+    } catch (error) {
+      console.error('Wishlist fetch error:', error);
+      throw error;
+    }
   },
 
   wishlistDelete: async (productId: string | number) => {
@@ -695,6 +695,19 @@ wishlistDelete: async (productId: string | number) => {
         Authorization: `Bearer ${token}`,
       },
     };
-    return APIKit.delete(`wishlist/product/${productId}`, apiHeaders);
+    const numericProductId = Number(productId);
+    console.log('Wishlist delete for product:', numericProductId);
+    return APIKit.delete(`wishlist/product/${numericProductId}`, apiHeaders);
+  },
+
+  getProductById: async (id: string | number) => {
+    const apiHeaders = {
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Skip-Auth': 'true',
+      },
+    };
+    return APIKit.get(`products/${id}`, apiHeaders);
   },
 };

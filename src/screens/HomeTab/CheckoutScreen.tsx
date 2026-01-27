@@ -51,10 +51,10 @@ type CartItem = {
   product_name?: string;
   variant_sku?: string;
   total_price?: number;
-  actual_price?: number; // Add this line
+  actual_price?: number;
   quantity: number;
   variants?: { variant_id?: number | string }[];
-  variant_id?: number | string;
+  variant_id?: number | string; // Make sure this exists
   name?: string;
   unit?: string;
 };
@@ -71,6 +71,9 @@ type Address = {
 };
 
 const CheckoutScreen = ({ navigation }: { navigation: any }) => {
+  const getCouponCode = (item: any) =>
+    String(item?.code ?? item?.promo_code ?? item?.promo ?? item?.title ?? '');
+
   const {
     addToCart,
     removeFromCart,
@@ -116,6 +119,35 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   ///coupans code
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
+
+  const recalculateCoupon = () => {
+    const total = Number(cartData?.discounted_total || 0);
+
+    const discountType = String(selectedPromoCode.type).toLowerCase();
+    const discountValue = Number(selectedPromoCode.discount || 0);
+    const maxDiscount = Number(selectedPromoCode.max_discount || 0);
+
+    let calculatedDiscount = 0;
+
+    if (discountType === 'percentage') {
+      calculatedDiscount = (total * discountValue) / 100;
+      if (maxDiscount > 0 && calculatedDiscount > maxDiscount) {
+        calculatedDiscount = maxDiscount;
+      }
+    } else {
+      calculatedDiscount = discountValue;
+    }
+
+    calculatedDiscount = Math.min(calculatedDiscount, total);
+
+    setDiscountAmount(Math.round(calculatedDiscount * 100) / 100);
+  };
+
+  useEffect(() => {
+    if (appliedPromo && selectedPromoCode?.code) {
+      recalculateCoupon();
+    }
+  }, [cartData?.discounted_total]);
 
   // Add useEffect to sync when cart context changes
   useEffect(() => {
@@ -203,17 +235,75 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       });
     }
   };
-
   const renderRightActions = (item: CartItem) => {
+    console.log('DEBUG - Item structure for removal:', {
+      product_id: item.product_id,
+      variant_id: item.variant_id,
+      variants: item.variants,
+      fullItem: JSON.stringify(item, null, 2),
+    });
+
     return (
       <TouchableOpacity
         onPress={async () => {
           try {
             showLoader();
-            await removeFromCart(Number(item.product_id));
-            await GetCartDetails(); // Refresh after removal
-          } catch (err) {
-            Toast.show({ type: 'error', text1: 'Failed to remove item' });
+
+            // Extract product ID - handle both string and number
+            const productId = parseInt(String(item.product_id), 10);
+
+            // Extract variant ID from multiple possible locations
+            let variantId: number | null = null;
+
+            // Check different possible locations for variant_id
+            if (item.variant_id !== undefined && item.variant_id !== null) {
+              variantId = parseInt(String(item.variant_id), 10);
+              console.log(
+                'DEBUG - Found variant_id in item.variant_id:',
+                variantId,
+              );
+            }
+            // Check variants[0].variant_id
+            else if (item.variants?.[0]?.variant_id) {
+              variantId = parseInt(String(item.variants[0].variant_id), 10);
+              console.log(
+                'DEBUG - Found variant_id in variants[0].variant_id:',
+                variantId,
+              );
+            }
+            // Check variants[0].id (sometimes it's just 'id')
+            else if (item.variants?.[0]?.id) {
+              variantId = parseInt(String(item.variants[0].id), 10);
+              console.log(
+                'DEBUG - Found variant_id in variants[0].id:',
+                variantId,
+              );
+            }
+
+            console.log('DEBUG - Final extracted IDs:', {
+              productId,
+              variantId,
+            });
+
+            if (isNaN(productId)) {
+              console.error('ERROR - Invalid productId:', productId);
+              Toast.show({ type: 'error', text1: 'Invalid product ID' });
+              return;
+            }
+
+            await removeFromCart(productId, variantId);
+          } catch (err: any) {
+            console.log('DEBUG - Remove button error details:', {
+              message: err.message,
+              response: err.response?.data,
+              status: err.response?.status,
+              stack: err.stack,
+            });
+            Toast.show({
+              type: 'error',
+              text1: 'Failed to remove item',
+              text2: err.message || 'Please try again',
+            });
           } finally {
             hideLoader();
           }
@@ -230,8 +320,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
   const renderShipmentItem = ({ item }: { item: CartItem }) => {
     // Convert prices to numbers for comparison
-    const actualPriceNum = parseFloat(item.actual_price || "0");
-    const totalPriceNum = parseFloat(item.total_price || "0");
+    const actualPriceNum = parseFloat(item.actual_price || '0');
+    const totalPriceNum = parseFloat(item.total_price || '0');
     const hasDiscount = totalPriceNum > actualPriceNum;
 
     return (
@@ -265,7 +355,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
             {/* Price display - show discount if available */}
             <View
-              style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: 4,
+              }}
             >
               {/* Discounted price (actual price) */}
               <Text style={styles.shipmentActualPrice}>
@@ -279,9 +373,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     {totalPriceNum.toFixed(2)} €
                   </Text>
                   {/* Show savings amount */}
-                  <Text style={styles.savingsText}>
+                  {/* <Text style={styles.savingsText}>
                     Save {(totalPriceNum - actualPriceNum).toFixed(2)} €
-                  </Text>
+                  </Text> */}
                 </>
               )}
             </View>
@@ -374,58 +468,61 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       </View>
     </TouchableOpacity>
   );
+  const getNumericValue = (value: any) => {
+    if (!value) return 0;
+    return Number(String(value).replace(/[^\d.]/g, '')) || 0;
+  };
 
-  const SetPromo = async () => {
+  // In the SetPromo function, fix the field mapping:
+  const SetPromo = () => {
     if (!selectedPromoCode?.code) {
-      Toast.show({ type: 'info', text1: 'Please select a coupon first.' });
+      Toast.show({ type: 'info', text1: 'Please select a coupon first' });
       return;
     }
 
-    try {
-      setIsApplyingPromo(true);
-      const selectedPromo = promoOptions.find(
-        p =>
-          String(p.code ?? p.promo_code ?? p.promo ?? p.title) ===
-          String(selectedPromoCode.code),
-      );
+    const total =
+      Number(cartData?.discounted_total) || Number(cartData?.total_amount) || 0;
 
-      if (!selectedPromo) {
-        Toast.show({ type: 'error', text1: 'Invalid coupon selected.' });
-        return;
+    // IMPORTANT: Use correct field names from your API response
+    const discountType = String(selectedPromoCode.type).toLowerCase(); // "percentage"
+    const discountValue = parseFloat(selectedPromoCode.discount); // "10.00" -> 10
+    const maxDiscount = parseFloat(selectedPromoCode.max_discount) || Infinity; // "20" -> 20
+
+    let calculatedDiscount = 0;
+
+    if (discountType === 'percentage') {
+      calculatedDiscount = (total * discountValue) / 100;
+
+      // Apply max discount limit
+      if (maxDiscount && calculatedDiscount > maxDiscount) {
+        calculatedDiscount = maxDiscount;
       }
-
-      const total = Number(cartData?.total_amount ?? 0);
-      const discountType = selectedPromo.discount_type?.toLowerCase();
-      const discountValue =
-        parseFloat(selectedPromoCode.code.replace(/[^\d.]/g, '')) || 0;
-      const maxDiscount = Number(selectedPromo.max_discount ?? 0);
-
-      let calculatedDiscount = 0;
-
-      if (discountType === 'percentage') {
-        calculatedDiscount = (total * discountValue) / 100;
-        if (maxDiscount > 0 && calculatedDiscount > maxDiscount)
-          calculatedDiscount = maxDiscount;
-      } else {
-        calculatedDiscount = discountValue;
-      }
-
-      if (calculatedDiscount > total) calculatedDiscount = total;
-
-      setDiscountAmount(Number(calculatedDiscount.toFixed(0)));
-      setAppliedPromo(selectedPromo);
-      setPromoModalVisible(false);
-
-      Toast.show({
-        type: 'success',
-        text1: `Coupon applied! You saved ${calculatedDiscount.toFixed(0)}`,
-      });
-    } catch (err) {
-      console.log('SetPromo error', err);
-      Toast.show({ type: 'error', text1: 'Failed to apply coupon' });
-    } finally {
-      setIsApplyingPromo(false);
+    } else {
+      // Fixed amount discount
+      calculatedDiscount = discountValue;
     }
+
+    // Ensure discount doesn't exceed total
+    if (calculatedDiscount > total) {
+      calculatedDiscount = total;
+    }
+
+    // Round to 2 decimal places
+    calculatedDiscount = Math.round(calculatedDiscount * 100) / 100;
+
+    setDiscountAmount(calculatedDiscount);
+    setAppliedPromo({
+      code: selectedPromoCode.code,
+      discountType,
+      discountValue,
+      maxDiscount
+    });
+
+    Toast.show({
+      type: 'success',
+      text1: `Coupon applied! Saved ${calculatedDiscount.toFixed(2)} €`
+    });
+    setPromoModalVisible(false);
   };
 
   const removeCoupon = () => {
@@ -462,7 +559,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           const variant = item.variants?.[0] || {};
 
           // Determine actual price (discounted price)
-          let actualPrice = variant.actual_price || item.actual_price || variant.price || item.total_price;
+          let actualPrice =
+            variant.actual_price ||
+            item.actual_price ||
+            variant.price ||
+            item.total_price;
 
           // Determine display price (original price)
           let displayPrice = variant.price || item.total_price;
@@ -472,7 +573,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             // Calculate original price from discounted price and percentage
             const discountPercent = parseFloat(variant.percentage);
             actualPrice = variant.price; // This is the discounted price from API
-            displayPrice = (parseFloat(actualPrice) * 100) / (100 - discountPercent);
+            displayPrice =
+              (parseFloat(actualPrice) * 100) / (100 - discountPercent);
           }
 
           return {
@@ -480,21 +582,27 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             actual_price: actualPrice,
             total_price: displayPrice, // This becomes the original/original price
             unit: variant.unit || item.unit,
-            variant_id: variant.id || item.variant_id
+            variant_id: variant.id || item.variant_id,
           };
         });
-
+        const round = (n: number) => Math.round(n * 100) / 100;
         // Calculate totals with actual prices (discounted prices)
-        const discountedTotal = processedItems.reduce((sum, item) => {
-          const price = parseFloat(item.actual_price || 0) * (item.quantity || 1);
-          return sum + price;
-        }, 0);
+        const discountedTotal = round(
+          processedItems.reduce((sum, item) => {
+            const price =
+              Number(item.actual_price || 0) * Number(item.quantity || 1);
+            return sum + price;
+          }, 0),
+        );
 
         // Calculate original total (before discounts)
-        const originalTotal = processedItems.reduce((sum, item) => {
-          const price = parseFloat(item.total_price || 0) * (item.quantity || 1);
-          return sum + price;
-        }, 0);
+        const originalTotal = round(
+          processedItems.reduce((sum, item) => {
+            const price =
+              Number(item.total_price || 0) * Number(item.quantity || 1);
+            return sum + price;
+          }, 0),
+        );
 
         const totalSavings = originalTotal - discountedTotal;
 
@@ -513,7 +621,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         console.log('Cart prices calculated:', {
           discountedTotal,
           originalTotal,
-          totalSavings
+          totalSavings,
         });
       } else {
         setApiCartData({ items: [], total_amount: 0, id: null });
@@ -533,23 +641,19 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const GetPromo = async () => {
     try {
       setIsFetchingPromo(true);
-      showLoader();
+
       const res = await UserService.GetPromo_Code();
       const data = Array.isArray(res?.data)
         ? res.data
         : res?.data?.data ?? res?.data;
-      const list = Array.isArray(data) ? data : [];
-      setPromoOptions(list);
-      setPromoModalVisible(true);
 
-      return list;
+      setPromoOptions(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.log('GetPromo', JSON.stringify(err));
+      console.log('GetPromo', err);
       Toast.show({ type: 'error', text1: 'Failed to fetch coupons' });
-      return [];
+      setPromoOptions([]);
     } finally {
       setIsFetchingPromo(false);
-      hideLoader();
     }
   };
 
@@ -770,12 +874,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             <TouchableOpacity
               style={styles.couponBtn}
               activeOpacity={0.8}
-              onPress={async () => {
-                await GetPromo();
+              onPress={() => {
+                setPromoModalVisible(true); // ✅ open instantly
+                GetPromo(); // ✅ fetch in background
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Image
+                  tintColor={'#AEB254'}
                   source={require('../../assets/Png/discount.png')}
                   style={{
                     width: 25,
@@ -801,176 +907,178 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               />
             </TouchableOpacity>
 
+            {/* Coupon Modal */}
             <Modal
               visible={promoModalVisible}
               transparent
               animationType="slide"
               onRequestClose={() => setPromoModalVisible(false)}
             >
-              <TouchableWithoutFeedback
-                onPress={() => setPromoModalVisible(false)}
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  justifyContent: 'flex-end',
+                }}
               >
+                <TouchableWithoutFeedback
+                  onPress={() => setPromoModalVisible(false)}
+                >
+                  <View style={{ flex: 1 }} />
+                </TouchableWithoutFeedback>
+
                 <View
                   style={{
-                    flex: 1,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    justifyContent: 'flex-end',
+                    backgroundColor: '#fff',
+                    borderTopLeftRadius: 16,
+                    borderTopRightRadius: 16,
+                    padding: 16,
+                    maxHeight: '70%',
                   }}
                 >
-                  <TouchableWithoutFeedback>
+                  <View style={{ alignItems: 'center', marginBottom: 8 }}>
                     <View
                       style={{
-                        backgroundColor: '#fff',
-                        borderTopLeftRadius: 16,
-                        borderTopRightRadius: 16,
-                        padding: 16,
-                        maxHeight: '70%',
+                        width: 40,
+                        height: 5,
+                        backgroundColor: '#ccc',
+                        borderRadius: 3,
+                      }}
+                    />
+                  </View>
+
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: '600',
+                      marginBottom: 12,
+                    }}
+                  >
+                    Available Coupons
+                  </Text>
+
+                  {isFetchingPromo ? (
+                    <ActivityIndicator size="small" color="#5DA53B" />
+                  ) : promoOptions.length === 0 ? (
+                    <Text style={{ textAlign: 'center', color: '#666' }}>
+                      No coupons available
+                    </Text>
+                  ) : (
+                    <FlatList
+                      data={promoOptions}
+                      keyExtractor={(it, idx) =>
+                        (it.id ?? it.code ?? it.promo_code ?? idx).toString()
+                      }
+                      // In the coupon modal FlatList renderItem:
+                      renderItem={({ item }) => {
+                        // Extract coupon details correctly
+                        const code = item?.coupon_code || item?.code || '';
+
+                        // Check if coupon is selected
+                        const isSelected = selectedPromoCode?.code === code;
+
+                        // Prepare description text
+                        let discountText = '';
+                        if (item.discount_type === 'percentage') {
+                          discountText = `${item.discount_value}% off (max ${item.max_discount} €)`;
+                        } else {
+                          discountText = `${item.discount_value} € off`;
+                        }
+
+                        return (
+                          <TouchableOpacity
+                            onPress={() => {
+                              console.log('Selected coupon:', {
+                                code: item.coupon_code,
+                                type: item.discount_type,
+                                discount: item.discount_value,
+                                max_discount: item.max_discount
+                              });
+
+                              setSelectedPromoCode({
+                                code: item.coupon_code,  // Your API uses "coupon_code"
+                                type: item.discount_type, // "percentage"
+                                discount: item.discount_value, // "10.00"
+                                max_discount: item.max_discount // "20"
+                              });
+                            }}
+                            style={{
+                              borderWidth: 1,
+                              borderColor: isSelected ? '#AEB254' : '#EAEAEA',
+                              backgroundColor: isSelected ? '#F7F9E5' : '#fff',
+                              padding: 12,
+                              borderRadius: 8,
+                              marginBottom: 10,
+                            }}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontWeight: '700' }}>{code}</Text>
+                              <Text style={{ color: '#666', marginTop: 4, fontSize: 12 }}>
+                                {discountText}
+                              </Text>
+                              {item.description ? (
+                                <Text style={{ color: '#888', marginTop: 2, fontSize: 11 }}>
+                                  {item.description}
+                                </Text>
+                              ) : null}
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={{ fontSize: 12, color: '#888' }}>
+                                {item.start_date ? new Date(item.start_date).toLocaleDateString() : ''}
+                              </Text>
+                              <Text style={{ fontSize: 10, color: '#5DA53B', marginTop: 2 }}>
+                                {item.is_valid ? 'Valid' : 'Expired'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      }}
+                      contentContainerStyle={{ paddingBottom: 10 }}
+                    />
+                  )}
+
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      marginTop: 8,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        setPromoModalVisible(false);
+                      }}
+                      style={{
+                        backgroundColor: '#eee',
+                        paddingVertical: 12,
+                        borderRadius: 28,
+                        alignItems: 'center',
+                        flex: 1,
+                        marginRight: 8,
                       }}
                     >
-                      <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                        <View
-                          style={{
-                            width: 40,
-                            height: 5,
-                            backgroundColor: '#ccc',
-                            borderRadius: 3,
-                          }}
-                        />
-                      </View>
-                      <Text
-                        style={{
-                          fontSize: 18,
-                          fontWeight: '600',
-                          marginBottom: 12,
-                        }}
-                      >
-                        Available Coupons
+                      <Text style={{ color: '#333' }}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => SetPromo()}
+                      disabled={isApplyingPromo}
+                      style={{
+                        backgroundColor: Colors.button[100],
+                        paddingVertical: 12,
+                        borderRadius: 28,
+                        alignItems: 'center',
+                        flex: 1,
+                      }}
+                    >
+                      <Text style={{ color: '#000', fontWeight: '700' }}>
+                        {isApplyingPromo ? 'Applying...' : 'Apply Coupon'}
                       </Text>
-                      {isFetchingPromo ? (
-                        <ActivityIndicator size="small" color="#5DA53B" />
-                      ) : promoOptions.length === 0 ? (
-                        <Text style={{ textAlign: 'center', color: '#666' }}>
-                          No coupons available
-                        </Text>
-                      ) : (
-                        <FlatList
-                          data={promoOptions}
-                          keyExtractor={(it, idx) =>
-                            (
-                              it.id ??
-                              it.code ??
-                              it.promo_code ??
-                              idx
-                            ).toString()
-                          }
-                          renderItem={({ item }) => {
-                            const code =
-                              item?.code ??
-                              item?.promo_code ??
-                              item?.promo ??
-                              item?.title ??
-                              'N/A';
-
-                            const desc = item?.description ?? '';
-                            const discountType = item?.discount_type ?? '';
-                            const discountValue =
-                              item?.discount ?? item?.value ?? '';
-
-                            const isSelected =
-                              selectedPromoCode?.code === String(code);
-
-                            return (
-                              <TouchableOpacity
-                                onPress={() =>
-                                  setSelectedPromoCode({
-                                    code: String(code),
-                                    type: discountType,
-                                    discount: discountValue,
-                                  })
-                                }
-                                style={{
-                                  flexDirection: 'row',
-                                  justifyContent: 'space-between',
-                                  borderWidth: 1,
-                                  borderColor: isSelected
-                                    ? '#AEB254'
-                                    : '#EAEAEA',
-                                  backgroundColor: isSelected
-                                    ? '#F7F9E5'
-                                    : '#fff',
-                                  padding: 12,
-                                  borderRadius: 8,
-                                  marginBottom: 10,
-                                }}
-                              >
-                                <View style={{ flex: 1 }}>
-                                  <Text style={{ fontWeight: '700' }}>
-                                    {code}
-                                  </Text>
-                                  {desc ? (
-                                    <Text
-                                      style={{ color: '#666', marginTop: 4 }}
-                                    >
-                                      {desc}
-                                    </Text>
-                                  ) : null}
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                  <Text style={{ fontSize: 12, color: '#888' }}>
-                                    {discountValue}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          }}
-                          contentContainerStyle={{ paddingBottom: 10 }}
-                        />
-                      )}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          marginTop: 8,
-                        }}
-                      >
-                        <TouchableOpacity
-                          onPress={() => {
-                            setPromoModalVisible(false),
-                              setSelectedPromoCode({ code: '' });
-                          }}
-                          style={{
-                            backgroundColor: '#eee',
-                            paddingVertical: 12,
-                            borderRadius: 28,
-                            alignItems: 'center',
-                            flex: 1,
-                            marginRight: 8,
-                          }}
-                        >
-                          <Text style={{ color: '#333' }}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => SetPromo()}
-                          disabled={isApplyingPromo}
-                          style={{
-                            backgroundColor: Colors.button[100],
-                            paddingVertical: 12,
-                            borderRadius: 28,
-                            alignItems: 'center',
-                            flex: 1,
-                          }}
-                        >
-                          <Text style={{ color: '#000', fontWeight: '700' }}>
-                            {isApplyingPromo ? 'Applying...' : 'Apply Coupon'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </TouchableWithoutFeedback>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </TouchableWithoutFeedback>
+              </View>
             </Modal>
-
 
             {/* Bill details */}
             {cartData && (
@@ -987,9 +1095,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
                 {/* Subtotal (original prices) */}
                 <View style={styles.billRow}>
-                  <Text style={styles.billLabel}>Subtotal ({cartData.items.length} items)</Text>
+                  <Text style={styles.billLabel}>
+                    Subtotal ({cartData.items.length} items)
+                  </Text>
                   <Text style={styles.billValue}>
-                    {cartData?.subtotal_amount?.toFixed(2) || "0.00"} €
+                    {cartData?.subtotal_amount?.toFixed(2) || '0.00'} €
                   </Text>
                 </View>
 
@@ -1086,7 +1196,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   >
                     {(
                       (cartData?.discounted_total || 0) - discountAmount
-                    ).toFixed(2)} €
+                    ).toFixed(2)}{' '}
+                    €
                   </Text>
                 </View>
               </View>
