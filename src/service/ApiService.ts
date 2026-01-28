@@ -636,15 +636,29 @@ export const UserService = {
   },
 
   search: async (word: string) => {
-    const token = await LocalStorage.read('@token');
-    const apiHeaders = {
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    };
-    return APIKit.get(`search?q=${word}`, apiHeaders);
+    try {
+      console.log('--- UserService.search called with:', word);
+      const token = await LocalStorage.read('@token');
+      console.log('--- Token:', token);
+
+      const apiHeaders = {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      };
+
+      const res = await APIKit.get(
+        `search-product?search=${encodeURIComponent(word)}`,
+        apiHeaders,
+      );
+      console.log('--- Search API response:', res.data);
+      return res;
+    } catch (error) {
+      console.error('--- Search API ERROR:', error);
+      throw error;
+    }
   },
 
   // Add these methods to your UserService object:

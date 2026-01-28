@@ -196,6 +196,7 @@ const ArticleScreen = ({ navigation }: any) => {
             onPress={() => navigation.goBack()}
           >
             <Image
+            
               source={require('../../assets/Png/back.png')} // Adjust path as needed
               style={styles.backIcon}
             />
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
   backIcon: {
     width: 24,
     height: 24,
-    tintColor: Colors.button[100], // Optional: adjust color
+    tintColor:'#000', // Optional: adjust color
   },
   headerTitle: {
     fontSize: 18,

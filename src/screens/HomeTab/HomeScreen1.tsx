@@ -25,7 +25,7 @@ import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
-import { WishlistContext, WishlistContextValue } from '../../context';
+import { WishlistContext} from '../../context';
 import Toast from 'react-native-toast-message';
 import LinearGradient from 'react-native-linear-gradient';
 import { UserData, UserDataContext } from '../../context/userDataContext';
@@ -81,13 +81,6 @@ const HomeScreen1 = ({ navigation }: any) => {
     const index = Math.round(offsetX / (WISHLIST_CARD_WIDTH + 12));
     setActiveRec(index);
   };
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    refreshAllData();
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
 
   // Helper function to get current product type
   const getCurrentProductType = () => {
@@ -255,18 +248,40 @@ const HomeScreen1 = ({ navigation }: any) => {
       );
     });
   };
+  // const refreshAllData = async () => {
+  //   try {
+  //     showLoader(); // Only show loader once
+
+  //     // Execute all async operations in parallel or sequence
+  //     await Promise.all([
+  //       GetCategoryProducts(),
+  //       bigsale(),
+  //       RecommendProducts(),
+  //       OrderList(),
+  //       ApiSorting(),
+  //       GetHeader(),
+  //     ]);
+
+  //     await fetchWishlist();
+  //   } catch (error) {
+  //     console.log('Error refreshing data:', error);
+  //   } finally {
+  //     hideLoader(); // Hide loader once all operations complete
+  //   }
+  // };
+
   const refreshAllData = async () => {
     try {
-      showLoader(); // Only show loader once
+      showLoader(); // Show loader once at the beginning
 
-      // Execute all async operations in parallel or sequence
+      // Execute all async operations
       await Promise.all([
-        GetCategoryProducts(),
-        bigsale(),
-        RecommendProducts(),
-        OrderList(),
-        ApiSorting(),
-        GetHeader(),
+        GetCategoryProductsWithoutLoader(),
+        bigsaleWithoutLoader(),
+        RecommendProductsWithoutLoader(),
+        OrderListWithoutLoader(),
+        ApiSortingWithoutLoader(),
+        GetHeaderWithoutLoader(),
       ]);
 
       await fetchWishlist();
@@ -280,14 +295,35 @@ const HomeScreen1 = ({ navigation }: any) => {
   useFocusEffect(
     React.useCallback(() => {
       console.log('Home screen focused, refreshing data...');
-      refreshAllData();
 
-      // Optional: Return cleanup function
+      // Use silent loading without loader
+      loadDataSilently();
+
       return () => {
         console.log('Home screen unfocused');
       };
-    }, [userType, isLoggedIn]), // Dependencies
+    }, [userType, isLoggedIn]),
   );
+
+  // Add this function for silent loading:
+  const loadDataSilently = async () => {
+    try {
+      await Promise.all([
+        GetCategoryProductsWithoutLoader(),
+        bigsaleWithoutLoader(),
+        RecommendProductsWithoutLoader(),
+        ApiSortingWithoutLoader(),
+        GetHeaderWithoutLoader(),
+      ]);
+
+      if (isLoggedIn) {
+        await OrderListWithoutLoader();
+        await fetchWishlist();
+      }
+    } catch (error) {
+      console.log('Error loading data silently:', error);
+    }
+  };
   // Inside your HomeScreen1 component, add these logs:
   // Replace your current useEffect debug logs with this more detailed version:
 
@@ -342,6 +378,19 @@ const HomeScreen1 = ({ navigation }: any) => {
       return '0';
     }
   };
+
+  const RecommendProductsWithoutLoader = async () => {
+    try {
+      const res = await UserService.recommended();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res.data?.data || [];
+        const filteredProducts = filterProductsByType(fetchedProducts);
+        setApiRecommend(filteredProducts);
+      }
+    } catch (err) {
+      console.log('recommenderror', err);
+    }
+  };
   useEffect(() => {
     console.log('Wishlist Context Detailed Debug:', {
       isLoggedIn,
@@ -372,33 +421,6 @@ const HomeScreen1 = ({ navigation }: any) => {
     // No need for local state management
     console.log('Wishlist items updated:', wishlistItems.length);
   }, [wishlistItems]);
-
-  const GetHeader = async () => {
-    try {
-      showLoader();
-      const res = await UserService.header();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        // Log raw data for debugging
-        console.log(
-          'Raw header data:',
-          JSON.stringify(res?.data?.data, null, 2),
-        );
-
-        // Use helper function to get appropriate banners
-        const banners = getPromotionalBanners(res?.data?.data || {});
-
-        // Log filtered banners for debugging
-        console.log('Filtered banners count:', banners.length);
-        console.log('Filtered banners:', JSON.stringify(banners, null, 2));
-
-        setPromotional(banners);
-      }
-    } catch (err) {
-      console.log('GetHeader error:', err);
-    } finally {
-      hideLoader();
-    }
-  };
 
   // Add this function to get the correct price
   const getCorrectPrice = (item: any) => {
@@ -508,76 +530,169 @@ const HomeScreen1 = ({ navigation }: any) => {
       return priceNum.toFixed(2);
     }
   };
-  const GetCategoryProducts = async () => {
+
+  //   try {
+  //     setIsLoadingCategory(true);
+  //     showLoader();
+  //     const res = await UserService.GetCategory();
+  //     if (res && res.data && res.status === HttpStatusCode.Ok) {
+  //       hideLoader();
+  //       const fetchedProducts = res.data?.categories || [];
+  //       setApiCateProducts(fetchedProducts);
+  //       const defaultId = fetchedProducts?.[0]?.id ?? 1;
+  //       setSelectedCategoryId(defaultId);
+  //       GetCategoryID(defaultId);
+  //     }
+  //   } catch (err) {
+  //     console.log('error category', err);
+  //     hideLoader();
+  //     setIsLoadingCategory(false);
+  //   }
+  // };
+
+  const GetCategoryProductsWithoutLoader = async () => {
     try {
       setIsLoadingCategory(true);
-      showLoader();
       const res = await UserService.GetCategory();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
-        hideLoader();
         const fetchedProducts = res.data?.categories || [];
         setApiCateProducts(fetchedProducts);
         const defaultId = fetchedProducts?.[0]?.id ?? 1;
         setSelectedCategoryId(defaultId);
-        GetCategoryID(defaultId);
+        await GetCategoryIDWithoutLoader(defaultId);
       }
     } catch (err) {
       console.log('error category', err);
-      hideLoader();
-      setIsLoadingCategory(false);
-    }
-  };
-  {
-    console.log('HEY', wishlistItems);
-  }
-  const GetCategoryID = async (categoryId: any) => {
-    try {
-      setIsLoadingCategory(true);
-      showLoader();
-      const res = await UserService.GetCategoryByID(categoryId);
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        hideLoader();
-        const fetchedProducts = res?.data?.data || [];
-        const filteredProducts = filterProductsByType(fetchedProducts);
-
-        // Add debugging
-        console.log('Category ID:', categoryId);
-        console.log('Fetched products:', fetchedProducts.length);
-        console.log('Filtered products:', filteredProducts.length);
-        console.log('Filtered products data:', filteredProducts);
-
-        setcategoryProduct(filteredProducts);
-        await featuredproduct();
-      }
-    } catch (err) {
-      console.log('error category', err);
-      hideLoader();
     } finally {
       setIsLoadingCategory(false);
     }
   };
 
-  const featuredproduct = async () => {
+  const featuredproductWithoutLoader = async () => {
     try {
-      showLoader();
       const res = await UserService.featuredproducts();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
-        hideLoader();
         const fetchedProducts = res?.data?.data || {};
-
-        // Use helper function to get appropriate featured products
         const typeProducts = getFeaturedProducts(fetchedProducts);
         setFeaturesProduct(typeProducts);
 
         if (isLoggedIn) {
-          await OrderList();
+          await OrderListWithoutLoader();
         }
       }
     } catch (err) {
       console.log('error featuredproduct', err);
-      hideLoader();
     }
   };
+  const OrderListWithoutLoader = async () => {
+    try {
+      const response = await UserService.order();
+      if (response && response.data && response.status === HttpStatusCode.Ok) {
+        const orders = response.data?.orders || [];
+        const filteredOrders = filterOrdersByType(orders);
+        setorderitem(filteredOrders);
+      }
+    } catch (err) {
+      console.log('Order fetch exception:', err);
+    }
+  };
+
+  const ApiSortingWithoutLoader = async () => {
+    try {
+      const res = await UserService.Sorting('price_asc');
+      if (res?.status === HttpStatusCode.Ok) {
+        const sortedProducts = res?.data?.data || [];
+        const filteredProducts = filterProductsByType(sortedProducts);
+        console.log('Heyyyyyyy', filteredProducts);
+        setlowestitem(filteredProducts);
+      } else {
+        console.log('Failed to sort products:', res);
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to sort products',
+        });
+      }
+    } catch (err) {
+      console.log('Sorting error:', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to sort products',
+      });
+    }
+  };
+
+  const GetHeaderWithoutLoader = async () => {
+    try {
+      const res = await UserService.header();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const banners = getPromotionalBanners(res?.data?.data || {});
+        setPromotional(banners);
+      }
+    } catch (err) {
+      console.log('GetHeader error:', err);
+    }
+  };
+
+  // Also update your toggleWishlist to not use loader:
+  const handleToggleWishlist = async (productId: string) => {
+    try {
+      if (isWishlisted(productId)) {
+        await removeFromWishlist(productId);
+      } else {
+        await addToWishlist(productId);
+      }
+    } catch (error) {
+      console.log('Wishlist toggle error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update wishlist',
+      });
+    }
+  };
+
+  const bigsaleWithoutLoader = async () => {
+    try {
+      const res = await UserService.bigsales();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res.data?.data || {};
+        const typeProducts = getSalesProducts(fetchedProducts);
+        const activeSalesProducts = filterActiveBigSaleProducts(typeProducts);
+
+        if (
+          Array.isArray(activeSalesProducts) &&
+          activeSalesProducts.length > 0
+        ) {
+          setsalesProduct(activeSalesProducts);
+        } else {
+          setsalesProduct([]);
+        }
+      }
+    } catch (err) {
+      console.log('error bigsale', err);
+      setsalesProduct([]);
+    }
+  };
+
+  const GetCategoryIDWithoutLoader = async (categoryId: any) => {
+    try {
+      setIsLoadingCategory(true);
+      const res = await UserService.GetCategoryByID(categoryId);
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res?.data?.data || [];
+        const filteredProducts = filterProductsByType(fetchedProducts);
+        setcategoryProduct(filteredProducts);
+        await featuredproductWithoutLoader();
+      }
+    } catch (err) {
+      console.log('error category', err);
+    } finally {
+      setIsLoadingCategory(false);
+    }
+  };
+
+  {
+    console.log('HEY', wishlistItems);
+  }
 
   // Helper function to check if sale is currently active
   const isSaleActive = (startDate: string, endDate: string) => {
@@ -612,95 +727,7 @@ const HomeScreen1 = ({ navigation }: any) => {
     });
   };
 
-  const bigsale = async () => {
-    try {
-      showLoader();
-      const res = await UserService.bigsales();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        hideLoader();
-        const fetchedProducts = res.data?.data || {};
-
-        // Use helper function to get appropriate sales products
-        const typeProducts = getSalesProducts(fetchedProducts);
-        const activeSalesProducts = filterActiveBigSaleProducts(typeProducts);
-
-        if (
-          Array.isArray(activeSalesProducts) &&
-          activeSalesProducts.length > 0
-        ) {
-          setsalesProduct(activeSalesProducts);
-        } else {
-          setsalesProduct([]);
-        }
-      }
-    } catch (err) {
-      console.log('error bigsale', err);
-      hideLoader();
-      setsalesProduct([]);
-    }
-  };
-
-  const RecommendProducts = async () => {
-    try {
-      showLoader();
-      const res = await UserService.recommended();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        hideLoader();
-        const fetchedProducts = res.data?.data || [];
-        const filteredProducts = filterProductsByType(fetchedProducts);
-        setApiRecommend(filteredProducts);
-      }
-    } catch (err) {
-      hideLoader();
-      console.log('recommenderror', err);
-    }
-  };
-
   // Call this function when adding/removing from wishlist
-
-  const OrderList = async () => {
-    try {
-      showLoader();
-      const response = await UserService.order();
-      if (response && response.data && response.status === HttpStatusCode.Ok) {
-        hideLoader();
-        const orders = response.data?.orders || [];
-
-        // Filter orders by product type
-        const filteredOrders = filterOrdersByType(orders);
-        setorderitem(filteredOrders);
-      }
-    } catch (err) {
-      hideLoader();
-      console.log('Order fetch exception:', err);
-    }
-  };
-
-  const ApiSorting = async () => {
-    try {
-      showLoader();
-      const res = await UserService.Sorting('price_asc');
-      if (res?.status === HttpStatusCode.Ok) {
-        const sortedProducts = res?.data?.data || [];
-        const filteredProducts = filterProductsByType(sortedProducts);
-        setlowestitem(filteredProducts);
-      } else {
-        console.log('Failed to sort products:', res);
-        Toast.show({
-          type: 'error',
-          text1: 'Failed to sort products',
-        });
-      }
-    } catch (err) {
-      console.log('Sorting error:', err);
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to sort products',
-      });
-    } finally {
-      hideLoader();
-    }
-  };
 
   // PromotionalBanner component
   const PromotionalBanner: React.FC<{
@@ -803,7 +830,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            // onRefresh={onRefresh}
             colors={['#2E2E2E']}
             tintColor="#2E2E2E"
           />
@@ -887,7 +914,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                   <TouchableOpacity
                     onPress={() => {
                       setSelectedCategoryId(item.id);
-                      GetCategoryID(item.id);
+                      GetCategoryIDWithoutLoader(item.id);
                     }}
                     style={{ alignItems: 'center', marginHorizontal: 10 }}
                   >
@@ -1549,7 +1576,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                 paddingHorizontal: widthPercentageToDP(3),
               }}
             >
-              <Text style={[styles.sectionTitle, { alignSelf: 'center' }]}>
+              <Text style={[styles.sectionTitle, { alignSelf: 'center', }]}>
                 LOWEST PRICES EVER
               </Text>
               <FlatList
@@ -2336,6 +2363,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginVertical: heightPercentageToDP(1),
+    fontFamily:"REDHATDISPLAY-ITALIC"
   },
 
   freqCard: {

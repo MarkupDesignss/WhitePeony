@@ -7,19 +7,31 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Keyboard,
   StatusBar,
+  Animated,
+  Easing,
+  Vibration,
+  Dimensions,
+  Platform,
 } from 'react-native';
-import React, { useCallback, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image_url, UserService } from '../../service/ApiService';
-import { HttpStatusCode } from 'axios';
 import { Colors } from '../../constant';
 import {
   heightPercentageToDP,
   widthPercentageToDP,
 } from '../../constant/dimentions';
+import Voice from '@react-native-voice/voice';
+import Toast from 'react-native-toast-message';
+import { WishlistContext } from '../../context';
 
 const { width } = Dimensions.get('window');
 
@@ -27,204 +39,763 @@ const Searchpage = ({ navigation }: any) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [listening, setListening] = useState(false);
+  const [wishlistLoadingMap, setWishlistLoadingMap] = useState<Record<string, boolean>>({});
 
+  // Use WishlistContext
+  const {
+    wishlistIds,
+    isWishlisted,
+    toggleWishlist,
+  } = useContext(WishlistContext);
+
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const silenceTimer = useRef<any>(null);
+  const debounceTimer = useRef<any>(null);
+
+  /* ---------------- VOICE EVENTS ---------------- */
+  useEffect(() => {
+    Voice.onSpeechStart = () => {
+      setListening(true);
+      Vibration.vibrate(50);
+      startPulse();
+      resetSilenceTimer();
+    };
+
+    Voice.onSpeechResults = e => {
+      const text = e.value?.[0] || '';
+      setQuery(text);
+      resetSilenceTimer();
+    };
+
+    Voice.onSpeechEnd = stopListening;
+    Voice.onSpeechError = stopListening;
+
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
+
+  /* ---------------- MIC ANIMATION ---------------- */
+  const startPulse = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.3,
+          duration: 500,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  };
+
+  /* ---------------- AUTO STOP ON SILENCE ---------------- */
+  const resetSilenceTimer = () => {
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    silenceTimer.current = setTimeout(() => {
+      stopListening();
+    }, 2000);
+  };
+
+  const startVoice = async () => {
+    try {
+      await Voice.start('en-IN');
+    } catch (e) {
+      console.log('Voice start error', e);
+    }
+  };
+
+  const stopListening = async () => {
+    try {
+      await Voice.stop();
+    } catch { }
+
+    setListening(false);
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
+
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+  };
+
+  /* ---------------- SEARCH API ---------------- */
   const GetSearch = useCallback(async (word: string) => {
+    if (!word.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
     try {
       setIsSearching(true);
       const res = await UserService.search(word);
-      if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
-        const dataRaw = Array.isArray(res.data?.data?.products)
-          ? res.data?.data?.products
-          : res.data?.data?.products ?? [];
-        //console.log("searchdata", dataRaw)
-        const list = Array.isArray(dataRaw) ? dataRaw : [];
-        const baseUrl = res?.data?.base_url || Image_url || '';
-        const mapped = list.map((p: any) => {
-          const ID = p.id;
+
+      if (res?.data?.status) {
+        const products = Array.isArray(res.data.data) ? res.data.data : [];
+        const mapped = products.map((p: any) => {
           const images = [p.front_image, p.back_image, p.side_image]
             .filter(Boolean)
-            .map((img: string) =>
-              img.startsWith('http') ? img : `${baseUrl}${img}`,
+            .map(img =>
+              img.startsWith('http') ? img : `${Image_url}${img}`,
             );
-          const variant =
-            p.variants && p.variants.length ? p.variants[0] : null;
-          const price = variant?.price || p.main_price || p.price || '0';
-          const unit = variant?.unit || p.unit || '';
-          return { ...p, images, price, unit, ID };
+
+          const variant = p.variants?.[0];
+          const productId = String(p.id);
+
+          // Check if product is in wishlist using context
+          const isWishlistedItem = isWishlisted(productId);
+
+          return {
+            ID: p.id,
+            name: p.name,
+            images,
+            price:
+              variant?.actual_price ?? variant?.price ?? p.main_price ?? '0',
+            unit: variant?.unit ?? '',
+            brand: p.brand || 'Brand',
+            discount: variant?.discount || 0,
+            is_wishlist: isWishlistedItem,
+          };
         });
         setSearchResults(mapped);
       } else {
         setSearchResults([]);
       }
-    } catch (err) {
-      console.log('errrsearch', err);
+    } catch (error) {
+      console.log('Search error:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [isWishlisted]);
 
-  const onSubmit = () => {
-    const trimmed = query.trim();
-    Keyboard.dismiss();
-    if (!trimmed) return setSearchResults([]);
-    GetSearch(trimmed);
+  /* ---------------- DEBOUNCE INPUT CHANGE ---------------- */
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    debounceTimer.current = setTimeout(() => {
+      GetSearch(query.trim());
+    }, 300);
+
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [query, GetSearch]);
+
+  const handleManualSearch = () => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    GetSearch(query.trim());
   };
 
-  const renderItem = ({ item }: { item: any }) => {
-    const imageUri = item.images && item.images.length ? item.images[0] : null;
+  /* ---------------- HANDLE WISHLIST TOGGLE ---------------- */
+  const handleToggleWishlist = async (item: any) => {
+    const productId = String(item.ID || item.id);
+
+    // Set loading state for this specific product
+    setWishlistLoadingMap(prev => ({ ...prev, [productId]: true }));
+
+    try {
+      // Use the context's toggleWishlist function
+      await toggleWishlist(productId);
+
+      // Update local state to reflect the change
+      setSearchResults(prev =>
+        prev.map(p =>
+          String(p.ID) === productId
+            ? { ...p, is_wishlist: !p.is_wishlist }
+            : p,
+        ),
+      );
+    } catch (error: any) {
+      console.log('Wishlist toggle error:', error);
+      // The context already shows error toast
+    } finally {
+      // Clear loading state for this product
+      setWishlistLoadingMap(prev => ({ ...prev, [productId]: false }));
+    }
+  };
+
+  const renderItem = ({ item, index }: any) => {
+    const productId = String(item.ID);
+    const isWishlistedItem = isWishlisted(productId);
+    const isLoading = wishlistLoadingMap[productId] || false;
+
     return (
       <TouchableOpacity
+        style={[styles.card, { marginRight: index % 2 === 0 ? 8 : 0 }]}
         onPress={() =>
-          navigation.navigate('ProductDetails', { productId: item?.ID })
+          navigation.navigate('ProductDetails', { productId: item.ID })
         }
-        style={styles.card}
-        activeOpacity={0.8}
+        activeOpacity={0.7}
       >
-        <Image
-          source={
-            imageUri
-              ? { uri: imageUri }
-              : require('../../assets/peony_logo.png')
-          }
-          style={styles.cardImage}
-        />
+        <View style={styles.imageContainer}>
+          <Image
+            source={
+              item.images?.[0]
+                ? { uri: item.images[0] }
+                : require('../../assets/Png/peony_logo.png')
+            }
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+          {item.discount > 0 && (
+            <View style={styles.discountBadge}>
+              <Text style={styles.discountText}>{item.discount}% OFF</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.wishlistButton, isLoading && styles.wishlistButtonDisabled]}
+            onPress={() => handleToggleWishlist(item)}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#AEB254" />
+            ) : (
+              <Image
+                source={
+                  isWishlistedItem
+                    ? require('../../assets/heart.png') // Filled heart
+                    : require('../../assets/Png/heart-1.png') // Outline heart
+                }
+                style={[
+                  styles.wishlistIcon,
+                  isWishlistedItem && styles.wishlistIconActive,
+                ]}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.cardBody}>
-          <Text numberOfLines={2} style={styles.cardTitle}>
-            {item.name || item.title || item.product_name || 'Unnamed product'}
+          <Text style={styles.brandName} numberOfLines={1}>
+            {item.brand}
           </Text>
-          <Text style={styles.cardPrice}>
-            € {item.price} {item.unit ? ` / ${item.unit}` : ''}
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.name}
           </Text>
+
+          <View style={styles.priceContainer}>
+            <Text style={styles.cardPrice}>
+              €{item.price}
+              {item.unit && <Text style={styles.unitText}> / {item.unit}</Text>}
+            </Text>
+            {item.discount > 0 && (
+              <Text style={styles.originalPrice}>
+                €
+                {(
+                  (parseFloat(item.price) * 100) /
+                  (100 - item.discount)
+                ).toFixed(2)}
+              </Text>
+            )}
+          </View>
+
+          {item.discount > 0 && (
+            <Text style={styles.discountTag}>
+              Save €
+              {((parseFloat(item.price) * item.discount) / 100).toFixed(2)}
+            </Text>
+          )}
+
+          <TouchableOpacity style={styles.addToCartButton}>
+            <Text style={styles.addToCartText}>GET DETAILS</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFF0' }}>
-      <StatusBar barStyle={'dark-content'} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          paddingVertical: heightPercentageToDP(3),
-          paddingHorizontal: widthPercentageToDP(3),
-        }}
-      >
+      {/* HEADER */}
+      <View style={styles.header}>
         <TouchableOpacity
-          style={styles.backBtn}
           onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Image
             source={require('../../assets/Png/back.png')}
-            style={{ width: 20, height: 20 }}
+            style={styles.backIcon}
           />
         </TouchableOpacity>
-        <Image
-          source={require('../../assets/peony_logo.png')}
-          style={{ width: 140, height: 25, resizeMode: 'contain', left: 10 }}
-        />
-        <View></View>
-      </View>
-      <View style={styles.searchRow}>
-        <Image
-          source={require('../../assets/Searchx.png')}
-          style={styles.icon}
-        />
-        <TextInput
-          placeholder={`Search Products`}
-          value={query}
-          onChangeText={setQuery}
-          style={styles.input}
-          returnKeyType="search"
-          onSubmitEditing={onSubmit}
-          clearButtonMode="while-editing"
-        />
-        <View style={styles.sep} />
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            /* TODO: voice input */
-          }}
-        >
+
+        <View style={styles.logoContainer}>
           <Image
-            source={require('../../assets/micx.png')}
-            style={styles.icon}
+            source={require('../../assets/peony_logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
           />
-        </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 12 }}>
+      {/* SEARCH BAR */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Image
+            source={require('../../assets/Searchx.png')}
+            style={styles.searchIcon}
+          />
+
+          <TextInput
+            placeholder="Search for products, brands and more"
+            placeholderTextColor="#999"
+            value={query}
+            onChangeText={setQuery}
+            style={styles.input}
+            onSubmitEditing={handleManualSearch}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setQuery('')}
+              style={styles.clearButton}
+            >
+              <Text style={styles.clearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.separator} />
+
+          <TouchableOpacity
+            onPressIn={startVoice}
+            onPressOut={stopListening}
+            style={styles.voiceButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Animated.Image
+              source={require('../../assets/micx.png')}
+              style={[
+                styles.voiceIcon,
+                {
+                  transform: [{ scale: pulseAnim }],
+                  tintColor: listening ? Colors.button[100] : '#666',
+                },
+              ]}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* RESULTS */}
+      <View style={styles.resultsContainer}>
         {isSearching ? (
-          <View style={{ alignItems: 'center', marginTop: 20 }}>
+          <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.button[100]} />
+            <Text style={styles.loadingText}>Searching products...</Text>
           </View>
-        ) : (
+        ) : searchResults.length > 0 ? (
           <FlatList
             data={searchResults}
-            keyExtractor={(item, idx) => `${item.id ?? item._id ?? idx}`}
             renderItem={renderItem}
-            ListEmptyComponent={() => (
-              <View style={{ marginTop: 40, alignItems: 'center' }}>
-                <Text style={{ color: '#888' }}>
-                  {query
-                    ? 'No products found'
-                    : 'Search for products by typing above'}
-                </Text>
-              </View>
-            )}
+            keyExtractor={(item, i) => `${item.ID}-${i}`}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrapper}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
           />
+        ) : query ? (
+          <View style={styles.emptyContainer}>
+            <Image
+              source={require('../../assets/noproduct.png')}
+              style={styles.emptyImage}
+            />
+            <Text style={styles.emptyTitle}>No products found</Text>
+            <Text style={styles.emptySubtitle}>
+              Try searching with different keywords
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.initialContainer}>
+            <Image
+              source={require('../../assets/search_illustration.png')}
+              style={styles.initialImage}
+            />
+            <Text style={styles.initialTitle}>What are you looking for?</Text>
+            <Text style={styles.initialSubtitle}>
+              Type or use voice search to find products
+            </Text>
+            <View style={styles.trendingContainer}>
+              <Text style={styles.trendingTitle}>Trending Searches</Text>
+              <View style={styles.trendingTags}>
+                {['Lipstick', 'Skincare', 'Perfume', 'Makeup', 'Haircare'].map(
+                  tag => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={styles.trendingTag}
+                      onPress={() => setQuery(tag)}
+                    >
+                      <Text style={styles.trendingTagText}>{tag}</Text>
+                    </TouchableOpacity>
+                  ),
+                )}
+              </View>
+            </View>
+          </View>
         )}
       </View>
     </SafeAreaView>
   );
 };
 
+export default Searchpage;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  backBtn: {
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  backButton: {
+    padding: 8,
+  },
+  backIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#000',
+  },
+  logoContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 120,
+    height: 25,
+  },
+  headerRight: {
+    width: 40,
+    alignItems: 'flex-end',
+  },
+  cartButton: {
+    position: 'relative',
+  },
+  cartIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#000',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: Colors.button[100],
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
   },
-  searchRow: {
+  cartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 12,
-    marginTop: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 48,
     borderWidth: 1,
-    borderColor: '#E1E1E1',
-    borderRadius: 28,
-    height: 50,
-    paddingHorizontal: 10,
+    borderColor: '#E0E0E0',
   },
-  icon: { width: 20, height: 20, resizeMode: 'contain' },
-  input: { flex: 1, marginLeft: 10, fontSize: 16, color: '#222' },
-  sep: {
+  searchIcon: {
+    width: 18,
+    height: 18,
+    tintColor: '#666',
+  },
+  input: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 15,
+    color: '#333',
+    paddingVertical: 8,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  clearText: {
+    fontSize: 18,
+    color: '#999',
+    fontWeight: '300',
+  },
+  separator: {
     width: 1,
-    height: 28,
-    backgroundColor: '#E1E1E1',
-    marginHorizontal: 10,
+    height: 24,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 12,
+  },
+  voiceButton: {
+    padding: 4,
+  },
+  voiceIcon: {
+    width: 20,
+    height: 20,
+  },
+  resultsContainer: {
+    flex: 1,
+    backgroundColor: '#F8F8F8',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
+  },
+  listContent: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
   },
   card: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+    maxWidth: (width - 40) / 2,
   },
-  cardImage: { width: 88, height: 88, borderRadius: 8, resizeMode: 'cover' },
-  cardBody: { flex: 1, paddingLeft: 12, justifyContent: 'center' },
-  cardTitle: { fontSize: 15, color: '#111', marginBottom: 6 },
-  cardPrice: { fontSize: 14, color: Colors.button[100], fontWeight: '600' },
+  imageContainer: {
+    position: 'relative',
+    backgroundColor: '#F8F8F8',
+  },
+  cardImage: {
+    width: '100%',
+    height: width * 0.4,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: Colors.button[100],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  discountText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  wishlistButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wishlistButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  wishlistIcon: {
+    width: 16,
+    height: 16,
+    tintColor: '#666',
+  },
+  wishlistIconActive: {
+    tintColor: '#AEB254',
+  },
+  cardBody: {
+    padding: 12,
+  },
+  brandName: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  cardTitle: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
+    fontWeight: '400',
+    lineHeight: 18,
+    height: 36,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  cardPrice: {
+    fontSize: 16,
+    color: '#000000',
+    fontWeight: 'bold',
+    marginRight: 6,
+  },
+  unitText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: 'normal',
+  },
+  originalPrice: {
+    fontSize: 13,
+    color: '#999',
+    textDecorationLine: 'line-through',
+    fontWeight: '400',
+  },
+  discountTag: {
+    fontSize: 12,
+    color: Colors.button[100],
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  addToCartButton: {
+    backgroundColor: Colors.button[100],
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  addToCartText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyImage: {
+    width: 120,
+    height: 120,
+    marginBottom: 24,
+    opacity: 0.6,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  initialContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  initialImage: {
+    width: 140,
+    height: 140,
+    marginBottom: 24,
+  },
+  initialTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  initialSubtitle: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  trendingContainer: {
+    width: '100%',
+  },
+  trendingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  trendingTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  trendingTag: {
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    marginBottom: 8,
+  },
+  trendingTagText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
 });
-
-export default Searchpage;

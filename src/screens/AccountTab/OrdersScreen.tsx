@@ -968,12 +968,12 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                     : newRating === 1
                     ? 'Terrible'
                     : 'Select a rating'}
-                  {existingRating !== null && (
+                  {/* {existingRating !== null && (
                     <Text style={styles.previousRatingText}>
                       {' '}
                       (Previous: {existingRating})
                     </Text>
-                  )}
+                  )} */}
                 </Text>
 
                 <Text style={styles.modalSubtitle}>

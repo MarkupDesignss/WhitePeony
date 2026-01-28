@@ -36,8 +36,18 @@ import Video from 'react-native-video';
 import LoginModal from '../../components/LoginModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
-const HERO_HEIGHT = 300;
+const wp = widthPercentageToDP;
+const hp = heightPercentageToDP;
+const HERO_HEIGHT = hp(28); // ✅ recommended
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SIDE_SPACING = wp(4);
+const ITEM_SPACING = wp(3);
+
+const BANNER_WIDTH = SCREEN_WIDTH - SIDE_SPACING * 2;
+const ITEM_FULL_WIDTH = BANNER_WIDTH + ITEM_SPACING;
+
+
 
 type ProductDetailsProps = {
   route: { params: { productId: string } };
@@ -567,57 +577,72 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         style={styles.content}
         contentContainerStyle={{ paddingHorizontal: 12 }}
       >
-        {/* Image carousel with dots. Tap an image to open zoom modal */}
-        {/* Fixed Image Carousel */}
+
+        {/* Image carousel with dots */}
         <View style={styles.carouselContainer}>
           <FlatList
             ref={flatListRef}
             data={productImages}
-            keyExtractor={(_, i) => String(i)}
             horizontal
-            pagingEnabled
+            pagingEnabled={false}
             showsHorizontalScrollIndicator={false}
+            snapToInterval={ITEM_FULL_WIDTH}
             decelerationRate="fast"
-            snapToInterval={width} // This ensures proper pagination
-            snapToAlignment="start"
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.floor(e.nativeEvent.contentOffset.x / width);
-              if (idx >= 0 && idx < productImages.length) {
-                setActiveIndex(idx);
-              }
+            disableIntervalMomentum
+            contentContainerStyle={{
+              
+            }}
+            keyExtractor={(_, i) => String(i)}
+            getItemLayout={(_, index) => ({
+              length: ITEM_FULL_WIDTH,
+              offset: ITEM_FULL_WIDTH * index,
+              index,
+            })}
+            onMomentumScrollEnd={e => {
+              const index = Math.round(
+                e.nativeEvent.contentOffset.x / ITEM_FULL_WIDTH,
+              );
+              setActiveIndex(index);
             }}
             renderItem={({ item, index }) => (
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => openZoom(index)}
-                style={{ width: width - 24 }} // Account for padding
                 onPressIn={() => {
                   setIsInteracting(true);
                   stopAutoplay();
                 }}
                 onPressOut={() => {
                   setIsInteracting(false);
-                  stopAutoplay();
                   startAutoplay();
                 }}
+                style={{ width: ITEM_FULL_WIDTH }}
               >
-                <View style={styles.imageContainer}>
-                  <Animated.View style={[styles.animatedImageWrapper, { opacity: animOpacity }]}>
+                <View
+                  style={{
+                    width: BANNER_WIDTH,
+                    height: HERO_HEIGHT,
+                    marginRight: ITEM_SPACING,
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    backgroundColor: '#f4f4f4',
+                  }}
+                >
+                  <Animated.View style={{ flex: 1, opacity: animOpacity }}>
                     <Image
                       source={resolveImageSource(item)}
-                      style={styles.heroImage}
-                      resizeMode="contain"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                      }}
+                      resizeMode="cover"
                     />
                   </Animated.View>
                 </View>
               </TouchableOpacity>
             )}
-            getItemLayout={(data, index) => ({
-              length: width - 24,
-              offset: (width - 24) * index,
-              index,
-            })}
           />
+
 
           {/* Dots Indicator - Only show if more than 1 image */}
           {productImages.length > 1 && (
@@ -1028,7 +1053,7 @@ export default ProductDetails;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   hero: {
-    width: width,
+
     height: HERO_HEIGHT,
     justifyContent: 'flex-start',
     marginTop: '5%',
@@ -1091,8 +1116,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     margin: 5,
   },
-  cardImage: { width: 177, height: 245, borderRadius: 9 },
-  cardBody: { padding: 8, alignItems: 'center', justifyContent: 'center' },
+  cardImage: { width: 177, height: 245, borderRadius: 9, },
+  cardBody: { alignItems: 'center', justifyContent: 'center', },
   cardTitle: { fontSize: 13, fontWeight: '600' },
   cardPrice: {
     marginTop: 6,
@@ -1239,8 +1264,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-
-
   cartButton: {
     backgroundColor: Colors.button[100],
     borderRadius: 20,
@@ -1279,22 +1302,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  carouselContainer: {
-    width: '100%',
-    height: HERO_HEIGHT,
-    marginTop: 10,
-    position: 'relative',
-  },
 
-  imageContainer: {
-    width: width - 24, // Account for padding
-    height: HERO_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
 
   animatedImageWrapper: {
     width: '100%',
@@ -1303,42 +1311,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    maxWidth: '100%',
-    maxHeight: '100%',
-  },
 
-  dotsContainer: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
 
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-
-  dotActive: {
-    backgroundColor: Colors.button[100],
-    width: 20,
-  },
-
-  dotInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-  },
 
   noImageContainer: {
-    width: width - 24,
+
     height: HERO_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1352,4 +1329,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+
+
+
+
+
+
+
+
+  carouselContainer: {
+    height: HERO_HEIGHT,
+    marginTop: 10,
+    position: 'relative',
+    
+  },
+
+  dotsContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+
+  dotActive: {
+    width: 20,
+    backgroundColor: '#000',
+  },
+
+  dotInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  },
 });

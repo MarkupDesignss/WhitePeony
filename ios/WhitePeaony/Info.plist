@@ -45,6 +45,8 @@
 	<string>We need your location to provide location-based services.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires microphone access for recording audio.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+    <string>Voice search needs speech recognition</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app requires photo library access to upload images.</string>
 	<key>NSUserTrackingUsageDescription</key>
