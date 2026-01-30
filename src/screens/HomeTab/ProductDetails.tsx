@@ -125,8 +125,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             discount: v.percentage,
           }));
           setWeightItems(allVariants);
-          console.log('varients', allVariants);
-
+         
           const variant0 = allVariants.length ? allVariants[0] : null;
           const price = variant0?.price || first.main_price || '0';
           const actualPrice = variant0?.actual_price ?? variant0?.price ?? '0';
@@ -173,7 +172,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         }
       }
     } catch (err) {
-      console.log('Product fetch error:', err);
     }
   };
 
@@ -198,7 +196,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       const res = await UserService.CatbyProduct(categoryId);
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         const fetchedProducts = res.data?.data || [];
-        console.log('Related products fetched for category:', categoryId);
         const resolvedBase = res.data?.base_url || baseUrl;
         setBaseUrl(resolvedBase);
 
@@ -225,7 +222,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         setRelatedProducts([]);
       }
     } catch (err) {
-      console.log('CategorieProduct error:', err);
       setRelatedProducts([]);
     }
   };
@@ -238,7 +234,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { data } = res.data;
         setReviews(data || []);
-        // console.log("review data", res?.data?.data[0]?.customer)
       } else {
         Toast.show({
           type: 'error',
@@ -249,7 +244,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       hideLoader();
       const error = e as any;
       if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
       } else {
         // Toast.show({
         //   type: 'error',
@@ -400,7 +394,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     } catch (e) {
       const error = e as any;
       if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
       } else {
         Toast.show({
           type: 'error',
@@ -431,7 +424,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     } catch (e) {
       const error = e as any;
       if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
+       
       } else {
         Toast.show({
           type: 'error',

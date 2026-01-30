@@ -70,8 +70,7 @@ const EventDetails = ({ navigation, route }: any) => {
     if (!eventDateString) return false;
 
     try {
-      console.log('🔍 Checking event date:', eventDateString);
-
+    
       // Parse event date
       const eventDate = new Date(eventDateString);
 
@@ -91,14 +90,10 @@ const EventDetails = ({ navigation, route }: any) => {
         today.getDate(),
       );
 
-      console.log('📅 Event Date (no time):', eventOnlyDate.toDateString());
-      console.log('📅 Today (no time):', todayOnlyDate.toDateString());
-      console.log('📅 Event timestamp:', eventOnlyDate.getTime());
-      console.log('📅 Today timestamp:', todayOnlyDate.getTime());
-
+     
       // Compare: Event is passed if it's BEFORE today
       const isPassed = eventOnlyDate.getTime() < todayOnlyDate.getTime();
-      console.log('❌ Is event passed?', isPassed);
+    
 
       return isPassed;
     } catch (error) {
@@ -116,9 +111,7 @@ const EventDetails = ({ navigation, route }: any) => {
 
         // Check if event is passed using helper function
         const isPassed = isEventDatePassed(event.event_date);
-        console.log('📊 Final check - Event passed:', isPassed);
-        console.log('📊 Current date:', new Date().toDateString());
-
+     
         setIsEventPassed(isPassed);
 
         // If event is passed, prevent access and go back
@@ -142,7 +135,7 @@ const EventDetails = ({ navigation, route }: any) => {
         });
       }
     } catch (err: any) {
-      console.log('Error in EventList:', JSON.stringify(err));
+     
       Toast.show({
         type: 'error',
         text1:
@@ -214,7 +207,6 @@ const EventDetails = ({ navigation, route }: any) => {
         });
       }
     } catch (error: any) {
-      console.log('Registration error:', JSON.stringify(error));
       Toast.show({
         type: 'error',
         text1: error?.response?.data?.message || 'Something went wrong!',

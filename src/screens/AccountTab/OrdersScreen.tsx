@@ -69,11 +69,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
       showLoader();
       const res = await UserService.order();
 
-      console.log('=== ORDER API CALLED ===');
-      console.log('API Endpoint: Order list');
-      console.log('Response status:', res?.status);
-      console.log('Full response:', JSON.stringify(res?.data, null, 2));
-
+  
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         hideLoader();
 
@@ -81,26 +77,11 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
           ? res.data.orders
           : [];
 
-        // Debug: Check user data
-        console.log('=== USER DATA CONTEXT ===');
-        console.log('User Data:', userData);
-        console.log(
-          'User ID from context:',
-          userData?.id || userData?.user_id || userData?.userId,
-        );
-
-        // Check specifically for ratings in the response
-        console.log('=== CHECKING RATINGS IN ORDER DATA ===');
         apiOrders.forEach((order: any, index: number) => {
-          console.log(`Order ${index + 1} (ID: ${order.id}):`);
-          console.log('  - Items:', order.items);
 
           if (order.items && Array.isArray(order.items)) {
             order.items.forEach((item: any, itemIndex: number) => {
-              console.log(`  Item ${itemIndex + 1}:`);
-              console.log(`    - Product:`, item.product?.name);
-              console.log(`    - Product reviews:`, item.product?.reviews);
-
+           
               // Check for user's review
               if (
                 item.product?.reviews &&
@@ -116,11 +97,9 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 );
 
                 if (userReview) {
-                  console.log(`    - User's review found:`, userReview);
+                
                 } else {
-                  console.log(
-                    `    - No user review found for ID: ${currentUserId}`,
-                  );
+                
                 }
               }
             });
@@ -130,11 +109,11 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         setOrder(apiOrders);
       } else {
         hideLoader();
-        console.log('Order API response not OK');
+       
       }
     } catch (err) {
       hideLoader();
-      console.log('Order API error:', err);
+     
     }
   };
 
@@ -166,22 +145,12 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         ...(existingReviewId && { review_id: existingReviewId }),
       };
 
-      console.log('=== REVIEW API CALLED ===');
-      console.log('Product ID:', selectedProductId);
-      console.log('Is Update:', existingRating !== null);
-      console.log('Existing Review ID:', existingReviewId);
-      console.log('New rating:', newRating);
-      console.log('Previous rating:', existingRating);
-      console.log('Payload:', JSON.stringify(payload, null, 2));
-
+     
       showLoader();
 
       const res = await UserService.Review(payload, selectedProductId);
 
-      console.log('=== REVIEW API RESPONSE ===');
-      console.log('Response status:', res?.status);
-      console.log('Response data:', JSON.stringify(res?.data, null, 2));
-
+   
       if (res && res?.data && res?.status === HttpStatusCode.Ok) {
         hideLoader();
 
@@ -221,14 +190,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
       }
     } catch (error: any) {
       hideLoader();
-      console.log('=== REVIEW SUBMISSION ERROR ===');
-      console.log('Error:', error);
-
+     
       let errorMessage = 'Something went wrong! Please try again.';
       if (error.response) {
-        console.log('Error response data:', error.response.data);
-        console.log('Error response status:', error.response.status);
-
+       
         errorMessage =
           error.response.data?.message ||
           error.response.data?.error ||
@@ -245,13 +210,9 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const handleOpenReviewModal = (productId: string, productName: string) => {
-    console.log('=== OPENING REVIEW MODAL ===');
-    console.log('Product ID:', productId);
-    console.log('Product Name:', productName);
-    console.log('User Data from Context:', userData);
-
+  
     if (!productId) {
-      console.log('No productId provided!');
+   
       Toast.show({
         type: 'error',
         text1: 'Product information not available',
@@ -265,15 +226,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
       userData?.id ||
       userData?.user_id ||
       userData?.userId;
-    console.log(
-      'Current User ID from context (looking for customer_id):',
-      currentUserId,
-    );
-    console.log('userData.customer_id:', userData?.customer_id);
-    console.log('userData.id:', userData?.id);
-
+  
+  
     if (!currentUserId) {
-      console.log('No user ID found!');
+      
       Toast.show({
         type: 'error',
         text1: 'User not authenticated',
@@ -287,10 +243,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     let foundComment: string = '';
     let foundReviewId: string | null = null;
 
-    // Debug: Log all orders to see structure
-    console.log('=== SEARCHING FOR EXISTING REVIEW ===');
-    console.log('Total orders:', order.length);
-
+    
     // Search through all orders and items to find the user's review for this product
     order.forEach((orderItem: any, orderIndex: number) => {
       const itemsList = getItemsList(orderItem?.items);
@@ -300,17 +253,13 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         const itemProductId =
           product?.id?.toString() || product?.product_id?.toString();
 
-        console.log(`Order ${orderIndex}, Item ${itemIndex}:`);
-        console.log('  - Item Product ID:', itemProductId);
-        console.log('  - Target Product ID:', productId);
-        console.log('  - Product reviews:', product?.reviews);
-
+     
         if (itemProductId === productId) {
-          console.log('  - PRODUCT MATCH FOUND!');
+        
 
           // Check if there's a review from the current user
           if (product?.reviews && Array.isArray(product.reviews)) {
-            console.log('  - Checking', product.reviews.length, 'reviews');
+          
 
             // Find current user's review - check for customer_id field
             const currentUserReview = product.reviews.find((review: any) => {
@@ -319,15 +268,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 review.user_id ||
                 review.userId ||
                 review.user?.id;
-              console.log('    - Review customer_id:', review.customer_id);
-              console.log('    - Review user_id:', review.user_id);
-              console.log('    - Current user ID:', currentUserId);
-              console.log('    - Match?', reviewUserId == currentUserId);
               return reviewUserId == currentUserId;
             });
 
             if (currentUserReview) {
-              console.log('  - USER REVIEW FOUND:', currentUserReview);
               foundRating = Number(currentUserReview.rating);
               foundComment =
                 currentUserReview.review ||
@@ -337,29 +281,20 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
               foundReviewId =
                 currentUserReview.id || currentUserReview.review_id || null;
             } else {
-              console.log(
-                '  - No user review found for customer_id:',
-                currentUserId,
-              );
+             
               // Log all review customer IDs for debugging
               product.reviews.forEach((review: any, idx: number) => {
-                console.log(
-                  `    Review ${idx}: customer_id=${review.customer_id}, rating=${review.rating}`,
-                );
+               
               });
             }
           } else {
-            console.log('  - No reviews array found');
+           
           }
         }
       });
     });
 
-    console.log('=== SEARCH RESULTS ===');
-    console.log('Found rating:', foundRating);
-    console.log('Found comment:', foundComment);
-    console.log('Found review ID:', foundReviewId);
-
+ 
     setSelectedProductId(productId);
     setSelectedProductName(productName);
     setExistingRating(foundRating);
@@ -371,7 +306,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     setNewRating(foundRating || 5);
     setNewComment(foundComment);
 
-    console.log('Setting modal visible: true');
+   
     setWriteModalVisible(true);
   };
 
@@ -400,8 +335,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         userData?.id ||
         userData?.user_id ||
         userData?.userId;
-      console.log('extractProductInfo - Current User ID:', currentUserId);
-
+     
       // Try to find product ID in different possible paths
       let productId = null;
       let productName = null;
@@ -421,11 +355,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
 
           // Find current user's review - check for customer_id field
           if (currentUserId) {
-            console.log(
-              'Looking for user review in',
-              product.reviews.length,
-              'reviews',
-            );
+           
 
             const userReview = product.reviews.find((review: any) => {
               // Check for customer_id (from API) or user_id (what your code expects)
@@ -434,22 +364,12 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 review.user_id ||
                 review.userId ||
                 review.user?.id;
-              console.log(
-                'Review customer_id:',
-                review.customer_id,
-                'Current user ID:',
-                currentUserId,
-                'Match?',
-                reviewUserId == currentUserId,
-              );
+              
               return reviewUserId == currentUserId;
             });
 
             if (userReview) {
-              console.log(
-                'USER REVIEW FOUND in extractProductInfo:',
-                userReview,
-              );
+             
               userRating = Number(userReview.rating);
             }
           }
@@ -524,13 +444,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         productName = item.product_name || 'Product';
       }
 
-      console.log('extractProductInfo result:', {
-        productId,
-        productName,
-        productRating,
-        userRating,
-        reviewCount: customerReviews.length,
-      });
+    
 
       return {
         productId,
@@ -540,7 +454,6 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         customerReviews,
       };
     } catch (error) {
-      console.log('Error extracting product info:', error);
       return {
         productId: null,
         productName: null,
@@ -567,15 +480,6 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     const displayRating = userRating !== null ? userRating : productRating;
 
     // Log the extracted rating for debugging
-    console.log('Rendering order:', {
-      orderId: item.id,
-      productId,
-      productName,
-      productRating,
-      userRating,
-      displayRating,
-      reviewCount: customerReviews.length,
-    });
 
     return (
       <TouchableOpacity

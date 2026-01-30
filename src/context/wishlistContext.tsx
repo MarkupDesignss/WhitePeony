@@ -115,7 +115,6 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         await loadLocalWishlist();
       }
     } catch (error) {
-      console.log('Error loading initial wishlist:', error);
     } finally {
       setIsLoading(false);
     }
@@ -127,19 +126,19 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
       if (Array.isArray(storedItems)) {
         const filteredItems = filterItemsByUserType(storedItems);
         setWishlistItems(filteredItems);
-        console.log('Loaded local wishlist items:', filteredItems.length);
+   
       }
     } catch (error) {
-      console.log('Error loading local wishlist:', error);
+
     }
   };
 
   const saveLocalWishlist = async (items: WishlistItem[]) => {
     try {
       await LocalStorage.save(STORAGE_KEY, items);
-      console.log('Saved wishlist to local storage:', items.length, 'items');
+     
     } catch (error) {
-      console.log('Error saving wishlist:', error);
+
     }
   };
 
@@ -174,10 +173,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
       target?.variants?.[0]?.actual_price !== undefined &&
       target?.variants?.[0]?.actual_price !== null
     ) {
-      console.log(
-        '  Using variant actual_price:',
-        target.variants[0].actual_price,
-      );
+   
       return String(target.variants[0].actual_price);
     }
 
@@ -186,17 +182,13 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
       target?.variants?.[0]?.price !== undefined &&
       target?.variants?.[0]?.price !== null
     ) {
-      console.log('  Using variant price:', target.variants[0].price);
       return String(target.variants[0].price);
     }
 
     // Priority 3: Use main_price as fallback
     if (target?.main_price !== undefined && target?.main_price !== null) {
-      console.log('  Using main_price:', target.main_price);
       return String(target.main_price);
     }
-
-    console.log('  No price found, using "0"');
     return '0';
   };
 
@@ -204,7 +196,6 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
   const fetchWishlist = async () => {
     // Return early if user is not logged in
     if (!isLoggedIn) {
-      console.log('User not logged in, loading local wishlist instead');
       await loadLocalWishlist();
       return;
     }
@@ -212,12 +203,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('wishlistContext.tsx: Fetching wishlist from server...');
-
       const response = await UserService.wishlist();
-
-      console.log('Wishlist API response type:', typeof response);
-      console.log('Wishlist API response:', response);
 
       let wishlistData = [];
 
@@ -237,43 +223,15 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         }
       }
 
-      console.log('Parsed wishlistData:', wishlistData);
-      console.log('Parsed wishlistData length:', wishlistData.length);
-
+  
       if (!Array.isArray(wishlistData)) {
         console.error('Wishlist API did not return an array:', wishlistData);
         throw new Error('Wishlist API did not return an array');
       }
 
       // DEBUG: Log each item before transformation
-      console.log('=== BEFORE TRANSFORMATION ===');
       wishlistData.forEach((item, index) => {
-        console.log(`Item ${index}:`);
-        console.log('  Item ID:', item?.id);
-        console.log('  Item name:', item?.name);
-        console.log('  Has product property:', !!item?.product);
-        console.log('  Price sources:');
-        console.log('    - item.main_price:', item?.main_price);
-        console.log(
-          '    - item.variants?.[0]?.price:',
-          item?.variants?.[0]?.price,
-        );
-        console.log(
-          '    - item.variants?.[0]?.actual_price:',
-          item?.variants?.[0]?.actual_price,
-        );
-        console.log(
-          '    - item.product?.main_price:',
-          item?.product?.main_price,
-        );
-        console.log(
-          '    - item.product?.variants?.[0]?.price:',
-          item?.product?.variants?.[0]?.price,
-        );
-        console.log(
-          '    - item.product?.variants?.[0]?.actual_price:',
-          item?.product?.variants?.[0]?.actual_price,
-        );
+      
       });
 
       // Transform the data
@@ -297,11 +255,6 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         // Get price using the helper function
         const price = extractCorrectPrice(item, product);
 
-        console.log(`Transforming item ${itemId}:`);
-        console.log('  Name:', product.name);
-        console.log('  Final extracted price:', price);
-        console.log('  Price type:', typeof price);
-
         return {
           id: itemId,
           product_id: productId,
@@ -317,12 +270,9 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         };
       });
 
-      console.log('=== AFTER TRANSFORMATION ===');
-      console.log('Transformed items count:', transformedItems.length);
+     
       transformedItems.forEach((item, index) => {
-        console.log(`Item ${index}: ${item.name}`);
-        console.log('  Stored price:', item.price);
-        console.log('  Has variants:', !!item.variants);
+      
       });
 
       // Filter by user type and update state
@@ -386,10 +336,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         try {
           await UserService.wishlistadd({ product_id: id });
         } catch (apiError) {
-          console.log(
-            'API error while adding to wishlist, continuing locally:',
-            apiError,
-          );
+         
           // Don't show error toast for API failure, just continue with local storage
         }
       }
@@ -404,7 +351,6 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         text2: isLoggedIn ? 'Saved to your account' : 'Saved locally',
       });
     } catch (error) {
-      console.log('Error adding to wishlist:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -425,10 +371,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         try {
           await UserService.wishlistDelete(id);
         } catch (apiError) {
-          console.log(
-            'API error while removing from wishlist, continuing locally:',
-            apiError,
-          );
+          
           // Don't show error toast for API failure
         }
       }
@@ -443,7 +386,6 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
         text2: isLoggedIn ? 'Removed from your account' : 'Removed locally',
       });
     } catch (error) {
-      console.log('Error removing from wishlist:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -456,7 +398,6 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
 
   // 4. TOGGLE WISHLIST - Combine add and remove
   const toggleWishlist = async (id: WishlistItemId) => {
-    console.log('Toggling wishlist for item:', id);
     if (wishlistIds.includes(String(id))) {
       await removeFromWishlist(id);
     } else {
@@ -468,7 +409,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
   const isWishlisted = useCallback(
     (id: WishlistItemId) => {
       const isInWishlist = wishlistIds.includes(String(id));
-      console.log(`isWishlisted(${id}): ${isInWishlist}`);
+
       return isInWishlist;
     },
     [wishlistIds],
@@ -477,7 +418,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
   // 6. CLEAR WISHLIST
   const clearWishlist = async () => {
     try {
-      console.log('Clearing wishlist');
+
 
       // Only call API if user is logged in
       if (isLoggedIn) {
@@ -485,10 +426,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
           // Assuming you have a clear wishlist API endpoint
           // await UserService.clearWishlist();
         } catch (apiError) {
-          console.log(
-            'API error while clearing wishlist, continuing locally:',
-            apiError,
-          );
+       
         }
       }
 
@@ -503,7 +441,6 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
           : 'All items have been removed locally',
       });
     } catch (error) {
-      console.log('Clear wishlist error:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',

@@ -101,7 +101,6 @@ const ArticleDetails = ({ navigation, route }: any) => {
 
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { message, data } = res.data;
-        console.log('EventList response data:', res.data);
         setairtcleDetails(data || null);
       } else {
         Toast.show({
@@ -111,7 +110,6 @@ const ArticleDetails = ({ navigation, route }: any) => {
       }
     } catch (err: any) {
       hideLoader();
-      console.log('Error in EventList:', JSON.stringify(err));
       Toast.show({
         type: 'error',
         text1:

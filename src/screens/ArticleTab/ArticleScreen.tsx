@@ -73,7 +73,6 @@ const ArticleScreen = ({ navigation }: any) => {
       }
     } catch (err: any) {
       hideLoader();
-      console.log('Error in EventList:', JSON.stringify(err));
       Toast.show({
         type: 'error',
         text1:

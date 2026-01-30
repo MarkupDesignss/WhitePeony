@@ -86,7 +86,6 @@ const AddressModal: React.FC<AddressModalProps> = ({
         setAddressList([]);
       }
     } catch (err: any) {
-      console.log('Error in Addresses:', err.message || err);
       Toast.show({
         type: 'error',
         text1:
@@ -154,7 +153,6 @@ const AddressModal: React.FC<AddressModalProps> = ({
       }
     } catch (err: any) {
       hideLoader();
-      console.log('Delete address error:', err.message || err);
       Toast.show({
         type: 'error',
         text1:

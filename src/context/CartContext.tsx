@@ -55,7 +55,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
                     await getCartDetails();
                 }
             } catch (e) {
-                console.log('CartProvider init error', e);
+               
             }
         })();
     }, []);
@@ -118,7 +118,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
             // Logged-in: call API
             showLoader();
-            console.log('addToCart payload', payload);
             const res = await UserService.AddToCart(payload);
             hideLoader();
 
@@ -128,9 +127,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
                     type: 'success',
                     text1: res.data?.message || 'Added to cart!',
                 });
-                console.log('addtocart responce', res?.data);
             } else {
-                console.log('errorlist,', res?.data);
                 Toast.show({
                     type: 'error',
                     text1: res?.data?.message || 'Failed to add to cart',
@@ -138,7 +135,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
             }
         } catch (err: any) {
             hideLoader();
-            console.log('addToCart error', JSON.stringify(err));
             Toast.show({
                 type: 'error',
                 text1:
@@ -165,10 +161,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
                 const fetchedProducts = res.data?.cart?.items || [];
                 setCart(fetchedProducts);
             } else {
-                console.log('getCartDetails: unexpected response', res?.status);
+             
             }
         } catch (err) {
-            console.log('GetCartDetails error:', err);
         } finally {
             setIsLoadingCart(false);
         }
@@ -176,11 +171,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // removeFromCart: supports guest and logged-in removal with variant
     const removeFromCart = async (productId: number, variantId?: number | null) => {
-        console.log('removeFromCart called with:', { productId, variantId, isLoggedIn });
 
         try {
             if (!isLoggedIn) {
-                console.log('Guest user - removing from local cart');
+             
                 setCart(prev => prev.filter(item =>
                     !(item.id === productId && (item.variant_id || null) === (variantId || null))
                 ));
@@ -190,26 +184,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
             showLoader();
 
-            console.log('Logged-in user - checking variantId:', variantId);
-
+        
             if (variantId) {
                 try {
-                    console.log('Calling RemoveCartWithVariant API with:', { productId, variantId });
                     const res = await UserService.RemoveCartWithVariant(productId, variantId);
-                    console.log('RemoveCartWithVariant response:', res?.status, res?.data);
+        
 
                     if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
-                        console.log('Variant-specific remove successful');
+                  
                         Toast.show({
                             type: 'success',
                             text1: res.data?.message || 'Item removed from cart!',
                         });
                         await getCartDetails();
                     } else {
-                        console.log('Variant API failed, trying fallback');
+
                         // Fallback to regular remove if variant API fails
                         const fallbackRes = await UserService.RemoveCart(productId);
-                        console.log('Fallback response:', fallbackRes?.status, fallbackRes?.data);
 
                         if (fallbackRes && (fallbackRes.status === HttpStatusCode.Ok || fallbackRes.status === 200)) {
                             Toast.show({
@@ -222,12 +213,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
                         }
                     }
                 } catch (variantError: any) {
-                    console.log('Variant-specific remove error:', variantError);
-                    console.log('Error response:', variantError?.response?.data);
-
-                    // Try fallback
+                   
                     try {
-                        console.log('Trying fallback to regular RemoveCart');
+                  
                         const fallbackRes = await UserService.RemoveCart(productId);
                         if (fallbackRes && (fallbackRes.status === HttpStatusCode.Ok || fallbackRes.status === 200)) {
                             Toast.show({
@@ -237,7 +225,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
                             await getCartDetails();
                         }
                     } catch (fallbackError) {
-                        console.log('Fallback also failed:', fallbackError);
+                     
                         Toast.show({
                             type: 'error',
                             text1: 'Failed to remove item from cart'
@@ -246,9 +234,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
             } else {
                 // No variantId, use regular RemoveCart
-                console.log('No variantId, using regular RemoveCart');
+             
                 const res = await UserService.RemoveCart(productId);
-                console.log('Regular RemoveCart response:', res?.status, res?.data);
+      
 
                 if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
                     Toast.show({
@@ -262,9 +250,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
             }
         } catch (err: any) {
             hideLoader();
-            console.log('removeFromCart general error:', err);
-            console.log('Error response data:', err?.response?.data);
-            console.log('Error status:', err?.response?.status);
+          
 
             Toast.show({
                 type: 'error',
@@ -289,7 +275,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
                             quantity: item.quantity,
                         });
                     } catch (err) {
-                        console.log('syncCart item failed:', err);
+                     
                     }
                 }
                 await AsyncStorage.removeItem('guest_cart');
@@ -301,7 +287,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
             setToken(t);
             await getCartDetails();
         } catch (err) {
-            console.log('syncCartAfterLogin error', err);
+          
         }
     };
 

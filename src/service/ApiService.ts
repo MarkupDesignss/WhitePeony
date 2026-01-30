@@ -25,7 +25,7 @@ APIKit.interceptors.request.use(
     return config;
   },
   error => {
-    console.log('Request error:', error);
+  
     return Promise.reject(error);
   },
 );
@@ -38,9 +38,9 @@ export const UserService = {
         Accept: 'application/json',
       },
     };
-    console.log('REQUEST OTP PAYLOAD:', payload);
+   
     const res = await APIKit.post('login/request-otp', payload, apiHeaders);
-    console.log('REQUEST OTP RESPONSE:', res.data);
+   
     return res;
   },
 
@@ -51,9 +51,9 @@ export const UserService = {
         Accept: 'application/json',
       },
     };
-    console.log('VERIFY OTP PAYLOAD:', payload);
+   
     const res = await APIKit.post('login/verify-otp', payload, apiHeaders);
-    console.log('VERIFY OTP RESPONSE:', res.data);
+   
     return res;
   },
 
@@ -65,7 +65,6 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", payload);
     return APIKit.post('update/profile', payload, apiHeaders);
   },
 
@@ -208,7 +207,6 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", token)
 
     return APIKit.get('order', apiHeaders);
   },
@@ -398,8 +396,7 @@ export const UserService = {
         );
     }
     const query = parts.length ? `?${parts.join('&')}` : '';
-    console.log('FilterProducts params:', params, query);
-
+ 
     return APIKit.get(`products/filter${query}`, apiHeaders);
   },
 
@@ -435,13 +432,11 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", payload)
     return APIKit.post('addtocart', payload, apiHeaders);
   },
 
   viewCart: async () => {
     const token = await LocalStorage.read('@token');
-    // console.log("token", token);
     const apiHeaders = {
       headers: {
         'Content-Type': 'application/json',
@@ -502,7 +497,6 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", payload, apiHeaders);
     return APIKit.post('updatecart', payload, apiHeaders);
   },
 
@@ -527,7 +521,6 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    // console.log("payload", payload)
     return APIKit.post('placeorder', payload, apiHeaders);
   },
 
@@ -637,9 +630,9 @@ export const UserService = {
 
   search: async (word: string) => {
     try {
-      console.log('--- UserService.search called with:', word);
+    
       const token = await LocalStorage.read('@token');
-      console.log('--- Token:', token);
+
 
       const apiHeaders = {
         headers: {
@@ -653,7 +646,7 @@ export const UserService = {
         `search-product?search=${encodeURIComponent(word)}`,
         apiHeaders,
       );
-      console.log('--- Search API response:', res.data);
+     
       return res;
     } catch (error) {
       console.error('--- Search API ERROR:', error);
@@ -674,7 +667,7 @@ export const UserService = {
     const numericPayload = {
       product_id: Number(payload.product_id),
     };
-    console.log('Wishlist add payload:', numericPayload);
+
     return APIKit.post(`wishlist/add`, numericPayload, apiHeaders);
   },
 
@@ -687,12 +680,10 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    console.log('Fetching wishlist from:', STAGING_API_URL + 'wishlist');
-
+  
     try {
       const response = await APIKit.get('wishlist', apiHeaders);
-      console.log('Wishlist API Response:', response.data);
-
+    
       // Return the data part of the response
       return response.data;
     } catch (error) {
@@ -710,7 +701,7 @@ export const UserService = {
       },
     };
     const numericProductId = Number(productId);
-    console.log('Wishlist delete for product:', numericProductId);
+   
     return APIKit.delete(`wishlist/product/${numericProductId}`, apiHeaders);
   },
 

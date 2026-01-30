@@ -78,13 +78,12 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
             'my-custom-header': 'my custom header value',
           },
         });
-        console.log('InAppBrowser result:', result);
       } else {
         // Fallback to Linking if InAppBrowser is not available
         Linking.openURL(url);
       }
     } catch (error) {
-      console.log('InAppBrowser error:', error);
+    
       Alert.alert('Error', 'Unable to open the link');
     }
   };
@@ -161,7 +160,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
       hideLoader();
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { message, data } = res.data;
-        console.log('DeleteAcc response data:', res.data);
+     
         Toast.show({ type: 'success', text1: message });
         setTimeout(() => {
           setIsLoggedIn(false);
@@ -177,7 +176,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
       }
     } catch (err: any) {
       hideLoader();
-      console.log('Error in DeleteAcc:', JSON.stringify(err));
+    
       Toast.show({
         type: 'error',
         text1:
@@ -466,8 +465,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
         visible={modalAddress}
         onClose={() => setModalAddress(false)}
         onSelect={(address) => {
-          console.log('Selected address:', address);
-          // Handle selected address if needed
+         
           setModalAddress(false);
         }}
       />

@@ -109,12 +109,10 @@ const EventScreen = ({ navigation }: any) => {
         hideLoader();
         const { latitude, longitude } = position.coords;
         setLocation({ latitude, longitude });
-        console.log('Current Location:', latitude, longitude);
         EventNearbyList(latitude, longitude);
       },
       error => {
         hideLoader();
-        console.log('Location Error:', error);
         Alert.alert('Error', 'Unable to fetch location. Please try again.');
       },
       {
@@ -144,7 +142,6 @@ const EventScreen = ({ navigation }: any) => {
       hideLoader();
       const error = e as any;
       if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
       } else {
         Toast.show({
           type: 'error',
@@ -178,9 +175,8 @@ const EventScreen = ({ navigation }: any) => {
       hideLoader();
       const error = e as any;
       if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
       } else {
-        console.log('Unauthorized access - error', error);
+       
       }
     }
   };

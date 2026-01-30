@@ -54,12 +54,6 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
   // Debug logging
   useEffect(() => {
-    console.log('=== WISHLIST SCREEN DEBUG ===');
-    console.log('isLoggedIn:', isLoggedIn);
-    console.log('wishlistIds:', wishlistIds);
-    console.log('wishlistItems count:', wishlistItems?.length);
-    console.log('wishlistItems sample:', wishlistItems?.[0]);
-    console.log('cart count:', cart?.length);
 
     setDebugInfo({
       isLoggedIn,
@@ -73,21 +67,19 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
   // Load wishlist items when component mounts or when dependencies change
   useEffect(() => {
-    console.log('useEffect triggered - loading wishlist');
+   
     loadWishlistItems();
   }, [isLoggedIn, wishlistIds, wishlistItems]);
 
   // Update items' cart status when cart changes
   useEffect(() => {
     if (!cart) return;
-    console.log('Cart updated, checking items in cart');
+ 
     setItems(currentItems =>
       currentItems.map(item => {
         const isInCart = cart.some(cartItem => String(cartItem.id) === item.id);
         if (isInCart !== item.isInCart) {
-          console.log(
-            `Item ${item.id} cart status changed: ${item.isInCart} -> ${isInCart}`,
-          );
+         
         }
         return { ...item, isInCart };
       }),
@@ -95,7 +87,6 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
   }, [cart]);
 
   const loadWishlistItems = async () => {
-    console.log('loadWishlistItems called, isLoggedIn:', isLoggedIn);
 
     if (isLoggedIn) {
       await fetchServerWishlist();
@@ -106,25 +97,18 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
   const fetchServerWishlist = async () => {
     try {
-      console.log('Fetching server wishlist...');
+    
       showLoader();
       const res = await UserService.wishlist();
-      console.log('Server wishlist response:', {
-        status: res?.status,
-        dataLength: res?.data?.data?.length,
-        dataSample: res?.data?.data?.[0],
-      });
+     
 
       const apiItems = res?.data?.data || [];
 
       if (apiItems.length === 0) {
-        console.log(
-          'API returned empty array, checking wishlistIds:',
-          wishlistIds,
-        );
+        
         // Fallback to local if API returns empty but we have local items
         if (wishlistIds && wishlistIds.length > 0) {
-          console.log('Falling back to local wishlist');
+       
           await loadLocalWishlist();
           hideLoader();
           return;
@@ -133,7 +117,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
       const mapped: DisplayWishlistItem[] = apiItems.map(
         (item: any, index: number) => {
-          console.log(`Processing API item ${index}:`, item);
+          
 
           // Try multiple possible ID sources
           const productId =
@@ -210,8 +194,6 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
           };
         },
       );
-
-      console.log(`Mapped ${mapped.length} items from server`);
       setItems(mapped);
       hideLoader();
     } catch (error: any) {
@@ -219,7 +201,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
       console.error('Error fetching server wishlist:', error);
 
       // Fallback to local on error
-      console.log('Falling back to local wishlist due to error');
+
       await loadLocalWishlist();
 
       Toast.show({
@@ -232,22 +214,17 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
   const loadLocalWishlist = async () => {
     try {
-      console.log('Loading local wishlist...');
-      console.log('wishlistItems:', wishlistItems);
-      console.log('wishlistIds:', wishlistIds);
-
+  
       showLoader();
 
       let mapped: DisplayWishlistItem[] = [];
 
       // First try to use wishlistItems from context
       if (Array.isArray(wishlistItems) && wishlistItems.length > 0) {
-        console.log(
-          `Using wishlistItems array with ${wishlistItems.length} items`,
-        );
+       
 
         mapped = wishlistItems.map((item: any, index: number) => {
-          console.log(`Processing wishlistItems item ${index}:`, item);
+         
 
           // Get product ID from transformed item
           const productId =
@@ -315,7 +292,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
       }
       // If wishlistItems is empty but we have wishlistIds
       else if (Array.isArray(wishlistIds) && wishlistIds.length > 0) {
-        console.log(`Using wishlistIds array with ${wishlistIds.length} IDs`);
+    
 
         mapped = wishlistIds.map((id: string, index: number) => {
           return {
@@ -336,13 +313,12 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
       }
       // If both are empty but we have items in context state
       else if (items.length > 0) {
-        console.log('Keeping existing items:', items.length);
+       
         // Keep current items
         hideLoader();
         return;
       }
 
-      console.log(`Loaded ${mapped.length} local items`);
       setItems(mapped);
       hideLoader();
     } catch (error: any) {
@@ -359,15 +335,12 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
   const handleRemoveFromWishlist = async (productId: string) => {
     try {
       showLoader();
-      console.log('Removing from wishlist:', productId);
+    
 
       if (isLoggedIn) {
         // Remove from server for logged-in users
         const res = await UserService.wishlistDelete(productId);
-        console.log('Server removal response:', {
-          status: res?.status,
-          data: res?.data,
-        });
+      
 
         if (res?.status === HttpStatusCode.Ok) {
           // Remove from local state
@@ -381,7 +354,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
             text1: 'Removed from wishlist',
           });
         } else {
-          console.log('Wishlist delete error:', JSON.stringify(res?.data));
+         
           Toast.show({
             type: 'error',
             text1: res?.data?.message || 'Failed to remove from wishlist',
@@ -427,7 +400,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
   const onRefresh = async () => {
     try {
       setRefreshing(true);
-      console.log('Refreshing wishlist...');
+    
       await fetchWishlist(); // Refresh context data first
       await loadWishlistItems(); // Then reload display items
     } catch (error) {

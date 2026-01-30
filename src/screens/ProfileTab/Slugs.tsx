@@ -15,7 +15,6 @@ const Slugs = ({ navigation, route }) => {
 
 
     useEffect(() => {
-        console.log("params", name)
         Slug();
     }, [name])
 
@@ -25,13 +24,13 @@ const Slugs = ({ navigation, route }) => {
             const res = await UserService.SlugAPI(name);
             const Getslugs = res?.data?.data?.content || {};
             sethtml(Getslugs);
-            console.log("slugs", Getslugs)
+          
 
         } catch (e) {
             hideLoader();
             const error = e as any;
             if (error.status === 401) {
-                console.log('Unauthorized access - perhaps token expired');
+              
             }
             else {
                 Toast.show({ type: 'error', text1: 'Failed to load slugs' });

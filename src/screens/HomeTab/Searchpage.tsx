@@ -107,7 +107,7 @@ const Searchpage = ({ navigation }: any) => {
     try {
       await Voice.start('en-IN');
     } catch (e) {
-      console.log('Voice start error', e);
+    
     }
   };
 
@@ -166,7 +166,7 @@ const Searchpage = ({ navigation }: any) => {
         setSearchResults([]);
       }
     } catch (error) {
-      console.log('Search error:', error);
+     
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -216,7 +216,7 @@ const Searchpage = ({ navigation }: any) => {
         ),
       );
     } catch (error: any) {
-      console.log('Wishlist toggle error:', error);
+     
       // The context already shows error toast
     } finally {
       // Clear loading state for this product

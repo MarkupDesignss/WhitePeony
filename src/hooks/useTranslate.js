@@ -41,7 +41,7 @@ export const TranslationProvider = ({ children }) => {
       } catch (error) {
         hideloader();
         if (error.status === 401) {
-          console.log('Unauthorized access - perhaps token expired');
+         
         }
         else {
           Toast.show({ type: 'error', text1: 'Failed to load wishlist' });

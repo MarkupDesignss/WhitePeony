@@ -21,9 +21,9 @@ export const documentPicker = async () => {
     return result;
   } catch (err) {
     if (DocumentPicker.isCancel(err)) {
-      console.log('User cancelled the picker');
+    
     } else {
-      console.log('Unknown error: ', err);
+    
     }
   }
 }

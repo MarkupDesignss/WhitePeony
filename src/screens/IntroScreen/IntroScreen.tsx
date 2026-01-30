@@ -64,8 +64,7 @@ const IntroScreen = ({ navigation }) => {
         if (currentStep < slides.length - 1) {
             setCurrentStep(currentStep + 1);
         } else {
-            console.log('Intro Finished 🚀');
-            // 👉 Navigate to home or login here
+         
             navigation.replace('BottomTabScreen')
 
         }

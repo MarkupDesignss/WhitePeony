@@ -25,7 +25,7 @@ import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
-import { WishlistContext} from '../../context';
+import { WishlistContext } from '../../context';
 import Toast from 'react-native-toast-message';
 import LinearGradient from 'react-native-linear-gradient';
 import { UserData, UserDataContext } from '../../context/userDataContext';
@@ -40,6 +40,7 @@ const WISHLIST_CARD_WIDTH = Math.round(width * 0.35);
 const GAP = 12;
 const SMALL_HEIGHT = 120;
 const BIG_HEIGHT = SMALL_HEIGHT * 2 + GAP;
+const STICKY_HEADER_HEIGHT = heightPercentageToDP(10);
 
 const HomeScreen1 = ({ navigation }: any) => {
   const { setUserData, isLoggedIn, userType } =
@@ -149,15 +150,9 @@ const HomeScreen1 = ({ navigation }: any) => {
   const getPromotionalBanners = (data: any) => {
     const currentType = getCurrentProductType();
 
-    console.log('Current user type for banners:', currentType);
-    console.log('Raw banner data:', data);
-    console.log('isLoggedIn:', isLoggedIn); // Add this to see login state
-
     // If user is NOT logged in, show only b2c banners
     if (!isLoggedIn) {
-      console.log('User not logged in, showing only b2c banners');
       const b2cBanners = data?.b2c || [];
-      console.log('B2C banners count:', b2cBanners.length);
 
       // Remove duplicates and return b2c banners only
       return removeDuplicateBanners(b2cBanners);
@@ -166,16 +161,10 @@ const HomeScreen1 = ({ navigation }: any) => {
     // If userType is null or undefined (logged in but no specific type),
     // combine both b2c and b2b banners
     if (currentType === null || currentType === undefined) {
-      console.log('User logged in but no specific type, combining all banners');
       const b2cBanners = data?.b2c || [];
       const b2bBanners = data?.b2b || [];
 
-      console.log(
-        'Combining banners - b2c:',
-        b2cBanners.length,
-        'b2b:',
-        b2bBanners.length,
-      );
+
 
       // Combine all banners
       const allBanners = [...b2cBanners, ...b2bBanners];
@@ -183,13 +172,13 @@ const HomeScreen1 = ({ navigation }: any) => {
       // Remove duplicates using multiple criteria
       const uniqueBanners = removeDuplicateBanners(allBanners);
 
-      console.log('Unique banners after deduplication:', uniqueBanners.length);
+
       return uniqueBanners;
     }
 
     // For specific user types (b2c or b2b), just return their banners
     const typeBanners = data?.[currentType] || [];
-    console.log(`${currentType} banners:`, typeBanners.length);
+
 
     // Still deduplicate in case there are duplicates within the same type
     return removeDuplicateBanners(typeBanners);
@@ -264,7 +253,6 @@ const HomeScreen1 = ({ navigation }: any) => {
 
   //     await fetchWishlist();
   //   } catch (error) {
-  //     console.log('Error refreshing data:', error);
   //   } finally {
   //     hideLoader(); // Hide loader once all operations complete
   //   }
@@ -286,7 +274,6 @@ const HomeScreen1 = ({ navigation }: any) => {
 
       await fetchWishlist();
     } catch (error) {
-      console.log('Error refreshing data:', error);
     } finally {
       hideLoader(); // Hide loader once all operations complete
     }
@@ -294,13 +281,12 @@ const HomeScreen1 = ({ navigation }: any) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      console.log('Home screen focused, refreshing data...');
+
 
       // Use silent loading without loader
       loadDataSilently();
 
       return () => {
-        console.log('Home screen unfocused');
       };
     }, [userType, isLoggedIn]),
   );
@@ -321,7 +307,6 @@ const HomeScreen1 = ({ navigation }: any) => {
         await fetchWishlist();
       }
     } catch (error) {
-      console.log('Error loading data silently:', error);
     }
   };
   // Inside your HomeScreen1 component, add these logs:
@@ -332,7 +317,6 @@ const HomeScreen1 = ({ navigation }: any) => {
       return '0';
     }
 
-    console.log(`getFormattedPrice input: "${price}" (type: ${typeof price})`);
 
     try {
       // Convert to string first
@@ -359,9 +343,7 @@ const HomeScreen1 = ({ navigation }: any) => {
       if (priceNum > 0 && priceNum < 10) {
         // Check if this might be a price that's been divided by 10
         const possibleCorrectPrice = priceNum * 10;
-        console.log(
-          `Suspicious low price: ${priceNum}. Might be ${possibleCorrectPrice}?`,
-        );
+
 
         // For now, return the price as is but with better formatting
         return priceNum.toFixed(2).replace(/\.00$/, '');
@@ -374,7 +356,6 @@ const HomeScreen1 = ({ navigation }: any) => {
         return priceNum.toFixed(2); // Decimal price
       }
     } catch (error) {
-      console.log('Price formatting error:', error);
       return '0';
     }
   };
@@ -388,30 +369,10 @@ const HomeScreen1 = ({ navigation }: any) => {
         setApiRecommend(filteredProducts);
       }
     } catch (err) {
-      console.log('recommenderror', err);
     }
   };
   useEffect(() => {
-    console.log('Wishlist Context Detailed Debug:', {
-      isLoggedIn,
-      userType,
-      wishlistItemsCount: wishlistItems?.length || 0,
-      isLoading,
-      sampleItem: wishlistItems?.[0]
-        ? {
-            id: wishlistItems[0]?.id,
-            name: wishlistItems[0]?.name,
-            product_type: wishlistItems[0]?.product_type,
-            front_image: wishlistItems[0]?.front_image,
-            variants: wishlistItems[0]?.variants,
-            // Check all possible properties
-            hasProductProperty: !!wishlistItems[0]?.product,
-            productId: wishlistItems[0]?.product?.id,
-            productName: wishlistItems[0]?.product?.name,
-            productFrontImage: wishlistItems[0]?.product?.front_image,
-          }
-        : null,
-    });
+
   }, [wishlistItems, isLoggedIn, userType, isLoading]);
 
   // update wishlist items depending on login state (server vs local)
@@ -419,16 +380,13 @@ const HomeScreen1 = ({ navigation }: any) => {
   useEffect(() => {
     // The context already handles loading wishlist based on login state
     // No need for local state management
-    console.log('Wishlist items updated:', wishlistItems.length);
+
   }, [wishlistItems]);
 
   // Add this function to get the correct price
   const getCorrectPrice = (item: any) => {
     if (!item) return null;
 
-    console.log('=== PRICE DEBUG ===');
-    console.log('Item:', item?.name || 'Unknown');
-    console.log('Full item structure:', JSON.stringify(item, null, 2));
 
     // Check multiple possible price locations
     const priceSources = [
@@ -475,9 +433,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         priceSource.value !== null &&
         priceSource.value !== ''
       ) {
-        console.log(
-          `Found price in ${priceSource.source}: ${priceSource.value}`,
-        );
+
 
         // Convert to number if it's a string
         let priceValue = priceSource.value;
@@ -487,23 +443,17 @@ const HomeScreen1 = ({ navigation }: any) => {
 
         // Check if price looks suspicious (100 when it should be 225/250)
         if (priceValue === 100) {
-          console.log(
-            'WARNING: Price is 100 - checking if this is correct or should be variant price',
-          );
+
           // Check if there are variants with higher prices
           if (
             item?.variants?.[0]?.actual_price &&
             item.variants[0].actual_price > 100
           ) {
-            console.log(
-              `Found higher variant price: ${item.variants[0].actual_price}, using that instead`,
-            );
+
             return item.variants[0].actual_price;
           }
           if (item?.variants?.[0]?.price && item.variants[0].price > 100) {
-            console.log(
-              `Found higher variant price: ${item.variants[0].price}, using that instead`,
-            );
+
             return item.variants[0].price;
           }
         }
@@ -512,7 +462,7 @@ const HomeScreen1 = ({ navigation }: any) => {
       }
     }
 
-    console.log('No valid price found in any source');
+
     return null;
   };
 
@@ -544,7 +494,7 @@ const HomeScreen1 = ({ navigation }: any) => {
   //       GetCategoryID(defaultId);
   //     }
   //   } catch (err) {
-  //     console.log('error category', err);
+
   //     hideLoader();
   //     setIsLoadingCategory(false);
   //   }
@@ -562,7 +512,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         await GetCategoryIDWithoutLoader(defaultId);
       }
     } catch (err) {
-      console.log('error category', err);
+
     } finally {
       setIsLoadingCategory(false);
     }
@@ -581,7 +531,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         }
       }
     } catch (err) {
-      console.log('error featuredproduct', err);
+
     }
   };
   const OrderListWithoutLoader = async () => {
@@ -593,7 +543,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         setorderitem(filteredOrders);
       }
     } catch (err) {
-      console.log('Order fetch exception:', err);
+
     }
   };
 
@@ -603,17 +553,17 @@ const HomeScreen1 = ({ navigation }: any) => {
       if (res?.status === HttpStatusCode.Ok) {
         const sortedProducts = res?.data?.data || [];
         const filteredProducts = filterProductsByType(sortedProducts);
-        console.log('Heyyyyyyy', filteredProducts);
+
         setlowestitem(filteredProducts);
       } else {
-        console.log('Failed to sort products:', res);
+
         Toast.show({
           type: 'error',
           text1: 'Failed to sort products',
         });
       }
     } catch (err) {
-      console.log('Sorting error:', err);
+
       Toast.show({
         type: 'error',
         text1: 'Failed to sort products',
@@ -629,7 +579,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         setPromotional(banners);
       }
     } catch (err) {
-      console.log('GetHeader error:', err);
+
     }
   };
 
@@ -642,7 +592,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         await addToWishlist(productId);
       }
     } catch (error) {
-      console.log('Wishlist toggle error:', error);
+
       Toast.show({
         type: 'error',
         text1: 'Failed to update wishlist',
@@ -668,7 +618,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         }
       }
     } catch (err) {
-      console.log('error bigsale', err);
+
       setsalesProduct([]);
     }
   };
@@ -684,15 +634,13 @@ const HomeScreen1 = ({ navigation }: any) => {
         await featuredproductWithoutLoader();
       }
     } catch (err) {
-      console.log('error category', err);
+
     } finally {
       setIsLoadingCategory(false);
     }
   };
 
-  {
-    console.log('HEY', wishlistItems);
-  }
+
 
   // Helper function to check if sale is currently active
   const isSaleActive = (startDate: string, endDate: string) => {
@@ -727,9 +675,6 @@ const HomeScreen1 = ({ navigation }: any) => {
     });
   };
 
-  // Call this function when adding/removing from wishlist
-
-  // PromotionalBanner component
   const PromotionalBanner: React.FC<{
     promotional: any[];
     navigation: any;
@@ -740,9 +685,8 @@ const HomeScreen1 = ({ navigation }: any) => {
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${
-              item?.product_id || ''
-            }`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
+              }`}
             style={styles.page}
           >
             <Image
@@ -824,92 +768,82 @@ const HomeScreen1 = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        style={{ backgroundColor: '#FFFFF0' }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            // onRefresh={onRefresh}
-            colors={['#2E2E2E']}
-            tintColor="#2E2E2E"
-          />
-        }
-      >
-        {/* Search Bar */}
-        <TouchableOpacity onPress={() => navigation.navigate('Searchpage')}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              borderColor: '#A7A7A7',
-              borderWidth: 1,
-              borderRadius: 30,
-              height: 50,
-              backgroundColor: '#fff',
-              marginHorizontal: widthPercentageToDP(3),
-            }}
+      <View style={{ flex: 1, backgroundColor: '#FFFFF0' }}>
+
+        {/* ================= STICKY HEADER ================= */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            backgroundColor: '#FFFFF0',
+          }}
+        >
+          {/* ========= SEARCH BAR ========= */}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('Searchpage')}
           >
-            <Image
-              source={require('../../assets/Searchx.png')}
-              style={{
-                width: 20,
-                height: 20,
-                resizeMode: 'contain',
-                marginLeft: 10,
-                alignSelf: 'center',
-              }}
-            />
-            <Text
-              style={{
-                alignSelf: 'center',
-                color: '#A7A7A7',
-                fontSize: 16,
-                flex: 1,
-                marginLeft: 10,
-              }}
-            >
-              Search "Products"
-            </Text>
             <View
               style={{
-                borderWidth: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
                 borderColor: '#A7A7A7',
-                marginVertical: 8,
-                right: 10,
+                borderWidth: 1,
+                borderRadius: 30,
+                height: 50,
+                backgroundColor: '#fff',
+                marginHorizontal: widthPercentageToDP(3),
+                paddingHorizontal: 12,
               }}
-            />
-            <Image
-              source={require('../../assets/micx.png')}
-              style={{
-                width: 20,
-                height: 20,
-                resizeMode: 'contain',
-                marginRight: 10,
-                alignSelf: 'center',
-              }}
-            />
-          </View>
-        </TouchableOpacity>
+            >
+              <Image
+                source={require('../../assets/Searchx.png')}
+                style={{ width: 20, height: 20 }}
+              />
 
-        <View style={{ backgroundColor: '#fff', flex: 1 }}>
-          {/* Categories Horizontal List */}
-          <View
-            style={{
-              paddingVertical: heightPercentageToDP(2),
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: widthPercentageToDP(3),
-              backgroundColor: '#FFFFF0',
-            }}
-          >
+              <Text
+                style={{
+                  flex: 1,
+                  marginLeft: 10,
+                  fontSize: 16,
+                  color: '#A7A7A7',
+                }}
+              >
+                Search "Products"
+              </Text>
+
+              <View
+                style={{
+                  width: 1,
+                  height: 24,
+                  backgroundColor: '#A7A7A7',
+                  marginHorizontal: 10,
+                }}
+              />
+
+              <Image
+                source={require('../../assets/micx.png')}
+                style={{ width: 20, height: 20 }}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {/* ========= CATEGORIES ========= */}
+          <View style={{ marginTop: heightPercentageToDP(2) }}>
             <FlatList
               data={category}
               horizontal
               showsHorizontalScrollIndicator={false}
               keyExtractor={item => String(item.id)}
+              contentContainerStyle={{
+                paddingHorizontal: widthPercentageToDP(3),
+              }}
               renderItem={({ item }) => {
-                const isActive = item?.id === selectedCategoryId;
+                const isActive = item.id === selectedCategoryId;
+
                 return (
                   <TouchableOpacity
                     onPress={() => {
@@ -919,28 +853,28 @@ const HomeScreen1 = ({ navigation }: any) => {
                     style={{ alignItems: 'center', marginHorizontal: 10 }}
                   >
                     <Image
-                      source={{ uri: Image_url + item?.icon }}
+                      source={{ uri: Image_url + item.icon }}
                       style={{
                         width: 25,
                         height: 25,
-                        resizeMode: 'cover',
                         opacity: isActive ? 1 : 0.35,
-                        transform: [{ scale: isActive ? 1.05 : 1 }],
                       }}
                     />
+
                     <Text
                       style={{
-                        fontWeight: '700',
                         fontSize: 12,
-                        marginTop: heightPercentageToDP(1),
+                        fontWeight: '700',
+                        marginTop: 6,
                         color: isActive ? '#000' : '#A7A7A7',
                       }}
                     >
-                      {item?.name}
+                      {item.name}
                     </Text>
+
                     <View
                       style={{
-                        marginTop: 6,
+                        marginTop: 4,
                         height: 3,
                         width: 30,
                         borderRadius: 4,
@@ -952,18 +886,37 @@ const HomeScreen1 = ({ navigation }: any) => {
               }}
             />
           </View>
+
+          {/* ========= UNDERLINE / BORDER ========= */}
           <View
             style={{
-              borderWidth: 0.7,
-              borderColor: '#A7A7A7',
-              width: widthPercentageToDP(111),
-              paddingHorizontal: 0,
-              marginTop: heightPercentageToDP(-2.2),
+              borderWidth: 0.5,
+              borderColor: 'lightgrey',
+              width: '100%',
+              marginBottom:6
             }}
           />
-          {/* Categories Grid */}
-          {/* Categories Grid */}
-          // Update the Categories Grid section with this code:
+        </View>
+      </View>
+
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+
+        contentContainerStyle={{
+          paddingTop: 140,
+        }}
+
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            colors={['#2E2E2E']}
+            tintColor="#2E2E2E"
+          />
+        }
+      >
+
+        <View style={{ backgroundColor: '#fff', flex: 1, }}>
           {isLoadingCategory ? (
             <View style={styles.container}>
               <View style={[styles.row, { justifyContent: 'center' }]}>
@@ -1594,7 +1547,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                     if (!product)
                       return { discountedPrice: null, originalPrice: null };
 
-                    console.log('Price info for:', product?.name);
+
 
                     // Get the discounted price (actual_price)
                     let discountedPrice = null;
@@ -1603,10 +1556,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                       product?.variants?.[0]?.actual_price !== null
                     ) {
                       discountedPrice = product.variants[0].actual_price;
-                      console.log(
-                        '  Discounted price (actual_price):',
-                        discountedPrice,
-                      );
+
                     }
 
                     // Get the original price (price)
@@ -1616,7 +1566,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                       product?.variants?.[0]?.price !== null
                     ) {
                       originalPrice = product.variants[0].price;
-                      console.log('  Original price (price):', originalPrice);
+
                     }
 
                     // If no discounted price but we have main_price, use that as original
@@ -1626,10 +1576,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                       product?.main_price
                     ) {
                       originalPrice = product.main_price;
-                      console.log(
-                        '  Using main_price as original:',
-                        originalPrice,
-                      );
+
                     }
 
                     // If we have discounted price but no original, use main_price as original
@@ -1639,10 +1586,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                       product?.main_price
                     ) {
                       originalPrice = product.main_price;
-                      console.log(
-                        '  Using main_price as original for discounted item:',
-                        originalPrice,
-                      );
+
                     }
 
                     return { discountedPrice, originalPrice };
@@ -1664,7 +1608,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                       }
                       return priceNum.toFixed(2);
                     } catch (error) {
-                      console.log('Price formatting error:', error);
+
                       return '';
                     }
                   };
@@ -1674,15 +1618,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                   const displayOriginalPrice =
                     formatPriceForDisplay(originalPrice);
 
-                  console.log('Final prices for display:', {
-                    name: item.name,
-                    discounted: displayDiscountedPrice,
-                    original: displayOriginalPrice,
-                    hasDiscount:
-                      discountedPrice &&
-                      originalPrice &&
-                      discountedPrice !== originalPrice,
-                  });
+
 
                   return (
                     <TouchableOpacity
@@ -1733,7 +1669,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                               {/* Show original price crossed out if different from discounted */}
                               {displayOriginalPrice &&
                                 displayOriginalPrice !==
-                                  displayDiscountedPrice && (
+                                displayDiscountedPrice && (
                                   <Text
                                     style={[
                                       styles.smallOldPrice,
@@ -1745,20 +1681,20 @@ const HomeScreen1 = ({ navigation }: any) => {
                                 )}
                             </>
                           ) : /* Show only original price if no discount */
-                          displayOriginalPrice ? (
-                            <Text
-                              style={[
-                                styles.smallPrice,
-                                { color: '#2E2E2E', fontWeight: '700' },
-                              ]}
-                            >
-                              {displayOriginalPrice} €
-                            </Text>
-                          ) : (
-                            <Text style={{ fontSize: 12, color: '#666' }}>
-                              Price not available
-                            </Text>
-                          )}
+                            displayOriginalPrice ? (
+                              <Text
+                                style={[
+                                  styles.smallPrice,
+                                  { color: '#2E2E2E', fontWeight: '700' },
+                                ]}
+                              >
+                                {displayOriginalPrice} €
+                              </Text>
+                            ) : (
+                              <Text style={{ fontSize: 12, color: '#666' }}>
+                                Price not available
+                              </Text>
+                            )}
                         </View>
 
                         <View
@@ -1890,7 +1826,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                 }}
                 contentContainerStyle={{ paddingVertical: 8 }}
                 renderItem={({ item, index }) => {
-                  console.log(`Rendering wishlist item ${index}:`, item);
 
                   if (!item) return null;
 
@@ -2014,7 +1949,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                           activeOpacity={0.8}
                           onPress={async e => {
                             e.stopPropagation();
-                            console.log('Toggling wishlist for:', productId);
+
                             await toggleWishlist(productId);
                           }}
                           style={{
@@ -2228,7 +2163,7 @@ export default HomeScreen1;
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 20,
+    paddingVertical: 10,
     paddingHorizontal: widthPercentageToDP(3),
     backgroundColor: '#FFFFF0',
   },
@@ -2363,7 +2298,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginVertical: heightPercentageToDP(1),
-    fontFamily:"REDHATDISPLAY-ITALIC"
+    fontFamily: "REDHATDISPLAY-ITALIC"
   },
 
   freqCard: {

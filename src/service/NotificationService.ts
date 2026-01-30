@@ -26,10 +26,10 @@ class NotificationService {
             authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
         if (enabled) {
-            console.log('Notification permission enabled');
+    
             await this.getFCMToken();
         } else {
-            console.log('Notification permission not granted');
+        
         }
     }
 
@@ -38,24 +38,24 @@ class NotificationService {
             const fcmToken = await messaging().getToken();
             if (fcmToken) {
                 LocalStorage.save("fcmtoken", fcmToken)
-                console.log('FCM Token:', fcmToken)
+               
                 // You can save this token to your backend server here
             }
         } catch (error) {
-            console.log('Error fetching FCM token:', error);
+           
         }
     }
 
     listenToForegroundMessages() {
         return messaging().onMessage(async remoteMessage => {
-            console.log('Foreground Notification:', remoteMessage);
+           
             Alert.alert(remoteMessage.notification?.title || "New Message", remoteMessage.notification?.body || '');
         });
     }
 
     listenToBackgroundMessages() {
         messaging().setBackgroundMessageHandler(async remoteMessage => {
-            console.log('Background Notification:', remoteMessage);
+         
             await notifee.displayNotification({
                 title: remoteMessage.notification?.title || '📩 New Message',
                 body: remoteMessage.notification?.body || 'You have a new notification',
@@ -71,7 +71,7 @@ class NotificationService {
         });
 
         messaging().onNotificationOpenedApp(remoteMessage => {
-            console.log('App opened from background state:', remoteMessage);
+        
             // You can navigate based on notification data here
         });
 
@@ -89,11 +89,11 @@ export default new NotificationService();
 
 export const handleNotifeeBackgroundEvent = async () => {
     notifee.onBackgroundEvent(async ({ type, detail }) => {
-        console.log('[Notifee Background Event]', type, detail);
+    
 
         if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'reply') {
             // Handle quick reply or custom actions
-            console.log('User pressed a notification action:', detail.pressAction.id);
+          
         }
     });
 };

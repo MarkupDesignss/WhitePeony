@@ -32,12 +32,12 @@ const EditProfile = ({ navigation, route }) => {
         const GetProfile = res?.data?.user || {};
 
         setUserData(GetProfile)
-        console.log(GetProfile)
+       
       } catch (e) {
         hideLoader();
         const error = e as any;
         if (error.status === 401) {
-          console.log('Unauthorized access - perhaps token expired');
+         
         }
         else {
           Toast.show({ type: 'error', text1: 'Failed to load profile' });
@@ -134,7 +134,6 @@ const EditProfile = ({ navigation, route }) => {
     };
 
     const hasPermission = await requestPermissions();
-    // console.log('hasPermission', hasPermission);
     if (!hasPermission) {
       Alert.alert(
         'Permissions Required',
@@ -156,8 +155,7 @@ const EditProfile = ({ navigation, route }) => {
                   return resolve(null);
                 resolve(response.assets?.[0]);
                 setProfileImage(response.assets?.[0].uri || null);
-                console.log("response", response.assets?.[0].uri)
-
+              
               });
             },
           },
@@ -169,7 +167,7 @@ const EditProfile = ({ navigation, route }) => {
                   return resolve(null);
                 resolve(response.assets?.[0]);
                 setProfileImage(response.assets?.[0].uri || null);
-                console.log("response", response.assets?.[0].uri)
+ 
               });
             },
           },
@@ -229,7 +227,6 @@ const EditProfile = ({ navigation, route }) => {
               type: 'success',
               text1: res?.data?.message,
             });
-            console.log("profile", res.data)
             Toast.show({ type: 'success', text1: res?.data?.message });
             await LocalStorage.save('@user', res.data?.user);
             setUserData(res.data?.user);
@@ -243,7 +240,6 @@ const EditProfile = ({ navigation, route }) => {
         })
         .catch(err => {
           hideLoader();
-          console.log('Error in verify:', err);
           Toast.show({
             type: 'error',
             text1: err.response?.data?.message,
@@ -297,7 +293,7 @@ const EditProfile = ({ navigation, route }) => {
             validationSchema={profileSchema}
             onSubmit={values => {
               updateProfile(values);
-              console.log(values);
+           
             }}
           >
             {({ handleChange, handleBlur, handleSubmit, setFieldValue, values, errors, touched }) => (

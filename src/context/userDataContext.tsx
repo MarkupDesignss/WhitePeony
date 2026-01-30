@@ -44,8 +44,6 @@ const UserDataContextProvider: FC<Props> = ({ children }) => {
       let user = await LocalStorage.read('@user');
       let userTypeFromStorage = await LocalStorage.read('@userType');
 
-      console.log('Storage values:', { val, user, userTypeFromStorage });
-
       setUserData(user || null);
       setIsLoggedIn(val || null);
 

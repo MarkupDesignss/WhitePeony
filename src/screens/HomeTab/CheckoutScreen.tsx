@@ -152,7 +152,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   // Add useEffect to sync when cart context changes
   useEffect(() => {
     const syncCart = async () => {
-      console.log('Cart context changed, syncing checkout...');
       await GetCartDetails();
     };
     syncCart();
@@ -167,9 +166,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       } catch (e) {
         const error = e as any;
         if (error.status === 401) {
-          console.log('Unauthorized access - perhaps token expired');
         } else {
-          console.log('error fetching wishlist', error);
         }
       }
     };
@@ -190,7 +187,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const UpdateCart = async (item: CartItem, change: number) => {
-    console.log('UpdateCart called with item:', item, 'change:', change);
     showLoader();
     try {
       const currentQty = Number(item.quantity);
@@ -208,8 +204,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         variant_id: item.variant_id || item.variants?.[0]?.variant_id || null,
       };
 
-      console.log('UpdateCart payload:', payload);
-
       const res = await UserService.UpdateCart(payload);
       hideLoader();
 
@@ -218,14 +212,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           type: 'success',
           text1: res.data?.message || 'Cart updated!',
         });
-        console.log('UpdateCart response:', res?.data);
         await GetCartDetails(); // Refresh cart after update
       } else {
-        console.log('errcheckout', res?.data);
         Toast.show({ type: 'error', text1: 'Failed to update cart' });
       }
     } catch (err: any) {
-      console.log('errcheckout', JSON.stringify(err));
       hideLoader();
       Toast.show({
         type: 'error',
@@ -236,12 +227,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     }
   };
   const renderRightActions = (item: CartItem) => {
-    console.log('DEBUG - Item structure for removal:', {
-      product_id: item.product_id,
-      variant_id: item.variant_id,
-      variants: item.variants,
-      fullItem: JSON.stringify(item, null, 2),
-    });
+ 
 
     return (
       <TouchableOpacity
@@ -258,32 +244,20 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             // Check different possible locations for variant_id
             if (item.variant_id !== undefined && item.variant_id !== null) {
               variantId = parseInt(String(item.variant_id), 10);
-              console.log(
-                'DEBUG - Found variant_id in item.variant_id:',
-                variantId,
-              );
+              
             }
             // Check variants[0].variant_id
             else if (item.variants?.[0]?.variant_id) {
               variantId = parseInt(String(item.variants[0].variant_id), 10);
-              console.log(
-                'DEBUG - Found variant_id in variants[0].variant_id:',
-                variantId,
-              );
+             
             }
             // Check variants[0].id (sometimes it's just 'id')
             else if (item.variants?.[0]?.id) {
               variantId = parseInt(String(item.variants[0].id), 10);
-              console.log(
-                'DEBUG - Found variant_id in variants[0].id:',
-                variantId,
-              );
+              
             }
 
-            console.log('DEBUG - Final extracted IDs:', {
-              productId,
-              variantId,
-            });
+            
 
             if (isNaN(productId)) {
               console.error('ERROR - Invalid productId:', productId);
@@ -293,12 +267,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
             await removeFromCart(productId, variantId);
           } catch (err: any) {
-            console.log('DEBUG - Remove button error details:', {
-              message: err.message,
-              response: err.response?.data,
-              status: err.response?.status,
-              stack: err.stack,
-            });
+           
             Toast.show({
               type: 'error',
               text1: 'Failed to remove item',
@@ -618,16 +587,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         setApiCartData(processedCartData);
         setcartid(processedCartData?.id);
 
-        console.log('Cart prices calculated:', {
-          discountedTotal,
-          originalTotal,
-          totalSavings,
-        });
       } else {
         setApiCartData({ items: [], total_amount: 0, id: null });
       }
     } catch (err: any) {
-      console.log('GetCartDetails error', JSON.stringify(err));
       Toast.show({
         type: 'error',
         text1: err?.response?.data?.message || 'Failed to fetch cart',
@@ -649,7 +612,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
       setPromoOptions(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.log('GetPromo', err);
       Toast.show({ type: 'error', text1: 'Failed to fetch coupons' });
       setPromoOptions([]);
     } finally {
@@ -673,11 +635,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         if (firstActive) setSelectedShippingId(Number(firstActive.id));
         return options;
       } else {
-        console.log('Getshiping response', res?.data);
         return [];
       }
     } catch (err) {
-      console.log('Getshiping error', err);
       return [];
     } finally {
       setIsFetchingShipping(false);
@@ -710,7 +670,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         (res.status === HttpStatusCode.Ok || res.status === 200)
       ) {
         setShippingModalVisible(false);
-        console.log('PlaceOrder success', res?.data);
 
         if (res.data.payment_url) {
           setPaymentUrl(res.data.payment_url);
@@ -720,11 +679,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           navigation.goBack();
         }
       } else {
-        console.log('PlaceOrder error', res?.data);
         Toast.show({ type: 'error', text1: 'Failed to place order' });
       }
     } catch (err: any) {
-      console.log('PlaceOrder error', JSON.stringify(err));
       Toast.show({
         type: 'error',
         text1: err?.response?.data?.message || 'Failed to place order',
@@ -988,12 +945,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                         return (
                           <TouchableOpacity
                             onPress={() => {
-                              console.log('Selected coupon:', {
-                                code: item.coupon_code,
-                                type: item.discount_type,
-                                discount: item.discount_value,
-                                max_discount: item.max_discount
-                              });
+                             
 
                               setSelectedPromoCode({
                                 code: item.coupon_code,  // Your API uses "coupon_code"
@@ -1486,7 +1438,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             style={{ flex: 1 }}
             source={{ uri: paymentUrl }}
             onNavigationStateChange={navState => {
-              console.log('thankyuu', navState.url);
               if (navState.url.includes('payment-success')) {
                 setTimeout(() => {
                   setShowWebView(false);

@@ -68,7 +68,6 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
         showSlowInternetToast(lastToastTime);
       }
     } catch (err) {
-      console.log('Network check error:', err);
       setIsOffline(true);
     }
   };

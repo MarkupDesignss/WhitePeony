@@ -119,11 +119,9 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         }
       }
 
-      // 🔍 FULL API RESPONSE
-      console.log('🔴 RAW API RESPONSE:', response?.data);
-
+  
       const payload = response?.data?.data ?? response?.data ?? response ?? [];
-      console.log('🟡 PAYLOAD:', payload);
+
 
       const productsArray = Array.isArray(payload)
         ? payload
@@ -131,12 +129,11 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
 
       // 🔵 FIRST PRODUCT (MOST IMPORTANT)
       if (productsArray.length > 0) {
-        console.log('🟢 FIRST PRODUCT:', productsArray[0]);
+       
       }
 
       setApiProducts(productsArray); // ✅ IMPORTANT
     } catch (error) {
-      console.log('❌ fetchProducts error:', error);
     } finally {
       hideLoader();
     }
@@ -167,14 +164,12 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     const productId = item?.id ?? item?.product_id;
     const variantId = item?.variants?.[0]?.id ?? item?.variant_id ?? null;
     if (!productId) {
-      console.log('handleAddToCart: missing product id', item);
       return;
     }
     try {
       await addToCart(Number(productId), variantId);
       // no optimistic update here; cart effect will re-run and update is_cart
     } catch (e) {
-      console.log('addToCart failed', e);
     }
   };
 
@@ -199,23 +194,19 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           };
         });
 
-        console.log(
-          'ApiSorting -> setting products',
-          updatedProducts.length,
-          updatedProducts[0],
-        );
+     
         setApiProducts(updatedProducts);
         setSortVisible(false); // Close the sorting modal
         Toast.show({ type: 'success', text1: 'Products sorted successfully' });
       } else {
-        console.log('Failed to sort products:', res);
+       
         Toast.show({
           type: 'error',
           text1: 'Failed to sort products',
         });
       }
     } catch (err) {
-      console.log('Sorting error:', err);
+      
       Toast.show({
         type: 'error',
         text1: 'Failed to sort products',

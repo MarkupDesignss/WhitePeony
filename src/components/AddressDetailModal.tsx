@@ -122,7 +122,6 @@ const AddressDetailModal = ({
   ];
 
   useEffect(() => {
-    console.log('Editing address:', addresses);
     if (addresses) {
       setFormData({
         name: addresses.name || '',
@@ -159,7 +158,6 @@ const AddressDetailModal = ({
     let mounted = true;
 
     if (isVisible && onModalOpen && mounted) {
-      console.log('Modal opened, calling onModalOpen');
       onModalOpen();
     }
 
@@ -178,7 +176,6 @@ const AddressDetailModal = ({
   const handleSubmit = async () => {
     // Prevent double submission
     if (isSubmitting) {
-      console.log('Submission already in progress, ignoring duplicate call');
       return;
     }
 
@@ -203,12 +200,7 @@ const AddressDetailModal = ({
         postal_code: formData.zip,
       };
 
-      console.log(
-        'Submitting address:',
-        addresses?.id ? 'UPDATE' : 'CREATE',
-        payload,
-      );
-
+   
       let res;
 
       if (addresses?.id) {
@@ -234,7 +226,6 @@ const AddressDetailModal = ({
       }
     } catch (err) {
       hideLoader();
-      console.log('Error in handleSubmit:', err);
       Toast.show({
         type: 'error',
         text1:

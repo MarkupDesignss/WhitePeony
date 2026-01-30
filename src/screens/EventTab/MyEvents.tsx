@@ -35,7 +35,7 @@ const MyEventsScreen = ({ navigation }) => {
             const res = await UserService.eventsListing();
             if (res && res.data && res.status === HttpStatusCode.Ok) {
                 hideLoader();
-                console.log("'logsss", res.data);
+              
                 const apiOrders = Array.isArray(res?.data?.registered_events)
                     ? res.data.registered_events
                     : [];
@@ -43,12 +43,12 @@ const MyEventsScreen = ({ navigation }) => {
                 setEvents(apiOrders);
             } else {
                 hideLoader();
-                console.log('error', res?.data);
+       
                 // handle non-OK response if needed
             }
         } catch (err) {
             hideLoader();
-            console.log('error', err);
+          
             // handle network/error
         }
     };
@@ -81,19 +81,18 @@ const MyEventsScreen = ({ navigation }) => {
             const res = await UserService.eventscancel(id);
             if (res && res.data && res.status === HttpStatusCode.Ok) {
                 hideLoader();
-                console.log("'logsss", res.data);
                 setEvents(events.filter(e => e.id !== id));
                 // const apiOrders = Array.isArray(res?.data?.registered_events) ? res.data.registered_events : [];
 
                 // setEvents(apiOrders)
             } else {
                 hideLoader();
-                console.log('error', res?.data);
+             
                 // handle non-OK response if needed
             }
         } catch (err) {
             hideLoader();
-            console.log('error', JSON.stringify(err));
+    
             // handle network/error
         }
     };

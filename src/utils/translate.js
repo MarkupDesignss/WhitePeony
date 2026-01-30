@@ -28,7 +28,6 @@ export const translateText = async (text, targetLang = "es") => {
     cache.set(cacheKey, translated);
     return translated; // translated text
   } catch (error) {
-    console.log("Translation error:", error);
     return text; // fallback original text
   }
 };

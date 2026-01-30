@@ -177,7 +177,7 @@ const NotificationScreen = ({ navigation }) => {
             hideLoader();
             if (res?.status === HttpStatusCode.Ok && res?.data) {
                 const { message, data } = res.data;
-                console.log('NotoficationList data:', res.data);
+              
                 Toast.show({ type: 'success', text1: message });
             } else {
                 Toast.show({
@@ -187,7 +187,7 @@ const NotificationScreen = ({ navigation }) => {
             }
         } catch (err: any) {
             hideLoader();
-            console.log('Error in DeleteAcc:', JSON.stringify(err));
+           
             Toast.show({
                 type: 'error',
                 text1:
@@ -204,7 +204,7 @@ const NotificationScreen = ({ navigation }) => {
             hideLoader();
             if (res?.status === HttpStatusCode.Ok && res?.data) {
                 const { message, data } = res.data;
-                console.log('NotoficationRead data:', res.data);
+              
                 Toast.show({ type: 'success', text1: message });
             } else {
                 Toast.show({
@@ -214,7 +214,7 @@ const NotificationScreen = ({ navigation }) => {
             }
         } catch (err: any) {
             hideLoader();
-            console.log('Error in NotoficationRead:', JSON.stringify(err));
+           
             Toast.show({
                 type: 'error',
                 text1:
