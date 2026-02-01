@@ -35,7 +35,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import Video from 'react-native-video';
 import LoginModal from '../../components/LoginModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+// Add these imports
+import { useAppSelector } from '../../hooks/useAppSelector';
+import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import { convertAndFormatPrice } from '../../utils/currencyUtils';
 const wp = widthPercentageToDP;
 const hp = heightPercentageToDP;
 const HERO_HEIGHT = hp(28); // ✅ recommended
@@ -54,6 +57,20 @@ type ProductDetailsProps = {
 };
 
 const ProductDetails = ({ route }: ProductDetailsProps) => {
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency
+  );
+
+  // Fetch rates with caching
+  const { data: rates } = useGetRatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnReconnect: true,
+  });
+
+  // Price display helper
+  const displayPrices = (priceEUR: any): string => {
+    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+  };
   const { addToCart, cart, isLoggedIn } = useCart(); // ✅ hook at top
   const { productId: proDuctID } = route.params;
   const navigation = useNavigation<any>();
@@ -590,7 +607,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             decelerationRate="fast"
             disableIntervalMomentum
             contentContainerStyle={{
-              
+
             }}
             keyExtractor={(_, i) => String(i)}
             getItemLayout={(_, index) => ({
@@ -716,7 +733,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             </Text>
           </Text>
         </View>
-        <Text style={styles.price}>{Math.round(actualPrice)}€ </Text>
+        <Text style={styles.price}>{displayPrices(actualPrice)} </Text>
         {actualPrice !== displayPrice && (
           <Text
             style={{
@@ -726,7 +743,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
               color: '#999',
             }}
           >
-            {Math.round(displayPrice)}€{' '}
+            {displayPrices(displayPrice)}
           </Text>
         )}
         <View style={{ marginTop: heightPercentageToDP(2) }}>
@@ -1341,7 +1358,7 @@ const styles = StyleSheet.create({
     height: HERO_HEIGHT,
     marginTop: 10,
     position: 'relative',
-    
+
   },
 
   dotsContainer: {

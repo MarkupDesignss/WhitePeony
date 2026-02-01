@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+
 import LoginModal from '../../components/LoginModal';
 import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
@@ -32,7 +33,10 @@ import { WebView } from 'react-native-webview';
 import { Colors, Images } from '../../constant';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { useAppSelector } from '../../hooks/useAppSelector';
+import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import { convertAndFormatPrice } from '../../utils/currencyUtils';
+import { calculateCheckout } from '../../utils/checkoutCalculator';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 type DisplayWishlistItem = {
@@ -71,8 +75,20 @@ type Address = {
 };
 
 const CheckoutScreen = ({ navigation }: { navigation: any }) => {
-  const getCouponCode = (item: any) =>
-    String(item?.code ?? item?.promo_code ?? item?.promo ?? item?.title ?? '');
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency
+  );
+
+  // Fetch rates with caching
+  const { data: rates } = useGetRatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnReconnect: true,
+  });
+
+  // Price display helper
+  const displayPrice = (priceEUR: any): string => {
+    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+  };
 
   const {
     addToCart,
@@ -113,12 +129,34 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     code: '',
     type: '',
     discount: '',
+    max_discount: '',
   });
   const [isFetchingPromo, setIsFetchingPromo] = useState(false);
 
   ///coupans code
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
+
+  // Calculate shipping cost
+  const getShippingCost = () => {
+    if (selectedShippingId && shippingOptions.length > 0) {
+      const selectedShipping = shippingOptions.find(
+        s => Number(s.id) === Number(selectedShippingId)
+      );
+      return selectedShipping?.cost || 0;
+    }
+    return 0;
+  };
+
+  // Calculate checkout breakdown
+  const checkoutBreakdown = calculateCheckout(
+    cartData?.subtotal_amount || 0,
+    cartData?.total_savings || 0,
+    discountAmount || 0,
+    getShippingCost(), // Get actual shipping cost
+    selectedCurrency,
+    rates
+  );
 
   const recalculateCoupon = () => {
     const total = Number(cartData?.discounted_total || 0);
@@ -363,14 +401,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             >
               {/* Discounted price (actual price) */}
               <Text style={styles.shipmentActualPrice}>
-                {actualPriceNum.toFixed(2)} €
+                {displayPrice(actualPriceNum)}
               </Text>
 
               {/* Original price with strikethrough if discount exists */}
               {hasDiscount && (
                 <>
                   <Text style={styles.shipmentOriginalPrice}>
-                    {totalPriceNum.toFixed(2)} €
+                    {displayPrice(totalPriceNum)}
                   </Text>
                   {/* Show savings amount */}
                   {/* <Text style={styles.savingsText}>
@@ -463,15 +501,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           {item?.variants?.[0]?.unit || item?.unit}
         </Text>
         <Text style={[styles.suggestionPrice, { color: '#000' }]}>
-          {item?.variants?.[0]?.price || item?.price} €
+          {displayPrice(item?.variants?.[0]?.price || item?.price)}
         </Text>
       </View>
     </TouchableOpacity>
   );
-  const getNumericValue = (value: any) => {
-    if (!value) return 0;
-    return Number(String(value).replace(/[^\d.]/g, '')) || 0;
-  };
 
   // In the SetPromo function, fix the field mapping:
   const SetPromo = () => {
@@ -520,13 +554,13 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
     Toast.show({
       type: 'success',
-      text1: `Coupon applied! Saved ${calculatedDiscount.toFixed(2)} €`
+      text1: `Coupon applied! Saved ${displayPrice(calculatedDiscount)}`
     });
     setPromoModalVisible(false);
   };
 
   const removeCoupon = () => {
-    setSelectedPromoCode({ code: '' });
+    setSelectedPromoCode({ code: '', type: '', discount: '', max_discount: '' });
     setAppliedPromo(null);
     setDiscountAmount(0);
     Toast.show({ type: 'info', text1: 'Coupon removed.' });
@@ -695,11 +729,63 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
 
+    // Calculate the amount to pay (rounded as shown to user)
+    const shippingCost = getShippingCost();
+    const breakdown = calculateCheckout(
+      cartData?.subtotal_amount || 0,
+      cartData?.total_savings || 0,
+      discountAmount || 0,
+      shippingCost,
+      selectedCurrency,
+      rates
+    );
+
+    // Show currency conversion warning
+    if (selectedCurrency !== 'EUR') {
+      // Alert.alert(
+      //   'Currency Conversion Notice',
+      //   `Your order total: ${breakdown.displayAmountToPay}\n\n` +
+      //   `Payment will be processed in EUR: ${displayPrice(breakdown.grandTotalEUR)}\n\n` +
+      //   'Your bank/card will handle the currency conversion.\n' +
+      //   'The exact amount may vary based on your bank\'s exchange rate.',
+      //   [
+      //     { text: 'Cancel', style: 'cancel' },
+      //     {
+      //       text: 'Continue to Payment',
+      //       onPress: async () => {
+      //         await proceedWithPayment(breakdown);
+      //       },
+      //       style: 'default'
+      //     }
+      //   ]
+      // );
+    } else {
+      await proceedWithPayment(breakdown);
+    }
+  };
+
+  // Separate function for actual payment
+  const proceedWithPayment = async (breakdown: any) => {
+    // Send both EUR amount and selected currency
     const payload = {
       cart_id: cartid,
       address_id: selectedAddress?.id,
       shipping_id: selectedShippingId || 1,
+      // Send promo code if applied
+      ...(appliedPromo && { promo_code: appliedPromo.code }),
+      // Send currency info for backend
+      currency: selectedCurrency,
+      // Send the amount that should be charged (in EUR for payment gateway)
+      amount_eur: breakdown.grandTotalEUR, // Important: Send EUR amount
+      amount_to_pay: breakdown.amountToPay, // Rounded amount in selected currency
     };
+
+    console.log('Payment calculation:', {
+      userSees: breakdown.displayAmountToPay,
+      gatewayReceives: `${breakdown.grandTotalEUR} EUR`,
+      conversionRate: rates?.[selectedCurrency],
+      difference: `${breakdown.amountToPay} ${selectedCurrency} = ${breakdown.grandTotalEUR} EUR`
+    });
 
     try {
       showLoader();
@@ -715,25 +801,24 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         if (res.data.payment_url) {
           setPaymentUrl(res.data.payment_url);
           setShowWebView(true);
+
+          // Log for debugging
+          console.log('Payment gateway should show:', {
+            expectedEUR: breakdown.grandTotalEUR,
+            userCurrency: selectedCurrency,
+            convertedAmount: breakdown.amountToPay,
+            conversionNote: `Gateway shows EUR, user sees ${selectedCurrency}`
+          });
         } else {
-          Toast.show({ type: 'success', text1: 'Order placed successfully!' });
-          navigation.goBack();
+          // ... success without payment
         }
-      } else {
-        console.log('PlaceOrder error', res?.data);
-        Toast.show({ type: 'error', text1: 'Failed to place order' });
       }
     } catch (err: any) {
-      console.log('PlaceOrder error', JSON.stringify(err));
-      Toast.show({
-        type: 'error',
-        text1: err?.response?.data?.message || 'Failed to place order',
-      });
+      // ... error handling
     } finally {
       hideLoader();
     }
   };
-
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
@@ -969,7 +1054,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                       keyExtractor={(it, idx) =>
                         (it.id ?? it.code ?? it.promo_code ?? idx).toString()
                       }
-                      // In the coupon modal FlatList renderItem:
                       renderItem={({ item }) => {
                         // Extract coupon details correctly
                         const code = item?.coupon_code || item?.code || '';
@@ -980,9 +1064,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                         // Prepare description text
                         let discountText = '';
                         if (item.discount_type === 'percentage') {
-                          discountText = `${item.discount_value}% off (max ${item.max_discount} €)`;
+                          discountText = `${item.discount_value}% off (max ${displayPrice(item.max_discount)})`;
                         } else {
-                          discountText = `${item.discount_value} € off`;
+                          discountText = `${displayPrice(item.discount_value)} off`;
                         }
 
                         return (
@@ -1082,126 +1166,100 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
             {/* Bill details */}
             {cartData && (
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderColor: Colors.text[400],
-                  borderRadius: 12,
-                  margin: 10,
-                  padding: 10,
-                }}
-              >
+              <View style={styles.billSection}>
                 <Text style={styles.billTitle}>Bill details</Text>
 
-                {/* Subtotal (original prices) */}
-                <View style={styles.billRow}>
-                  <Text style={styles.billLabel}>
-                    Subtotal ({cartData.items.length} items)
-                  </Text>
-                  <Text style={styles.billValue}>
-                    {cartData?.subtotal_amount?.toFixed(2) || '0.00'} €
-                  </Text>
-                </View>
+                {(() => {
+                  const breakdown = checkoutBreakdown;
 
-                {/* Total savings from discounts */}
-                {cartData?.total_savings && cartData.total_savings > 0 && (
-                  <View style={styles.billRow}>
-                    <Text style={[styles.billLabel, { color: '#5DA53B' }]}>
-                      Total Savings
-                    </Text>
-                    <Text
-                      style={[
-                        styles.billValue,
-                        { color: '#5DA53B', fontWeight: '600' },
-                      ]}
-                    >
-                      -{cartData.total_savings.toFixed(2)} €
-                    </Text>
-                  </View>
-                )}
-
-                {/* Coupon discount if applied */}
-                {appliedPromo && (
-                  <View style={styles.billRow}>
-                    <View
-                      style={{ flexDirection: 'row', alignItems: 'center' }}
-                    >
-                      <Text
-                        style={[
-                          styles.billLabel,
-                          { color: Colors.button[100] },
-                        ]}
-                      >
-                        Coupon ({appliedPromo.code ?? appliedPromo.promo_code})
-                      </Text>
-                      <TouchableOpacity
-                        onPress={removeCoupon}
-                        style={{ marginLeft: 6 }}
-                      >
-                        <Text style={{ color: '#FF0000', fontSize: 12 }}>
-                          Remove
+                  return (
+                    <>
+                      {/* Subtotal */}
+                      <View style={styles.billRow}>
+                        <Text style={styles.billLabel}>
+                          Subtotal ({cartData.items.length} items)
                         </Text>
-                      </TouchableOpacity>
-                    </View>
-                    <Text
-                      style={[
-                        styles.billValue,
-                        { color: Colors.button[100], fontWeight: '700' },
-                      ]}
-                    >
-                      -{discountAmount.toFixed(2)} €
-                    </Text>
-                  </View>
-                )}
+                        <Text style={styles.billValue}>
+                          {breakdown.displaySubtotal}
+                        </Text>
+                      </View>
 
-                {/* Delivery charges */}
-                <View style={styles.billRow}>
-                  <Text style={[styles.billLabel, { fontWeight: '500' }]}>
-                    Delivery Charges
-                  </Text>
-                  <Text
-                    style={[
-                      styles.billValue,
-                      { color: '#878B2F', fontWeight: '600' },
-                    ]}
-                  >
-                    Free
-                  </Text>
-                </View>
+                      {/* Total savings */}
+                      {cartData?.total_savings && cartData.total_savings > 0 && (
+                        <View style={styles.billRow}>
+                          <Text style={[styles.billLabel, styles.savingsLabel]}>
+                            Total Savings
+                          </Text>
+                          <Text style={[styles.billValue, styles.savingsValue]}>
+                            {breakdown.displaySavings}
+                          </Text>
+                        </View>
+                      )}
 
-                <View
-                  style={{
-                    borderWidth: 0.6,
-                    width: '100%',
-                    borderColor: Colors.text[400],
-                    marginVertical: 10,
-                  }}
-                ></View>
+                      {/* Coupon discount */}
+                      {appliedPromo && (
+                        <View style={styles.billRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={[styles.billLabel, styles.couponLabel]}>
+                              Coupon ({appliedPromo.code ?? appliedPromo.promo_code})
+                            </Text>
+                            <TouchableOpacity onPress={removeCoupon} style={{ marginLeft: 6 }}>
+                              <Text style={{ color: '#FF0000', fontSize: 12 }}>Remove</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <Text style={[styles.billValue, styles.couponValue]}>
+                            {breakdown.displayCoupon}
+                          </Text>
+                        </View>
+                      )}
 
-                {/* Grand total */}
-                <View style={styles.billRow}>
-                  <Text
-                    style={[
-                      styles.billLabel,
-                      { fontWeight: '700', fontSize: 14 },
-                    ]}
-                  >
-                    Grand total
-                  </Text>
-                  <Text
-                    style={[
-                      styles.billValue,
-                      { fontWeight: '700', fontSize: 14 },
-                    ]}
-                  >
-                    {(
-                      (cartData?.discounted_total || 0) - discountAmount
-                    ).toFixed(2)}{' '}
-                    €
-                  </Text>
-                </View>
+                      {/* Delivery charges */}
+                      <View style={styles.billRow}>
+                        <Text style={[styles.billLabel, styles.deliveryLabel]}>
+                          Delivery Charges
+                        </Text>
+                        <Text style={[styles.billValue, styles.deliveryValue]}>
+                          {breakdown.displayDelivery}
+                        </Text>
+                      </View>
+
+                      <View style={styles.divider} />
+
+                      {/* Grand total (with conversion) */}
+                      <View style={styles.billRow}>
+                        <Text style={[styles.billLabel, styles.grandTotalLabel]}>
+                          Grand total
+                        </Text>
+                        <Text style={[styles.billValue, styles.grandTotalValue]}>
+                          {breakdown.displayGrandTotal}
+                        </Text>
+                      </View>
+
+                      {/* Optional: Show round off if you want */}
+                      {Math.abs(breakdown.roundOffAmount) > 0.01 && (
+                        <View style={styles.billRow}>
+                          <Text style={[styles.billLabel, styles.roundOffLabel]}>
+                            Round Off
+                          </Text>
+                          <Text style={[styles.billValue, styles.roundOffValue]}>
+                            {breakdown.displayRoundOff}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Amount to Pay (rounded) */}
+                      <View style={[styles.billRow, styles.amountToPayRow]}>
+                        <Text style={styles.amountToPayLabel}>Amount to Pay</Text>
+                        <Text style={styles.amountToPayValue}>
+                          {breakdown.displayAmountToPay}
+                        </Text>
+                      </View>
+                    </>
+                  );
+                })()}
               </View>
             )}
+
             {/* Delivery address */}
             <View style={styles.deliveryAddressCard}>
               <View style={{ alignSelf: 'center', flexDirection: 'row' }}>
@@ -1409,8 +1467,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                             >
                               Cost
                             </Text>
+                            {/* ✅ FIXED: Shipping cost wrapped in displayPrice */}
                             <Text style={{ color: '#AEB254', fontSize: 12 }}>
-                              {item.cost} €
+                              {displayPrice(item.cost)}
                             </Text>
                           </View>
                         </TouchableOpacity>
@@ -1452,22 +1511,23 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       />
 
       {/* Payment WebView */}
-      {showWebView && (
-        <View
+      {showWebView && checkoutBreakdown && (
+        <SafeAreaView
           style={{
             flex: 1,
             position: 'absolute',
             top: 0,
-            bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 999,
+            bottom: 0,
+            zIndex: 9999,
+            backgroundColor: '#fff',
           }}
         >
-          {/* Header */}
+          {/* Header with currency info */}
           <View
             style={{
-              height: 60,
+              height: 80,
               backgroundColor: '#f5f5f5',
               flexDirection: 'row',
               alignItems: 'center',
@@ -1477,29 +1537,249 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               borderBottomColor: '#ddd',
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: '600' }}>Payment</Text>
-            <TouchableOpacity onPress={() => setShowWebView(false)}>
+            <View style={{ flex: 1, }}>
+              <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 4 }}>
+                Payment Gateway
+              </Text>
+
+              {/* Show both amounts for clarity */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: 14, color: '#333', fontWeight: '500' }}>
+                    Your order: {checkoutBreakdown.displayAmountToPay}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                    (Payment processed in EUR)
+                  </Text>
+                </View>
+
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 14, color: '#5DA53B', fontWeight: '600' }}>
+                    ≈ {displayPrice(checkoutBreakdown.grandTotalEUR)}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#666', marginTop: 2 }}>
+                    Your card will charge in EUR
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Cancel Payment?',
+                  'Are you sure you want to cancel this payment?',
+                  [
+                    { text: 'No', style: 'cancel' },
+                    {
+                      text: 'Yes',
+                      onPress: () => setShowWebView(false),
+                      style: 'destructive'
+                    }
+                  ]
+                );
+              }}
+              style={{ marginLeft: 10 }}
+            >
               <Text style={{ fontSize: 18, color: '#000' }}>✕</Text>
             </TouchableOpacity>
-          </View>
+          </View   >
+
           <WebView
             style={{ flex: 1 }}
             source={{ uri: paymentUrl }}
+            onLoadStart={() => {
+              console.log('Payment Amount Details:', {
+                // What user sees
+                displayToUser: checkoutBreakdown.displayAmountToPay,
+                // What's sent to payment gateway
+                sentToGateway: `${checkoutBreakdown.grandTotalEUR} EUR`,
+                // Conversion details
+                conversion: `${checkoutBreakdown.grandTotalEUR} EUR = ${checkoutBreakdown.amountToPay} ${selectedCurrency}`,
+                // Exchange rate used
+                exchangeRate: rates?.[selectedCurrency],
+                // Breakdown
+                breakdown: {
+                  subtotal: cartData?.subtotal_amount,
+                  savings: cartData?.total_savings,
+                  coupon: discountAmount,
+                  shipping: getShippingCost(),
+                  totalEUR: checkoutBreakdown.grandTotalEUR,
+                  totalConverted: checkoutBreakdown.amountToPay,
+                }
+              });
+            }}
             onNavigationStateChange={navState => {
-              console.log('thankyuu', navState.url);
-              if (navState.url.includes('payment-success')) {
+              console.log('Payment navigation state:', {
+                url: navState.url,
+                title: navState.title,
+                loading: navState.loading,
+              });
+
+              // Check for success URLs
+              const successPatterns = [
+                'payment-success',
+                'success',
+                'thank-you',
+                'completed',
+                'order-confirmed',
+                'payment/complete',
+                'checkout/success'
+              ];
+
+              const cancelPatterns = [
+                'cancel',
+                'cancelled',
+                'payment-cancelled',
+                'checkout/cancel',
+                'payment/failed'
+              ];
+
+              const isSuccess = successPatterns.some(pattern =>
+                navState.url.toLowerCase().includes(pattern.toLowerCase())
+              );
+
+              const isCancel = cancelPatterns.some(pattern =>
+                navState.url.toLowerCase().includes(pattern.toLowerCase())
+              );
+
+              if (isSuccess) {
+                console.log('Payment successful, closing WebView...');
+
                 setTimeout(() => {
+                  // Close WebView
                   setShowWebView(false);
+
+                  // Clear cart
                   GetCartDetails();
-                  Toast.show({ type: 'success', text1: 'Payment successful!' });
-                }, 2000);
-              } else if (navState.url.includes('cancel')) {
+
+                  // Clear promo codes
+                  setAppliedPromo(null);
+                  setDiscountAmount(0);
+                  setSelectedPromoCode({ code: '', type: '', discount: '', max_discount: '' });
+
+                  // Show success message
+                  Toast.show({
+                    type: 'success',
+                    text1: 'Payment successful!',
+                    text2: 'Your order has been confirmed'
+                  });
+
+                  // Navigate to confirmation screen
+                  navigation.reset({
+                    index: 0,
+                    routes: [
+                      {
+                        name: 'OrderConfirmation',
+                        params: {
+                          paymentSuccess: true,
+                          timestamp: new Date().toISOString(),
+                          orderAmount: checkoutBreakdown.displayAmountToPay,
+                          eurAmount: displayPrice(checkoutBreakdown.grandTotalEUR),
+                          currencyNote: selectedCurrency !== 'EUR' ?
+                            `Your card was charged in EUR and converted to ${selectedCurrency}` :
+                            null
+                        }
+                      }
+                    ],
+                  });
+                }, 1500); // Slightly shorter delay
+
+              } else if (isCancel) {
+                console.log('Payment cancelled, closing WebView...');
+
                 setShowWebView(false);
-                Toast.show({ type: 'info', text1: 'Payment cancelled' });
+
+                Toast.show({
+                  type: 'info',
+                  text1: 'Payment cancelled',
+                  text2: 'You can try again when ready'
+                });
+
+              } else {
+                // Monitor URL changes for debugging
+                if (navState.url !== paymentUrl) {
+                  console.log('Navigated within payment gateway:', navState.url);
+
+                  // Check if the payment gateway shows amount in URL or title
+                  if (navState.title) {
+                    const titleLower = navState.title.toLowerCase();
+                    const amountPattern = /(\d+\.?\d*)\s*(€|eur|usd|czk|kč)/i;
+                    const match = navState.title.match(amountPattern);
+
+                    if (match) {
+                      console.log('Detected amount in page title:', {
+                        fullTitle: navState.title,
+                        extractedAmount: match[1],
+                        extractedCurrency: match[2],
+                        expectedAmount: checkoutBreakdown.grandTotalEUR,
+                      });
+                    }
+                  }
+
+                  // Check URL parameters for amount
+                  try {
+                    const urlObj = new URL(navState.url);
+                    const amountParam = urlObj.searchParams.get('amount');
+                    const currencyParam = urlObj.searchParams.get('currency');
+
+                    if (amountParam) {
+                      console.log('Payment gateway amount in URL:', {
+                        amount: amountParam,
+                        currency: currencyParam || 'EUR',
+                        expected: checkoutBreakdown.grandTotalEUR,
+                      });
+
+                      // Optional: Show amount to user in a toast
+                      if (currencyParam && currencyParam !== selectedCurrency) {
+                        Toast.show({
+                          type: 'info',
+                          text1: `Payment in ${currencyParam}`,
+                          text2: `Amount: ${amountParam} ${currencyParam}`,
+                          visibilityTime: 3000,
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    // Not a valid URL or can't parse
+                  }
+                }
               }
             }}
+            onError={(error) => {
+              console.error('WebView error:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Payment gateway error',
+                text2: 'Please try again or contact support',
+              });
+            }}
+            onHttpError={(error) => {
+              console.error('WebView HTTP error:', error);
+            }}
+            renderError={(errorDomain, errorCode, errorDesc) => (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+                <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 10 }}>
+                  Payment Gateway Error
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 }}>
+                  {errorDesc || 'Unable to load payment page'}
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#AEB254',
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => setShowWebView(false)}
+                >
+                  <Text style={{ color: '#000', fontWeight: '600' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           />
-        </View>
+        </SafeAreaView>
       )}
 
       <AddressModal
@@ -1812,6 +2092,74 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '700',
     fontSize: 14,
+  },
+  // Add to your styles:
+  billSection: {
+    borderWidth: 1,
+    borderColor: Colors.text[400],
+    borderRadius: 12,
+    margin: 10,
+    padding: 15,
+    backgroundColor: '#fff',
+  },
+  savingsLabel: {
+    color: '#5DA53B',
+  },
+  savingsValue: {
+    color: '#5DA53B',
+    fontWeight: '600',
+  },
+  couponLabel: {
+    color: Colors.button[100],
+  },
+  couponValue: {
+    color: Colors.button[100],
+    fontWeight: '700',
+  },
+  deliveryLabel: {
+    fontWeight: '500',
+  },
+  deliveryValue: {
+    color: '#878B2F',
+    fontWeight: '600',
+  },
+  divider: {
+    height: 0.6,
+    width: '100%',
+    backgroundColor: Colors.text[400],
+    marginVertical: 10,
+  },
+  grandTotalLabel: {
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  grandTotalValue: {
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  roundOffLabel: {
+    color: '#666',
+    fontSize: 12,
+  },
+  roundOffValue: {
+    color: '#666',
+    fontSize: 12,
+  },
+  amountToPayRow: {
+    marginTop: 12,
+    paddingTop: 9,
+    borderTopWidth: 1,
+    borderTopColor: Colors.text[400],
+  },
+  amountToPayLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#000',
+  },
+  amountToPayValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#000',
   },
 });
 

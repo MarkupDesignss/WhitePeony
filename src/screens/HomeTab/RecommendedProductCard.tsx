@@ -6,14 +6,29 @@ import { useCart } from '../../context/CartContext'; // adjust your path
 import { widthPercentageToDP } from '../../constant/dimentions';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { Colors } from '../../constant';
-
+import { useAppSelector } from '../../hooks/useAppSelector';
+import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import { convertAndFormatPrice } from '../../utils/currencyUtils';
 // ✅ Extracted reusable component outside the main file
 const RecommendedProductCard = ({ item, navigation, loadProduct }) => {
     const { cart, addToCart } = useCart(); // ✅ safe hook usage
     const [isInCart, setIsInCart] = useState(false);
     const { showLoader, hideLoader } = CommonLoader();
 
-
+    const selectedCurrency = useAppSelector(
+        state => state.currency.selectedCurrency
+      );
+    
+      // Fetch rates with caching
+      const { data: rates } = useGetRatesQuery(undefined, {
+        refetchOnMountOrArgChange: false,
+        refetchOnReconnect: true,
+      });
+    
+      // Price display helper
+      const displayPrice = (priceEUR: any): string => {
+        return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+      };
     useEffect(() => {
         const present = Array.isArray(cart)
             ? cart.some(c => {
@@ -50,8 +65,8 @@ const RecommendedProductCard = ({ item, navigation, loadProduct }) => {
             <View style={styles.cardBody}>
                 <Text numberOfLines={1} style={styles.cardTitle}>{item.name}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, }}>
-                    <Text style={styles.cardPrice}>{Math.round(item.price)}</Text>
-                    <Text style={styles.cardPrice}> €</Text>
+                    <Text style={styles.cardPrice}>{displayPrice(item.price)}</Text>
+                  
                 </View>
 
                 <View style={{ flexDirection: 'row', marginTop: 8 }}>

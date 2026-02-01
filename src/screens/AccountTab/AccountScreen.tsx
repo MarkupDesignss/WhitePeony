@@ -436,7 +436,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
 
           <TouchableOpacity
             onPress={() => handlePolicyLink('privacy')}
-            style={[styles.menuItem, styles.lastMenuItem]}
+            style={[styles.menuItem, styles.lastMenuItem, { borderBottomWidth: 1 }]}
           >
             <View style={styles.menuItemLeft}>
               <Image
@@ -447,6 +447,23 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
+
+
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('CurrencyScreen')}
+            style={styles.menuItem}
+          >
+            <View style={styles.menuItemLeft}>
+              <Image
+                source={require('../../assets/Png/shieldpro.png')} // add icon
+                style={styles.menuIcon}
+              />
+              <Text style={styles.menuItemText}>Change Currency</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
         </View>
 
         {isLoggedIn ? (

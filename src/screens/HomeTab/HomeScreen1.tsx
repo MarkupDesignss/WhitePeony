@@ -25,13 +25,21 @@ import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
-import { WishlistContext} from '../../context';
+import { WishlistContext } from '../../context';
 import Toast from 'react-native-toast-message';
 import LinearGradient from 'react-native-linear-gradient';
 import { UserData, UserDataContext } from '../../context/userDataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LoginModal from '../../components/LoginModal';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAppSelector } from '../../hooks/useAppSelector';
+import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import { convertAndFormatPrice, getPriceDisplay } from '../../utils/currencyUtils';
+// import {
+//   convertAndFormatPrice,
+//   getPriceDisplay,
+//   SupportedCurrency
+// } from '../../utils/currencyUtils';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 const SMALL_CARD_WIDTH = Math.round(width * 0.3);
@@ -42,6 +50,20 @@ const SMALL_HEIGHT = 120;
 const BIG_HEIGHT = SMALL_HEIGHT * 2 + GAP;
 
 const HomeScreen1 = ({ navigation }: any) => {
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency
+  )
+  // Fetch rates with caching
+  const { data: rates } = useGetRatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnReconnect: true,
+  });
+
+  // Quick price display helper
+  const displayPrice = (priceEUR: any): string => {
+    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+  };
+
   const { setUserData, isLoggedIn, userType } =
     useContext<UserData>(UserDataContext);
 
@@ -270,27 +292,6 @@ const HomeScreen1 = ({ navigation }: any) => {
   //   }
   // };
 
-  const refreshAllData = async () => {
-    try {
-      showLoader(); // Show loader once at the beginning
-
-      // Execute all async operations
-      await Promise.all([
-        GetCategoryProductsWithoutLoader(),
-        bigsaleWithoutLoader(),
-        RecommendProductsWithoutLoader(),
-        OrderListWithoutLoader(),
-        ApiSortingWithoutLoader(),
-        GetHeaderWithoutLoader(),
-      ]);
-
-      await fetchWishlist();
-    } catch (error) {
-      console.log('Error refreshing data:', error);
-    } finally {
-      hideLoader(); // Hide loader once all operations complete
-    }
-  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -327,57 +328,7 @@ const HomeScreen1 = ({ navigation }: any) => {
   // Inside your HomeScreen1 component, add these logs:
   // Replace your current useEffect debug logs with this more detailed version:
 
-  const getFormattedPrice = (price: any): string => {
-    if (price === null || price === undefined || price === '') {
-      return '0';
-    }
 
-    console.log(`getFormattedPrice input: "${price}" (type: ${typeof price})`);
-
-    try {
-      // Convert to string first
-      const priceStr = String(price).trim();
-
-      // Handle empty string
-      if (priceStr === '') return '0';
-
-      // Try to parse as float
-      let priceNum = parseFloat(priceStr);
-
-      // If parsing failed, try to extract numbers
-      if (isNaN(priceNum)) {
-        const matches = priceStr.match(/\d+(\.\d+)?/);
-        if (matches && matches[0]) {
-          priceNum = parseFloat(matches[0]);
-        } else {
-          return '0';
-        }
-      }
-
-      // Check if price seems too small (e.g., 3 instead of 30)
-      // If price is between 1-10 and original might be 10-100
-      if (priceNum > 0 && priceNum < 10) {
-        // Check if this might be a price that's been divided by 10
-        const possibleCorrectPrice = priceNum * 10;
-        console.log(
-          `Suspicious low price: ${priceNum}. Might be ${possibleCorrectPrice}?`,
-        );
-
-        // For now, return the price as is but with better formatting
-        return priceNum.toFixed(2).replace(/\.00$/, '');
-      }
-
-      // Normal price formatting
-      if (priceNum === Math.floor(priceNum)) {
-        return priceNum.toString(); // Integer price
-      } else {
-        return priceNum.toFixed(2); // Decimal price
-      }
-    } catch (error) {
-      console.log('Price formatting error:', error);
-      return '0';
-    }
-  };
 
   const RecommendProductsWithoutLoader = async () => {
     try {
@@ -399,17 +350,17 @@ const HomeScreen1 = ({ navigation }: any) => {
       isLoading,
       sampleItem: wishlistItems?.[0]
         ? {
-            id: wishlistItems[0]?.id,
-            name: wishlistItems[0]?.name,
-            product_type: wishlistItems[0]?.product_type,
-            front_image: wishlistItems[0]?.front_image,
-            variants: wishlistItems[0]?.variants,
-            // Check all possible properties
-            hasProductProperty: !!wishlistItems[0]?.product,
-            productId: wishlistItems[0]?.product?.id,
-            productName: wishlistItems[0]?.product?.name,
-            productFrontImage: wishlistItems[0]?.product?.front_image,
-          }
+          id: wishlistItems[0]?.id,
+          name: wishlistItems[0]?.name,
+          product_type: wishlistItems[0]?.product_type,
+          front_image: wishlistItems[0]?.front_image,
+          variants: wishlistItems[0]?.variants,
+          // Check all possible properties
+          hasProductProperty: !!wishlistItems[0]?.product,
+          productId: wishlistItems[0]?.product?.id,
+          productName: wishlistItems[0]?.product?.name,
+          productFrontImage: wishlistItems[0]?.product?.front_image,
+        }
         : null,
     });
   }, [wishlistItems, isLoggedIn, userType, isLoading]);
@@ -531,25 +482,6 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
-  //   try {
-  //     setIsLoadingCategory(true);
-  //     showLoader();
-  //     const res = await UserService.GetCategory();
-  //     if (res && res.data && res.status === HttpStatusCode.Ok) {
-  //       hideLoader();
-  //       const fetchedProducts = res.data?.categories || [];
-  //       setApiCateProducts(fetchedProducts);
-  //       const defaultId = fetchedProducts?.[0]?.id ?? 1;
-  //       setSelectedCategoryId(defaultId);
-  //       GetCategoryID(defaultId);
-  //     }
-  //   } catch (err) {
-  //     console.log('error category', err);
-  //     hideLoader();
-  //     setIsLoadingCategory(false);
-  //   }
-  // };
-
   const GetCategoryProductsWithoutLoader = async () => {
     try {
       setIsLoadingCategory(true);
@@ -633,22 +565,7 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
-  // Also update your toggleWishlist to not use loader:
-  const handleToggleWishlist = async (productId: string) => {
-    try {
-      if (isWishlisted(productId)) {
-        await removeFromWishlist(productId);
-      } else {
-        await addToWishlist(productId);
-      }
-    } catch (error) {
-      console.log('Wishlist toggle error:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to update wishlist',
-      });
-    }
-  };
+
 
   const bigsaleWithoutLoader = async () => {
     try {
@@ -740,9 +657,8 @@ const HomeScreen1 = ({ navigation }: any) => {
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${
-              item?.product_id || ''
-            }`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
+              }`}
             style={styles.page}
           >
             <Image
@@ -1089,10 +1005,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                                   style={{
                                     borderRadius: 4,
                                     backgroundColor: '#5f621a',
-                                    width: 40,
+
                                     alignSelf: 'center',
-                                    marginTop: 10,
+                                    padding: 5,
                                     justifyContent: 'center',
+                                    marginTop: 10
                                   }}
                                 >
                                   <Text
@@ -1105,18 +1022,14 @@ const HomeScreen1 = ({ navigation }: any) => {
                                       textAlignVertical: 'center',
                                     }}
                                   >
-                                    {Math.round(
-                                      availableProducts[0]?.variants?.[0]
-                                        ?.price || 0,
-                                    )}{' '}
-                                    €
+                                    {displayPrice(availableProducts[0]?.variants?.[0]?.price)}
                                   </Text>
                                 </View>
                                 <View
                                   style={{
                                     borderRadius: 4,
                                     backgroundColor: '#E0CB54',
-                                    width: 50,
+
                                     alignSelf: 'center',
                                     marginTop: 10,
                                   }}
@@ -1130,11 +1043,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                                       color: '#000',
                                     }}
                                   >
-                                    {Math.round(
-                                      availableProducts[0]?.variants?.[0]
-                                        ?.price || 0,
-                                    )}{' '}
-                                    €
+                                    {displayPrice(
+                                      availableProducts[0]?.variants?.[0]?.actual_price ||
+                                      0
+                                    )}
                                   </Text>
                                 </View>
                               </>
@@ -1594,8 +1506,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                     if (!product)
                       return { discountedPrice: null, originalPrice: null };
 
-                    console.log('Price info for:', product?.name);
-
                     // Get the discounted price (actual_price)
                     let discountedPrice = null;
                     if (
@@ -1603,10 +1513,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                       product?.variants?.[0]?.actual_price !== null
                     ) {
                       discountedPrice = product.variants[0].actual_price;
-                      console.log(
-                        '  Discounted price (actual_price):',
-                        discountedPrice,
-                      );
                     }
 
                     // Get the original price (price)
@@ -1616,73 +1522,23 @@ const HomeScreen1 = ({ navigation }: any) => {
                       product?.variants?.[0]?.price !== null
                     ) {
                       originalPrice = product.variants[0].price;
-                      console.log('  Original price (price):', originalPrice);
                     }
 
                     // If no discounted price but we have main_price, use that as original
-                    if (
-                      !discountedPrice &&
-                      !originalPrice &&
-                      product?.main_price
-                    ) {
+                    if (!discountedPrice && !originalPrice && product?.main_price) {
                       originalPrice = product.main_price;
-                      console.log(
-                        '  Using main_price as original:',
-                        originalPrice,
-                      );
                     }
 
                     // If we have discounted price but no original, use main_price as original
-                    if (
-                      discountedPrice &&
-                      !originalPrice &&
-                      product?.main_price
-                    ) {
+                    if (discountedPrice && !originalPrice && product?.main_price) {
                       originalPrice = product.main_price;
-                      console.log(
-                        '  Using main_price as original for discounted item:',
-                        originalPrice,
-                      );
                     }
 
                     return { discountedPrice, originalPrice };
                   };
 
                   const { discountedPrice, originalPrice } = getPriceInfo(item);
-
-                  // Format prices safely
-                  const formatPriceForDisplay = (price: any): string => {
-                    if (!price && price !== 0) return '';
-
-                    try {
-                      const priceNum = parseFloat(String(price));
-                      if (isNaN(priceNum)) return '';
-
-                      // If it's a whole number, don't show decimals
-                      if (priceNum === Math.floor(priceNum)) {
-                        return priceNum.toString();
-                      }
-                      return priceNum.toFixed(2);
-                    } catch (error) {
-                      console.log('Price formatting error:', error);
-                      return '';
-                    }
-                  };
-
-                  const displayDiscountedPrice =
-                    formatPriceForDisplay(discountedPrice);
-                  const displayOriginalPrice =
-                    formatPriceForDisplay(originalPrice);
-
-                  console.log('Final prices for display:', {
-                    name: item.name,
-                    discounted: displayDiscountedPrice,
-                    original: displayOriginalPrice,
-                    hasDiscount:
-                      discountedPrice &&
-                      originalPrice &&
-                      discountedPrice !== originalPrice,
-                  });
+                  const hasDiscount = discountedPrice && originalPrice && discountedPrice !== originalPrice;
 
                   return (
                     <TouchableOpacity
@@ -1709,7 +1565,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                           {item?.name}
                         </Text>
 
-                        {/* PRICE DISPLAY - Fixed with both prices */}
+                        {/* PRICE DISPLAY - Updated with currency conversion */}
                         <View
                           style={{
                             flexDirection: 'row',
@@ -1718,8 +1574,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             minHeight: 20,
                           }}
                         >
-                          {/* Show discounted price if available */}
-                          {displayDiscountedPrice ? (
+                          {hasDiscount ? (
                             <>
                               <Text
                                 style={[
@@ -1727,32 +1582,25 @@ const HomeScreen1 = ({ navigation }: any) => {
                                   { color: '#2E2E2E', fontWeight: '700' },
                                 ]}
                               >
-                                {displayDiscountedPrice} €
+                                {displayPrice(discountedPrice)}
                               </Text>
-
-                              {/* Show original price crossed out if different from discounted */}
-                              {displayOriginalPrice &&
-                                displayOriginalPrice !==
-                                  displayDiscountedPrice && (
-                                  <Text
-                                    style={[
-                                      styles.smallOldPrice,
-                                      { marginLeft: 8 },
-                                    ]}
-                                  >
-                                    {displayOriginalPrice} €
-                                  </Text>
-                                )}
+                              <Text
+                                style={[
+                                  styles.smallOldPrice,
+                                  { marginLeft: 8 },
+                                ]}
+                              >
+                                {displayPrice(originalPrice)}
+                              </Text>
                             </>
-                          ) : /* Show only original price if no discount */
-                          displayOriginalPrice ? (
+                          ) : originalPrice ? (
                             <Text
                               style={[
                                 styles.smallPrice,
                                 { color: '#2E2E2E', fontWeight: '700' },
                               ]}
                             >
-                              {displayOriginalPrice} €
+                              {displayPrice(originalPrice)}
                             </Text>
                           ) : (
                             <Text style={{ fontSize: 12, color: '#666' }}>
@@ -1994,7 +1842,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             }}
                           >
                             <Text style={styles.smallPrice}>
-                              {formatPrice(correctPrice)} €
+                              {displayPrice(correctPrice)}
                             </Text>
                           </View>
                         ) : (
@@ -2148,11 +1996,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                         style={{ flexDirection: 'row', alignItems: 'center' }}
                       >
                         <Text style={styles.smallPrice}>
-                          {Math.round(item.variants[0]?.price)} €
+                          {displayPrice(item.variants[0]?.actual_price || item.variants[0]?.price)}
                         </Text>
                         {item.variants[0]?.price && (
                           <Text style={styles.smallOldPrice}>
-                            {Math.round(item.variants[0]?.price)} €
+                            {displayPrice(item.variants[0]?.price)}
                           </Text>
                         )}
                       </View>
@@ -2363,7 +2211,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginVertical: heightPercentageToDP(1),
-    fontFamily:"REDHATDISPLAY-ITALIC"
+    fontFamily: "REDHATDISPLAY-ITALIC"
   },
 
   freqCard: {

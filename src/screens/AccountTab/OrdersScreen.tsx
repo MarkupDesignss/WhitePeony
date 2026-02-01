@@ -24,7 +24,10 @@ import Toast from 'react-native-toast-message';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserDataContext } from '../../context'; // Import the context
-
+// Add these imports
+import { useAppSelector } from '../../hooks/useAppSelector';
+import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import { convertAndFormatPrice } from '../../utils/currencyUtils'
 const TABS = [
   { key: 'placed', label: 'Completed' },
   { key: 'pending', label: 'Pending' },
@@ -43,6 +46,20 @@ type UiOrder = {
 };
 
 const OrdersScreen = ({ navigation }: { navigation: any }) => {
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency
+  );
+
+  // Fetch rates with caching
+  const { data: rates } = useGetRatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnReconnect: true,
+  });
+
+  // Price display helper
+  const displayPrice = (priceEUR: any): string => {
+    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+  };
   // Use the UserDataContext
   const { userData } = useContext(UserDataContext);
   const { showLoader, hideLoader } = CommonLoader();
@@ -604,8 +621,8 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
               {item?.tracking_number
                 ? `${item.tracking_number}`
                 : item?.payment_status
-                ? item.payment_status
-                : 'No tracking info'}
+                  ? item.payment_status
+                  : 'No tracking info'}
             </Text>
           </View>
           <Image
@@ -631,7 +648,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
           <View style={styles.productDetails}>
             <Text style={styles.productName}>{productName || 'Item'}</Text>
             <Text style={styles.productName}>
-              {item?.total_amount ? `${item.total_amount} €` : ''}
+              {item?.total_amount ? displayPrice(item.total_amount) : ''}
             </Text>
             <Text style={styles.productQty}>
               Qty :{' '}
@@ -720,7 +737,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
             <Text style={styles.detailLabel}>
               Total:{' '}
               <Text style={styles.detailValue}>
-                {item?.total_amount ? `${item.total_amount} €` : '—'}
+                {item?.total_amount ? displayPrice(item.total_amount) : '—'}
               </Text>
             </Text>
 
@@ -788,7 +805,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                       </Text>
                       <Text style={{ color: '#666', fontSize: 13 }}>
                         Qty: {it?.quantity || it?.qty || 1}{' '}
-                        {p?.price ? `• ${p.price} €` : ''}
+                        {p?.price ? `• ${displayPrice(p.price)}` : ''}
                       </Text>
 
                       {/* Display rating for this item */}
@@ -841,7 +858,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                           style={[
                             styles.reviewButton,
                             userItemRating !== null &&
-                              styles.updateReviewButton,
+                            styles.updateReviewButton,
                           ]}
                         >
                           <Text style={styles.reviewButtonText}>
@@ -960,14 +977,14 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                   {newRating === 5
                     ? 'Excellent'
                     : newRating === 4
-                    ? 'Good'
-                    : newRating === 3
-                    ? 'Average'
-                    : newRating === 2
-                    ? 'Poor'
-                    : newRating === 1
-                    ? 'Terrible'
-                    : 'Select a rating'}
+                      ? 'Good'
+                      : newRating === 3
+                        ? 'Average'
+                        : newRating === 2
+                          ? 'Poor'
+                          : newRating === 1
+                            ? 'Terrible'
+                            : 'Select a rating'}
                   {/* {existingRating !== null && (
                     <Text style={styles.previousRatingText}>
                       {' '}

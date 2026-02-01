@@ -24,9 +24,9 @@ import MyEventsScreen from "../screens/EventTab/MyEvents";
 import Slugs from "../screens/ProfileTab/Slugs";
 import SelectLanguageScreen from "../SelectLanguageScreen";
 import Searchpage from "../screens/HomeTab/Searchpage";
+import CurrencyScreen from "../screens/currency/CurrencyScreen";
 
-
-
+ 
 const HomeStackNavigator: FC = () => {
   const Stack = createNativeStackNavigator();
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
@@ -73,6 +73,7 @@ const HomeStackNavigator: FC = () => {
       <Stack.Screen name="MyEventsScreen" component={MyEventsScreen} />
       <Stack.Screen name="Searchpage" component={Searchpage} />
       <Stack.Screen name="Slugs" component={Slugs} />
+      <Stack.Screen name="CurrencyScreen" component={CurrencyScreen} />
     </Stack.Navigator>
   );
 };

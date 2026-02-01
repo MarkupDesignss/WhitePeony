@@ -3,7 +3,9 @@ import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { store, persistor } from './src/redux/store';
 import './src/components/TextOverride';
 
 import HomeStackNavigator from './src/navigations/HomeStackNavigation';
@@ -27,7 +29,6 @@ function App() {
   const theme = useColorScheme();
 
   useEffect(() => {
-    // ✅ ONLY local notification channel (no Firebase)
     const createChannel = async () => {
       await notifee.createChannel({
         id: 'default',
@@ -35,35 +36,38 @@ function App() {
         importance: AndroidImportance.HIGH,
       });
     };
-
     createChannel();
   }, []);
 
   return (
-    <NetworkProvider>
-      <TranslationProvider>
-        <CommonLoaderProvider>
-          <UserDataContextProvider>
-            <WishlistProvider>
-              <CartProvider>
-                <NetworkStatus />
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <NavigationContainer theme={theme === 'dark' ? DarkTheme : DefaultTheme}>
-                    <Stack.Navigator screenOptions={{ headerShown: false }}>
-                      <Stack.Screen
-                        name="HomeStackNavigator"
-                        component={HomeStackNavigator}
-                      />
-                    </Stack.Navigator>
-                  </NavigationContainer>
-                </GestureHandlerRootView>
-                <Toast />
-              </CartProvider>
-            </WishlistProvider>
-          </UserDataContextProvider>
-        </CommonLoaderProvider>
-      </TranslationProvider>
-    </NetworkProvider>
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <NetworkProvider>
+          <TranslationProvider>
+            <CommonLoaderProvider>
+              <UserDataContextProvider>
+                <WishlistProvider>
+                  <CartProvider>
+                    <NetworkStatus />
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                      <NavigationContainer theme={theme === 'dark' ? DarkTheme : DefaultTheme}>
+                        <Stack.Navigator screenOptions={{ headerShown: false }}>
+                          <Stack.Screen
+                            name="HomeStackNavigator"
+                            component={HomeStackNavigator}
+                          />
+                        </Stack.Navigator>
+                      </NavigationContainer>
+                    </GestureHandlerRootView>
+                    <Toast />
+                  </CartProvider>
+                </WishlistProvider>
+              </UserDataContextProvider>
+            </CommonLoaderProvider>
+          </TranslationProvider>
+        </NetworkProvider>
+      </PersistGate>
+    </Provider>
   );
 }
 
