@@ -1,180 +1,124 @@
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  ImageBackground,
-} from "react-native";
-import React, { useEffect, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Fonts, Colors, Images } from '../src/constant/index';
-import {
-  heightPercentageToDP as hp,
-  widthPercentageToDP as wp,
-} from "../src/constant/dimentions";
-import { useTranslate } from "./hooks/useTranslate";
-import T from "./components/T";
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { setLanguage, LanguageCode } from './redux/slices/languageSlice';
+import { RootState } from './redux/store';
+import { useNavigation } from '@react-navigation/native';
 
-
-const LANGUAGES = [
-  { code: "es", label: "Spanish" },
-  { code: "en", label: "English" },
-  { code: "fr", label: "French" },
+const languages: { code: LanguageCode; label: string; flag: string }[] = [
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'de', label: 'German', flag: '🇩🇪' },
+  { code: 'cs', label: 'Czech', flag: '🇨🇿' },
 ];
 
-const SelectLanguageScreen = ({ navigation }: { navigation: any }) => {
-  const { lang, changeLanguage } = useTranslate();
-  const [selectedLanguage, setSelectedLanguage] = useState(lang ?? "en");
+export default function SelectLanguageScreen() {
+  const dispatch = useDispatch();
+  const navigation = useNavigation();
+  const selectedLanguage = useSelector((state: RootState) => state.language.code);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setSelectedLanguage(lang);
-  }, [lang]);
+  const handleSelectLanguage = (code: LanguageCode) => {
+    setLoading(true);
+    dispatch(setLanguage(code));
 
-  const handleSelectLanguage = (languageCode: string) => {
-    setSelectedLanguage(languageCode);
-    changeLanguage(languageCode);
-  };
-
-  const handleNext = async () => {
-    await AsyncStorage.setItem("@language_selected", "true");
-    navigation.replace('IntroScreen');
-    // navigation.navigate("GetStartedScreen");
+    setTimeout(() => {
+      setLoading(false);
+      navigation.goBack();
+    }, 2000);
   };
 
   return (
     <View style={styles.container}>
-      <ImageBackground style={styles.langbg} source={Images.langbg}>
+      <Text style={styles.title}>Select Language</Text>
 
-        {/* Page Title */}
-        <T style={styles.TopTitle}>Preferred language</T>
-
-        {/* Language Cards */}
-        <View style={styles.langList}>
-          {LANGUAGES.map((lang) => (
-            <TouchableOpacity
-              key={lang.code}
-              style={[
-                styles.languageCard,
-                selectedLanguage === lang.code && styles.languageCardSelected,
-              ]}
-              onPress={() => handleSelectLanguage(lang.code)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.radioOuter}>
-                {selectedLanguage === lang.code && <View style={styles.radioInner} />}
-              </View>
-
-              <Text style={styles.languageText}>{lang.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* NEXT BUTTON */}
+      {languages.map(lang => (
         <TouchableOpacity
+          key={lang.code}
           style={[
-            styles.nextButton,
+            styles.button,
+            selectedLanguage === lang.code && styles.selectedButton,
           ]}
-          onPress={handleNext}
-          disabled={!selectedLanguage}
-          activeOpacity={0.8}
+          onPress={() => handleSelectLanguage(lang.code)}
+          disabled={loading}
         >
-          <T style={styles.nextButtonText}>Next</T>
+          <Text
+            style={[
+              styles.buttonText,
+              selectedLanguage === lang.code && styles.selectedButtonText,
+            ]}
+          >
+            <Text style={styles.flag}>{lang.flag}</Text> {lang.label}
+          </Text>
         </TouchableOpacity>
+      ))}
 
-      </ImageBackground>
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#28a745" />
+          <Text style={styles.loadingText}>Updating Language...</Text>
+        </View>
+      )}
     </View>
   );
-};
-
-export default SelectLanguageScreen;
-
-/* ------------------------- STYLES ------------------------- */
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.text[100],
-  },
-  langbg: {
-    flex: 1,
-    width: "100%",
-    alignItems: "center",
-    paddingTop: hp(60),
-  },
-
-  TopTitle: {
-    fontSize: 24,
-    color: Colors.text[200],
-    marginBottom: hp(3),
-    textAlign: "center",
-  },
-
-  langList: {
-    width: "90%",
+    padding: 25,
     justifyContent: 'center',
-    alignItems: "center"
+    backgroundColor: '#f9f9f9',
   },
-
-  languageCard: {
-    width: "100%",
-    height: 50,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.button[100],
-    backgroundColor: Colors.text[100],
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: 20,
-    marginBottom: 16,
-  },
-
-  languageCardSelected: {
-    backgroundColor: Colors.text[100],
-    borderColor: Colors.button[100],
-    borderWidth: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-
-  radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.button[100],
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "center",
-    backgroundColor: Colors.text[100],
-  },
-
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.button[100],
-  },
-
-  languageText: {
-    marginLeft: 16,
-    fontSize: 14,
-    color: Colors.text[200],
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 30,
     textAlign: 'center',
+    color: '#333',
   },
-
-  nextButton: {
-    top: hp(3),
-    backgroundColor: Colors.button[100],
+  button: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     borderRadius: 12,
-    paddingHorizontal: 40,
-    paddingVertical: 8,
+    backgroundColor: '#fff',
+    marginVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
   },
-
-  nextButtonText: {
-    color: '#000',
-    fontSize: 14,
+  selectedButton: {
+    backgroundColor: '#28a745',
+  },
+  buttonText: {
+    fontSize: 18,
+    color: '#333',
+    marginLeft: 10,
+  },
+  selectedButtonText: {
+    color: '#fff',
     fontWeight: '600',
+  },
+  flag: {
+    fontSize: 22,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#28a745',
+    fontWeight: '500',
   },
 });

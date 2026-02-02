@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useContext,
+  useCallback,
+  useMemo,
+} from 'react';
 import {
   View,
   Text,
@@ -18,16 +24,15 @@ import {
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
-import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { formatDate } from '../../helpers/helpers';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { UserDataContext } from '../../context'; // Import the context
-// Add these imports
+import { UserDataContext } from '../../context';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
-import { convertAndFormatPrice } from '../../utils/currencyUtils'
+import { convertAndFormatPrice } from '../../utils/currencyUtils';
+
 const TABS = [
   { key: 'placed', label: 'Completed' },
   { key: 'pending', label: 'Pending' },
@@ -47,7 +52,7 @@ type UiOrder = {
 
 const OrdersScreen = ({ navigation }: { navigation: any }) => {
   const selectedCurrency = useAppSelector(
-    state => state.currency.selectedCurrency
+    state => state.currency.selectedCurrency,
   );
 
   // Fetch rates with caching
@@ -57,12 +62,15 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   });
 
   // Price display helper
-  const displayPrice = (priceEUR: any): string => {
-    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
-  };
+  const displayPrice = useCallback(
+    (priceEUR: any): string => {
+      return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+    },
+    [selectedCurrency, rates],
+  );
+
   // Use the UserDataContext
   const { userData } = useContext(UserDataContext);
-  const { showLoader, hideLoader } = CommonLoader();
 
   const [activeTab, setActiveTab] = useState('placed');
   const [searchText, setSearchText] = useState('');
@@ -76,6 +84,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   const [existingRating, setExistingRating] = useState<number | null>(null);
   const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
   const [existingComment, setExistingComment] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     OrderList();
@@ -83,74 +92,34 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
 
   const OrderList = async () => {
     try {
-      showLoader();
+      setIsLoading(true);
       const res = await UserService.order();
 
       console.log('=== ORDER API CALLED ===');
       console.log('API Endpoint: Order list');
       console.log('Response status:', res?.status);
-      console.log('Full response:', JSON.stringify(res?.data, null, 2));
 
       if (res && res.data && res.status === HttpStatusCode.Ok) {
-        hideLoader();
+        setIsLoading(false);
 
         const apiOrders = Array.isArray(res?.data?.orders)
           ? res.data.orders
           : [];
 
-        // Debug: Check user data
-        console.log('=== USER DATA CONTEXT ===');
-        console.log('User Data:', userData);
-        console.log(
-          'User ID from context:',
-          userData?.id || userData?.user_id || userData?.userId,
-        );
-
-        // Check specifically for ratings in the response
-        console.log('=== CHECKING RATINGS IN ORDER DATA ===');
-        apiOrders.forEach((order: any, index: number) => {
-          console.log(`Order ${index + 1} (ID: ${order.id}):`);
-          console.log('  - Items:', order.items);
-
-          if (order.items && Array.isArray(order.items)) {
-            order.items.forEach((item: any, itemIndex: number) => {
-              console.log(`  Item ${itemIndex + 1}:`);
-              console.log(`    - Product:`, item.product?.name);
-              console.log(`    - Product reviews:`, item.product?.reviews);
-
-              // Check for user's review
-              if (
-                item.product?.reviews &&
-                Array.isArray(item.product.reviews)
-              ) {
-                const currentUserId =
-                  userData?.id || userData?.user_id || userData?.userId;
-                const userReview = item.product.reviews.find(
-                  (review: any) =>
-                    review.user_id === currentUserId ||
-                    review.userId === currentUserId ||
-                    review.user?.id === currentUserId,
-                );
-
-                if (userReview) {
-                  console.log(`    - User's review found:`, userReview);
-                } else {
-                  console.log(
-                    `    - No user review found for ID: ${currentUserId}`,
-                  );
-                }
-              }
-            });
-          }
+        // Sort orders by created_at in descending order (latest first)
+        const sortedOrders = [...apiOrders].sort((a, b) => {
+          const dateA = new Date(a.created_at || a.updated_at || 0);
+          const dateB = new Date(b.created_at || b.updated_at || 0);
+          return dateB.getTime() - dateA.getTime();
         });
 
-        setOrder(apiOrders);
+        setOrder(sortedOrders);
       } else {
-        hideLoader();
+        setIsLoading(false);
         console.log('Order API response not OK');
       }
     } catch (err) {
-      hideLoader();
+      setIsLoading(false);
       console.log('Order API error:', err);
     }
   };
@@ -179,28 +148,23 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
           newComment ||
           (existingRating !== null ? 'Updated review' : 'No comment'),
         product_id: selectedProductId,
-        // Include review_id if updating
         ...(existingReviewId && { review_id: existingReviewId }),
       };
 
       console.log('=== REVIEW API CALLED ===');
       console.log('Product ID:', selectedProductId);
       console.log('Is Update:', existingRating !== null);
-      console.log('Existing Review ID:', existingReviewId);
-      console.log('New rating:', newRating);
-      console.log('Previous rating:', existingRating);
       console.log('Payload:', JSON.stringify(payload, null, 2));
 
-      showLoader();
+      setIsLoading(true);
 
       const res = await UserService.Review(payload, selectedProductId);
 
       console.log('=== REVIEW API RESPONSE ===');
       console.log('Response status:', res?.status);
-      console.log('Response data:', JSON.stringify(res?.data, null, 2));
 
       if (res && res?.data && res?.status === HttpStatusCode.Ok) {
-        hideLoader();
+        setIsLoading(false);
 
         Toast.show({
           type: 'success',
@@ -224,12 +188,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         setExistingReviewId(null);
         setExistingComment('');
 
-        // Refresh order list with a slight delay
-        setTimeout(() => {
-          OrderList();
-        }, 500);
+        // Refresh order list
+        OrderList();
       } else {
-        hideLoader();
+        setIsLoading(false);
         Toast.show({
           type: 'error',
           text1: 'Something went wrong!',
@@ -237,15 +199,12 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         });
       }
     } catch (error: any) {
-      hideLoader();
+      setIsLoading(false);
       console.log('=== REVIEW SUBMISSION ERROR ===');
       console.log('Error:', error);
 
       let errorMessage = 'Something went wrong! Please try again.';
       if (error.response) {
-        console.log('Error response data:', error.response.data);
-        console.log('Error response status:', error.response.status);
-
         errorMessage =
           error.response.data?.message ||
           error.response.data?.error ||
@@ -261,144 +220,95 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
-  const handleOpenReviewModal = (productId: string, productName: string) => {
-    console.log('=== OPENING REVIEW MODAL ===');
-    console.log('Product ID:', productId);
-    console.log('Product Name:', productName);
-    console.log('User Data from Context:', userData);
+  const handleOpenReviewModal = useCallback(
+    (productId: string, productName: string) => {
+      if (!productId) {
+        Toast.show({
+          type: 'error',
+          text1: 'Product information not available',
+        });
+        return;
+      }
 
-    if (!productId) {
-      console.log('No productId provided!');
-      Toast.show({
-        type: 'error',
-        text1: 'Product information not available',
-      });
-      return;
-    }
+      // Get current user ID from context
+      const currentUserId =
+        userData?.customer_id ||
+        userData?.id ||
+        userData?.user_id ||
+        userData?.userId;
 
-    // Get current user ID from context - check for customer_id field
-    const currentUserId =
-      userData?.customer_id ||
-      userData?.id ||
-      userData?.user_id ||
-      userData?.userId;
-    console.log(
-      'Current User ID from context (looking for customer_id):',
-      currentUserId,
-    );
-    console.log('userData.customer_id:', userData?.customer_id);
-    console.log('userData.id:', userData?.id);
+      if (!currentUserId) {
+        Toast.show({
+          type: 'error',
+          text1: 'User not authenticated',
+          text2: 'Please login to submit reviews',
+        });
+        return;
+      }
 
-    if (!currentUserId) {
-      console.log('No user ID found!');
-      Toast.show({
-        type: 'error',
-        text1: 'User not authenticated',
-        text2: 'Please login to submit reviews',
-      });
-      return;
-    }
+      // Find the existing rating for this product
+      let foundRating: number | null = null;
+      let foundComment: string = '';
+      let foundReviewId: string | null = null;
 
-    // Find the existing rating for this product
-    let foundRating: number | null = null;
-    let foundComment: string = '';
-    let foundReviewId: string | null = null;
+      // Search through all orders and items to find the user's review for this product
+      for (const orderItem of order) {
+        const itemsList = getItemsList(orderItem?.items);
 
-    // Debug: Log all orders to see structure
-    console.log('=== SEARCHING FOR EXISTING REVIEW ===');
-    console.log('Total orders:', order.length);
+        for (const item of itemsList) {
+          const product = item?.product || item;
+          const itemProductId =
+            product?.id?.toString() || product?.product_id?.toString();
 
-    // Search through all orders and items to find the user's review for this product
-    order.forEach((orderItem: any, orderIndex: number) => {
-      const itemsList = getItemsList(orderItem?.items);
-
-      itemsList.forEach((item: any, itemIndex: number) => {
-        const product = item?.product || item;
-        const itemProductId =
-          product?.id?.toString() || product?.product_id?.toString();
-
-        console.log(`Order ${orderIndex}, Item ${itemIndex}:`);
-        console.log('  - Item Product ID:', itemProductId);
-        console.log('  - Target Product ID:', productId);
-        console.log('  - Product reviews:', product?.reviews);
-
-        if (itemProductId === productId) {
-          console.log('  - PRODUCT MATCH FOUND!');
-
-          // Check if there's a review from the current user
-          if (product?.reviews && Array.isArray(product.reviews)) {
-            console.log('  - Checking', product.reviews.length, 'reviews');
-
-            // Find current user's review - check for customer_id field
-            const currentUserReview = product.reviews.find((review: any) => {
-              const reviewUserId =
-                review.customer_id ||
-                review.user_id ||
-                review.userId ||
-                review.user?.id;
-              console.log('    - Review customer_id:', review.customer_id);
-              console.log('    - Review user_id:', review.user_id);
-              console.log('    - Current user ID:', currentUserId);
-              console.log('    - Match?', reviewUserId == currentUserId);
-              return reviewUserId == currentUserId;
-            });
-
-            if (currentUserReview) {
-              console.log('  - USER REVIEW FOUND:', currentUserReview);
-              foundRating = Number(currentUserReview.rating);
-              foundComment =
-                currentUserReview.review ||
-                currentUserReview.comment ||
-                currentUserReview.text ||
-                '';
-              foundReviewId =
-                currentUserReview.id || currentUserReview.review_id || null;
-            } else {
-              console.log(
-                '  - No user review found for customer_id:',
-                currentUserId,
-              );
-              // Log all review customer IDs for debugging
-              product.reviews.forEach((review: any, idx: number) => {
-                console.log(
-                  `    Review ${idx}: customer_id=${review.customer_id}, rating=${review.rating}`,
-                );
+          if (itemProductId === productId) {
+            // Check if there's a review from the current user
+            if (product?.reviews && Array.isArray(product.reviews)) {
+              // Find current user's review
+              const currentUserReview = product.reviews.find((review: any) => {
+                const reviewUserId =
+                  review.customer_id ||
+                  review.user_id ||
+                  review.userId ||
+                  review.user?.id;
+                return reviewUserId == currentUserId;
               });
+
+              if (currentUserReview) {
+                foundRating = Number(currentUserReview.rating);
+                foundComment =
+                  currentUserReview.review ||
+                  currentUserReview.comment ||
+                  currentUserReview.text ||
+                  '';
+                foundReviewId =
+                  currentUserReview.id || currentUserReview.review_id || null;
+              }
             }
-          } else {
-            console.log('  - No reviews array found');
+            break;
           }
         }
-      });
-    });
+        if (foundRating !== null) break;
+      }
 
-    console.log('=== SEARCH RESULTS ===');
-    console.log('Found rating:', foundRating);
-    console.log('Found comment:', foundComment);
-    console.log('Found review ID:', foundReviewId);
+      setSelectedProductId(productId);
+      setSelectedProductName(productName);
+      setExistingRating(foundRating);
+      setExistingReviewId(foundReviewId);
+      setExistingComment(foundComment);
+      setNewRating(foundRating || 5);
+      setNewComment(foundComment);
+      setWriteModalVisible(true);
+    },
+    [order, userData],
+  );
 
-    setSelectedProductId(productId);
-    setSelectedProductName(productName);
-    setExistingRating(foundRating);
-    setExistingReviewId(foundReviewId);
-    setExistingComment(foundComment);
-
-    // Set the rating for the modal
-    // If existing rating found, use it. Otherwise default to 5
-    setNewRating(foundRating || 5);
-    setNewComment(foundComment);
-
-    console.log('Setting modal visible: true');
-    setWriteModalVisible(true);
-  };
-
-  const toggleExpand = (id: string | number) => {
+  const toggleExpand = useCallback((id: string | number) => {
     setExpandedIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
     );
-  };
+  }, []);
 
-  const getItemsList = (rawItems: any) => {
+  const getItemsList = useCallback((rawItems: any) => {
     if (!rawItems) return [];
     if (Array.isArray(rawItems)) {
       if (rawItems.length > 0 && Array.isArray(rawItems[0])) {
@@ -407,649 +317,596 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
       return rawItems;
     }
     return [];
-  };
+  }, []);
 
-  const extractProductInfo = (item: any) => {
-    try {
-      // Get current user ID from context - check for customer_id field
-      const currentUserId =
-        userData?.customer_id ||
-        userData?.id ||
-        userData?.user_id ||
-        userData?.userId;
-      console.log('extractProductInfo - Current User ID:', currentUserId);
+  const extractProductInfo = useCallback(
+    (item: any) => {
+      try {
+        // Get current user ID from context
+        const currentUserId =
+          userData?.customer_id ||
+          userData?.id ||
+          userData?.user_id ||
+          userData?.userId;
 
-      // Try to find product ID in different possible paths
-      let productId = null;
-      let productName = null;
-      let productRating = null;
-      let userRating = null; // User's specific rating
-      let customerReviews = [];
+        let productId = null;
+        let productName = null;
+        let productRating = null;
+        let userRating = null;
+        let customerReviews = [];
 
-      // Path 1: items[0].product
-      if (item?.items?.[0]?.product) {
-        const product = item.items[0].product;
-        productId = product.id.toString();
-        productName = product.name;
+        // Find product info
+        const itemsList = getItemsList(item?.items);
+        for (const orderItem of itemsList) {
+          const product = orderItem?.product || orderItem;
+          if (product?.id || product?.product_id) {
+            productId = (product.id || product.product_id).toString();
+            productName = product.name || 'Product';
 
-        // Extract rating from reviews
-        if (product.reviews && Array.isArray(product.reviews)) {
-          customerReviews = product.reviews;
+            // Extract rating from reviews
+            if (product.reviews && Array.isArray(product.reviews)) {
+              customerReviews = product.reviews;
 
-          // Find current user's review - check for customer_id field
-          if (currentUserId) {
-            console.log(
-              'Looking for user review in',
-              product.reviews.length,
-              'reviews',
-            );
-
-            const userReview = product.reviews.find((review: any) => {
-              // Check for customer_id (from API) or user_id (what your code expects)
-              const reviewUserId =
-                review.customer_id ||
-                review.user_id ||
-                review.userId ||
-                review.user?.id;
-              console.log(
-                'Review customer_id:',
-                review.customer_id,
-                'Current user ID:',
-                currentUserId,
-                'Match?',
-                reviewUserId == currentUserId,
-              );
-              return reviewUserId == currentUserId;
-            });
-
-            if (userReview) {
-              console.log(
-                'USER REVIEW FOUND in extractProductInfo:',
-                userReview,
-              );
-              userRating = Number(userReview.rating);
-            }
-          }
-
-          // Calculate average rating
-          if (product.reviews.length > 0) {
-            const sum = product.reviews.reduce((acc, review) => {
-              return acc + Number(review.rating || 0);
-            }, 0);
-            productRating = sum / product.reviews.length;
-          }
-        }
-      }
-      // Path 2: items[0].product_id
-      else if (item?.items?.[0]?.product_id) {
-        productId = item.items[0].product_id.toString();
-        productName = item.items[0].product_name || 'Product';
-      }
-      // Path 3: items[0].id (if it's the product itself)
-      else if (item?.items?.[0]?.id) {
-        productId = item.items[0].id.toString();
-        productName = item.items[0].name || 'Product';
-      }
-      // Path 4: Check if items is an array with nested structure
-      else if (Array.isArray(item?.items) && item.items.length > 0) {
-        // Try to find any product reference in the array
-        for (const orderItem of item.items) {
-          if (orderItem?.product?.id) {
-            productId = orderItem.product.id.toString();
-            productName = orderItem.product.name;
-
-            // Extract rating
-            if (
-              orderItem.product.reviews &&
-              Array.isArray(orderItem.product.reviews)
-            ) {
-              customerReviews = orderItem.product.reviews;
-
-              // Find user's rating - check for customer_id field
+              // Find current user's review
               if (currentUserId) {
-                const userReview = orderItem.product.reviews.find(
-                  (review: any) => {
-                    const reviewUserId =
-                      review.customer_id ||
-                      review.user_id ||
-                      review.userId ||
-                      review.user?.id;
-                    return reviewUserId == currentUserId;
-                  },
-                );
+                const userReview = product.reviews.find((review: any) => {
+                  const reviewUserId =
+                    review.customer_id ||
+                    review.user_id ||
+                    review.userId ||
+                    review.user?.id;
+                  return reviewUserId == currentUserId;
+                });
 
                 if (userReview) {
                   userRating = Number(userReview.rating);
                 }
               }
 
-              if (orderItem.product.reviews.length > 0) {
-                const sum = orderItem.product.reviews.reduce((acc, review) => {
+              // Calculate average rating
+              if (product.reviews.length > 0) {
+                const sum = product.reviews.reduce((acc, review) => {
                   return acc + Number(review.rating || 0);
                 }, 0);
-                productRating = sum / orderItem.product.reviews.length;
+                productRating = sum / product.reviews.length;
               }
             }
             break;
           }
         }
+
+        return {
+          productId,
+          productName,
+          productRating,
+          userRating,
+          customerReviews,
+        };
+      } catch (error) {
+        console.log('Error extracting product info:', error);
+        return {
+          productId: null,
+          productName: null,
+          productRating: null,
+          userRating: null,
+          customerReviews: [],
+        };
       }
+    },
+    [userData, getItemsList],
+  );
 
-      // If still not found, check direct product properties
-      if (!productId && item?.product_id) {
-        productId = item.product_id.toString();
-        productName = item.product_name || 'Product';
-      }
-
-      console.log('extractProductInfo result:', {
-        productId,
-        productName,
-        productRating,
-        userRating,
-        reviewCount: customerReviews.length,
-      });
-
-      return {
+  const renderOrder = useCallback(
+    ({ item }: { item: any }) => {
+      const itemsList = getItemsList(item?.items);
+      const {
         productId,
         productName,
         productRating,
         userRating,
         customerReviews,
-      };
-    } catch (error) {
-      console.log('Error extracting product info:', error);
-      return {
-        productId: null,
-        productName: null,
-        productRating: null,
-        userRating: null,
-        customerReviews: [],
-      };
-    }
-  };
+      } = extractProductInfo(item);
+      const isExpanded = expandedIds.includes(item.id);
+      const formData = formatDate(item?.created_at || item?.updated_at);
+      const displayRating = userRating !== null ? userRating : productRating;
 
-  const renderOrder = ({ item }: { item: any }) => {
-    const itemsList = getItemsList(item?.items);
-    const {
-      productId,
-      productName,
-      productRating,
-      userRating,
-      customerReviews,
-    } = extractProductInfo(item);
-    const isExpanded = expandedIds.includes(item.id);
-    const formData = formatDate(item?.created_at || item?.updated_at);
-
-    // Use user's rating if available, otherwise use product average
-    const displayRating = userRating !== null ? userRating : productRating;
-
-    // Log the extracted rating for debugging
-    console.log('Rendering order:', {
-      orderId: item.id,
-      productId,
-      productName,
-      productRating,
-      userRating,
-      displayRating,
-      reviewCount: customerReviews.length,
-    });
-
-    return (
-      <TouchableOpacity
-        style={styles.orderCard}
-        activeOpacity={0.9}
-        onPress={() => toggleExpand(item.id)}
-      >
-        <View style={styles.deliveryInfo}>
-          <Image
-            source={require('../../assets/Png/orderLogo.png')}
-            style={{
-              width: 22,
-              height: 22,
-              backgroundColor: '#EAFDFF',
-              borderRadius: 20,
-            }}
-          />
-          <View style={{ marginLeft: 6 }}>
-            <Text style={styles.deliveryDate}>
-              {item?.status
-                ? item.status.charAt(0).toUpperCase() + item.status.slice(1)
-                : 'Order'}{' '}
-              • {formData}
-            </Text>
-            <Text style={styles.deliveryStatus}>
-              {item?.tracking_number
-                ? `${item.tracking_number}`
-                : item?.payment_status
+      return (
+        <TouchableOpacity
+          style={styles.orderCard}
+          activeOpacity={0.9}
+          onPress={() => toggleExpand(item.id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <View style={styles.deliveryInfo}>
+            <Image
+              source={require('../../assets/Png/orderLogo.png')}
+              style={{
+                width: 22,
+                height: 22,
+                backgroundColor: '#EAFDFF',
+                borderRadius: 20,
+              }}
+            />
+            <View style={{ marginLeft: 6 }}>
+              <Text style={styles.deliveryDate}>
+                {item?.status
+                  ? item.status.charAt(0).toUpperCase() + item.status.slice(1)
+                  : 'Order'}{' '}
+                • {formData}
+              </Text>
+              <Text style={styles.deliveryStatus}>
+                {item?.tracking_number
+                  ? `${item.tracking_number}`
+                  : item?.payment_status
                   ? item.payment_status
                   : 'No tracking info'}
-            </Text>
-          </View>
-          <Image
-            source={require('../../assets/Png/next.png')}
-            style={{ marginLeft: 'auto', width: 14, height: 14 }}
-          />
-        </View>
-
-        <View style={styles.productInfo}>
-          {itemsList[0]?.product?.front_image ? (
+              </Text>
+            </View>
             <Image
-              source={{
-                uri: Image_url + itemsList[0]?.product?.front_image,
-              }}
-              style={styles.productImage}
+              source={require('../../assets/Png/next.png')}
+              style={{ marginLeft: 'auto', width: 14, height: 14 }}
             />
-          ) : (
-            <Image
-              source={require('../../assets/Png/product.png')}
-              style={styles.productImage}
-            />
-          )}
-          <View style={styles.productDetails}>
-            <Text style={styles.productName}>{productName || 'Item'}</Text>
-            <Text style={styles.productName}>
-              {item?.total_amount ? displayPrice(item.total_amount) : ''}
-            </Text>
-            <Text style={styles.productQty}>
-              Qty :{' '}
-              {itemsList?.reduce(
-                (sum: number, it: any) => sum + (it?.quantity || it?.qty || 1),
-                1,
-              )}
-            </Text>
           </View>
-        </View>
 
-        <TouchableOpacity
-          onPress={() =>
-            productId &&
-            handleOpenReviewModal(productId, productName || 'Product')
-          }
-          activeOpacity={0.7}
-          disabled={!productId}
-        >
-          <View
-            style={[
-              styles.rateReviewRow,
-              !productId && styles.disabledRateReview,
-            ]}
-          >
-            <Text style={styles.rateReviewLabel}>
-              {userRating !== null ? 'Update Review' : 'Rate & Review'}
-            </Text>
-            <View style={{ flexDirection: 'row', marginTop: -10 }}>
-              {[1, 2, 3, 4, 5].map(r => {
-                const numericRating = Number(displayRating) || 0;
-
-                // NO RATING → TEXT STARS
-                if (numericRating === 0) {
-                  return (
-                    <Text
-                      key={r}
-                      style={{
-                        color: '#ccc',
-                        fontSize: 18,
-                        marginRight: 2,
-                      }}
-                    >
-                      ★
-                    </Text>
-                  );
-                }
-
-                // HAS RATING → IMAGE STARS
-                const isFull = numericRating >= r;
-
-                return (
-                  <Image
-                    key={r}
-                    source={require('../../assets/Png/star.png')}
-                    style={{
-                      width: 18,
-                      height: 18,
-                      marginRight: 2,
-                      tintColor: isFull ? '#F0C419' : '#ccc',
-                    }}
-                  />
-                );
-              })}
+          <View style={styles.productInfo}>
+            {itemsList[0]?.product?.front_image ? (
+              <Image
+                source={{
+                  uri: Image_url + itemsList[0]?.product?.front_image,
+                }}
+                style={styles.productImage}
+              />
+            ) : (
+              <Image
+                source={require('../../assets/Png/product.png')}
+                style={styles.productImage}
+              />
+            )}
+            <View style={styles.productDetails}>
+              <Text style={styles.productName}>{productName || 'Item'}</Text>
+              <Text style={styles.productName}>
+                {item?.total_amount ? displayPrice(item.total_amount) : ''}
+              </Text>
+              <Text style={styles.productQty}>
+                Qty :{' '}
+                {itemsList?.reduce(
+                  (sum: number, it: any) =>
+                    sum + (it?.quantity || it?.qty || 1),
+                  1,
+                )}
+              </Text>
             </View>
           </View>
-        </TouchableOpacity>
 
-        {isExpanded && (
-          <View style={styles.orderDetails}>
-            <Text style={styles.detailLabel}>
-              Order ID: <Text style={styles.detailValue}>{item?.id}</Text>
-            </Text>
-            <Text style={styles.detailLabel}>
-              Tracking:{' '}
-              <Text style={styles.detailValue}>
-                {item?.tracking_number || '—'}
-              </Text>
-            </Text>
-            <Text style={styles.detailLabel}>
-              Payment:{' '}
-              <Text style={styles.detailValue}>
-                {item?.payment_status || '—'}
-              </Text>
-            </Text>
-            <Text style={styles.detailLabel}>
-              Total:{' '}
-              <Text style={styles.detailValue}>
-                {item?.total_amount ? displayPrice(item.total_amount) : '—'}
-              </Text>
-            </Text>
-
-            <Text style={[styles.detailLabel, { marginTop: 8 }]}>Items:</Text>
-            {itemsList && itemsList.length > 0 ? (
-              itemsList.map((it: any, idx: number) => {
-                const p = it?.product || it;
-                const currentProductId = p?.id?.toString();
-                const currentProductName = p?.name || 'Item';
-
-                // Calculate rating for this specific product
-                let itemRating = null;
-                let userItemRating = null;
-                let itemReviewCount = 0;
-
-                if (p?.reviews && Array.isArray(p.reviews)) {
-                  itemReviewCount = p.reviews.length;
-
-                  // Get current user ID
-                  const currentUserId =
-                    userData?.id || userData?.user_id || userData?.userId;
-
-                  // Find user's review
-                  const userReview = p.reviews.find((review: any) => {
-                    const reviewUserId =
-                      review.user_id || review.userId || review.user?.id;
-                    return reviewUserId == currentUserId;
-                  });
-
-                  if (userReview) {
-                    userItemRating = Number(userReview.rating);
-                  }
-
-                  // Calculate average rating
-                  if (p.reviews.length > 0) {
-                    const sum = p.reviews.reduce((acc, review) => {
-                      return acc + Number(review.rating || 0);
-                    }, 0);
-                    itemRating = sum / p.reviews.length;
-                  }
-                }
-
-                // Use user's rating if available
-                const displayItemRating =
-                  userItemRating !== null ? userItemRating : itemRating;
-
-                return (
-                  <View key={idx} style={styles.itemRow}>
-                    <Image
-                      source={
-                        p?.front_image
-                          ? { uri: Image_url + p.front_image }
-                          : require('../../assets/Png/product.png')
-                      }
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: 8,
-                        marginRight: 8,
-                      }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: '600' }}>
-                        {currentProductName}
-                      </Text>
-                      <Text style={{ color: '#666', fontSize: 13 }}>
-                        Qty: {it?.quantity || it?.qty || 1}{' '}
-                        {p?.price ? `• ${displayPrice(p.price)}` : ''}
-                      </Text>
-
-                      {/* Display rating for this item */}
-                      {displayItemRating !== null && (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginTop: 4,
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row' }}>
-                            {[1, 2, 3, 4, 5].map(r => (
-                              <Image
-                                key={r}
-                                source={require('../../assets/Png/star.png')}
-                                style={{
-                                  width: 12,
-                                  height: 12,
-                                  marginRight: 1,
-                                  tintColor:
-                                    displayItemRating >= r ? '#F0C419' : '#ccc',
-                                }}
-                              />
-                            ))}
-                          </View>
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              color: '#666',
-                              marginLeft: 4,
-                            }}
-                          >
-                            ({displayItemRating.toFixed(1)}, {itemReviewCount}{' '}
-                            review
-                            {itemReviewCount !== 1 ? 's' : ''})
-                            {userItemRating !== null && ' • Your rating'}
-                          </Text>
-                        </View>
-                      )}
-
-                      {currentProductId && (
-                        <TouchableOpacity
-                          onPress={() =>
-                            handleOpenReviewModal(
-                              currentProductId,
-                              currentProductName,
-                            )
-                          }
-                          style={[
-                            styles.reviewButton,
-                            userItemRating !== null &&
-                            styles.updateReviewButton,
-                          ]}
-                        >
-                          <Text style={styles.reviewButtonText}>
-                            {userItemRating !== null
-                              ? 'Update Review'
-                              : 'Rate this item'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                );
-              })
-            ) : (
-              <Text style={{ color: '#666' }}>No items available</Text>
-            )}
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
-  const filteredOrders = order.filter(
-    o => (o?.status || '').toLowerCase() === activeTab,
-  );
-
-  const renderModal = () => (
-    <Modal
-      visible={writeModalVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={() => {
-        setWriteModalVisible(false);
-        setNewComment('');
-        setNewRating(5);
-        setSelectedProductId('');
-        setSelectedProductName('');
-        setExistingRating(null);
-        setExistingReviewId(null);
-        setExistingComment('');
-      }}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalContainer}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
+          <TouchableOpacity
+            onPress={() =>
+              productId &&
+              handleOpenReviewModal(productId, productName || 'Product')
+            }
+            activeOpacity={0.7}
+            disabled={!productId}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {existingRating !== null
-                    ? 'Update Your Review'
-                    : 'Write a Review'}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setWriteModalVisible(false);
-                    setNewComment('');
-                    setNewRating(5);
-                    setSelectedProductId('');
-                    setSelectedProductName('');
-                    setExistingRating(null);
-                    setExistingReviewId(null);
-                    setExistingComment('');
-                  }}
-                  style={styles.closeButton}
-                >
-                  <Text style={styles.closeButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
+            <View
+              style={[
+                styles.rateReviewRow,
+                !productId && styles.disabledRateReview,
+              ]}
+            >
+              <Text style={styles.rateReviewLabel}>
+                {userRating !== null ? 'Update Review' : 'Rate & Review'}
+              </Text>
+              <View style={{ flexDirection: 'row', marginTop: -10 }}>
+                {[1, 2, 3, 4, 5].map(r => {
+                  const numericRating = Number(displayRating) || 0;
 
-              <ScrollView
-                style={styles.modalScrollView}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                {selectedProductName && (
-                  <View>
-                    <Text style={styles.productNameLabel}>
-                      Product: {selectedProductName}
-                    </Text>
-                    {existingRating !== null && (
-                      <Text style={styles.existingReviewNote}>
-                        You've already reviewed this product
-                      </Text>
-                    )}
-                  </View>
-                )}
-
-                <Text style={styles.modalSubtitle}>
-                  How would you rate this product?
-                </Text>
-                <View style={styles.ratingContainer}>
-                  {[1, 2, 3, 4, 5].map(r => (
-                    <TouchableOpacity
-                      key={r}
-                      onPress={() => setNewRating(r)}
-                      style={styles.starButton}
-                    >
+                  if (numericRating === 0) {
+                    return (
                       <Text
-                        style={[
-                          styles.star,
-                          newRating >= r
-                            ? styles.starActive
-                            : styles.starInactive,
-                        ]}
+                        key={r}
+                        style={{
+                          color: '#ccc',
+                          fontSize: 18,
+                          marginRight: 2,
+                        }}
                       >
                         ★
                       </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={styles.ratingText}>
-                  {newRating === 5
-                    ? 'Excellent'
-                    : newRating === 4
-                      ? 'Good'
-                      : newRating === 3
-                        ? 'Average'
-                        : newRating === 2
-                          ? 'Poor'
-                          : newRating === 1
-                            ? 'Terrible'
-                            : 'Select a rating'}
-                  {/* {existingRating !== null && (
-                    <Text style={styles.previousRatingText}>
-                      {' '}
-                      (Previous: {existingRating})
-                    </Text>
-                  )} */}
-                </Text>
-
-                <Text style={styles.modalSubtitle}>
-                  Your Review{' '}
-                  {existingRating !== null ? '(Edit)' : '(Optional)'}
-                </Text>
-                <TextInput
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  placeholderTextColor={Colors.text[200]}
-                  placeholder={
-                    existingRating !== null
-                      ? 'Update your review...'
-                      : 'Share your experience with this product...'
+                    );
                   }
-                  style={styles.reviewInput}
-                  multiline
-                  numberOfLines={6}
-                  textAlignVertical="top"
-                  blurOnSubmit={true}
-                />
-              </ScrollView>
 
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  onPress={() => {
-                    setWriteModalVisible(false);
-                    setNewComment('');
-                    setNewRating(5);
-                    setSelectedProductId('');
-                    setSelectedProductName('');
-                    setExistingRating(null);
-                    setExistingReviewId(null);
-                    setExistingComment('');
-                  }}
-                  style={styles.cancelButton}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={PostReview}
-                  style={[
-                    styles.submitButton,
-                    !newRating && styles.submitButtonDisabled,
-                  ]}
-                  disabled={!newRating}
-                >
-                  <Text style={styles.submitButtonText}>
-                    {existingRating !== null
-                      ? 'Update Review'
-                      : 'Submit Review'}
-                  </Text>
-                </TouchableOpacity>
+                  const isFull = numericRating >= r;
+
+                  return (
+                    <Image
+                      key={r}
+                      source={require('../../assets/Png/star.png')}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        marginRight: 2,
+                        tintColor: isFull ? '#F0C419' : '#ccc',
+                      }}
+                    />
+                  );
+                })}
               </View>
             </View>
-          </KeyboardAvoidingView>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+          </TouchableOpacity>
+
+          {isExpanded && (
+            <View style={styles.orderDetails}>
+              <Text style={styles.detailLabel}>
+                Order ID: <Text style={styles.detailValue}>{item?.id}</Text>
+              </Text>
+              <Text style={styles.detailLabel}>
+                Tracking:{' '}
+                <Text style={styles.detailValue}>
+                  {item?.tracking_number || '—'}
+                </Text>
+              </Text>
+              <Text style={styles.detailLabel}>
+                Payment:{' '}
+                <Text style={styles.detailValue}>
+                  {item?.payment_status || '—'}
+                </Text>
+              </Text>
+              <Text style={styles.detailLabel}>
+                Total:{' '}
+                <Text style={styles.detailValue}>
+                  {item?.total_amount ? displayPrice(item.total_amount) : '—'}
+                </Text>
+              </Text>
+
+              <Text style={[styles.detailLabel, { marginTop: 8 }]}>Items:</Text>
+              {itemsList && itemsList.length > 0 ? (
+                itemsList.map((it: any, idx: number) => {
+                  const p = it?.product || it;
+                  const currentProductId = p?.id?.toString();
+                  const currentProductName = p?.name || 'Item';
+
+                  // Calculate rating for this specific product
+                  let itemRating = null;
+                  let userItemRating = null;
+                  let itemReviewCount = 0;
+
+                  if (p?.reviews && Array.isArray(p.reviews)) {
+                    itemReviewCount = p.reviews.length;
+
+                    const currentUserId =
+                      userData?.id || userData?.user_id || userData?.userId;
+
+                    const userReview = p.reviews.find((review: any) => {
+                      const reviewUserId =
+                        review.user_id || review.userId || review.user?.id;
+                      return reviewUserId == currentUserId;
+                    });
+
+                    if (userReview) {
+                      userItemRating = Number(userReview.rating);
+                    }
+
+                    if (p.reviews.length > 0) {
+                      const sum = p.reviews.reduce((acc, review) => {
+                        return acc + Number(review.rating || 0);
+                      }, 0);
+                      itemRating = sum / p.reviews.length;
+                    }
+                  }
+
+                  const displayItemRating =
+                    userItemRating !== null ? userItemRating : itemRating;
+
+                  return (
+                    <View key={idx} style={styles.itemRow}>
+                      <Image
+                        source={
+                          p?.front_image
+                            ? { uri: Image_url + p.front_image }
+                            : require('../../assets/Png/product.png')
+                        }
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 8,
+                          marginRight: 8,
+                        }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: '600' }}>
+                          {currentProductName}
+                        </Text>
+                        <Text style={{ color: '#666', fontSize: 13 }}>
+                          Qty: {it?.quantity || it?.qty || 1}{' '}
+                          {p?.price ? `• ${displayPrice(p.price)}` : ''}
+                        </Text>
+
+                        {displayItemRating !== null && (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 4,
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row' }}>
+                              {[1, 2, 3, 4, 5].map(r => (
+                                <Image
+                                  key={r}
+                                  source={require('../../assets/Png/star.png')}
+                                  style={{
+                                    width: 12,
+                                    height: 12,
+                                    marginRight: 1,
+                                    tintColor:
+                                      displayItemRating >= r
+                                        ? '#F0C419'
+                                        : '#ccc',
+                                  }}
+                                />
+                              ))}
+                            </View>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: '#666',
+                                marginLeft: 4,
+                              }}
+                            >
+                              ({displayItemRating.toFixed(1)}, {itemReviewCount}{' '}
+                              review
+                              {itemReviewCount !== 1 ? 's' : ''})
+                              {userItemRating !== null && ' • Your rating'}
+                            </Text>
+                          </View>
+                        )}
+
+                        {currentProductId && (
+                          <TouchableOpacity
+                            onPress={() =>
+                              handleOpenReviewModal(
+                                currentProductId,
+                                currentProductName,
+                              )
+                            }
+                            style={[
+                              styles.reviewButton,
+                              userItemRating !== null &&
+                                styles.updateReviewButton,
+                            ]}
+                            hitSlop={{
+                              top: 10,
+                              bottom: 10,
+                              left: 10,
+                              right: 10,
+                            }}
+                          >
+                            <Text style={styles.reviewButtonText}>
+                              {userItemRating !== null
+                                ? 'Update Review'
+                                : 'Rate this item'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={{ color: '#666' }}>No items available</Text>
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
+      );
+    },
+    [
+      expandedIds,
+      getItemsList,
+      extractProductInfo,
+      displayPrice,
+      handleOpenReviewModal,
+      toggleExpand,
+      userData,
+    ],
+  );
+
+  const filteredOrders = useMemo(() => {
+    return order
+      .filter(o => (o?.status || '').toLowerCase() === activeTab)
+      .sort((a, b) => {
+        // Ensure latest products come first
+        const dateA = new Date(a.created_at || a.updated_at || 0);
+        const dateB = new Date(b.created_at || b.updated_at || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }, [order, activeTab]);
+
+  const renderModal = useMemo(
+    () => (
+      <Modal
+        visible={writeModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setWriteModalVisible(false);
+          setNewComment('');
+          setNewRating(5);
+          setSelectedProductId('');
+          setSelectedProductName('');
+          setExistingRating(null);
+          setExistingReviewId(null);
+          setExistingComment('');
+        }}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.modalContainer}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
+            >
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {existingRating !== null
+                      ? 'Update Your Review'
+                      : 'Write a Review'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setWriteModalVisible(false);
+                      setNewComment('');
+                      setNewRating(5);
+                      setSelectedProductId('');
+                      setSelectedProductName('');
+                      setExistingRating(null);
+                      setExistingReviewId(null);
+                      setExistingComment('');
+                    }}
+                    style={styles.closeButton}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text style={styles.closeButtonText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  style={styles.modalScrollView}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {selectedProductName && (
+                    <View>
+                      <Text style={styles.productNameLabel}>
+                        Product: {selectedProductName}
+                      </Text>
+                      {existingRating !== null && (
+                        <Text style={styles.existingReviewNote}>
+                          You've already reviewed this product
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  <Text style={styles.modalSubtitle}>
+                    How would you rate this product?
+                  </Text>
+                  <View style={styles.ratingContainer}>
+                    {[1, 2, 3, 4, 5].map(r => (
+                      <TouchableOpacity
+                        key={r}
+                        onPress={() => setNewRating(r)}
+                        style={styles.starButton}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Text
+                          style={[
+                            styles.star,
+                            newRating >= r
+                              ? styles.starActive
+                              : styles.starInactive,
+                          ]}
+                        >
+                          ★
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <Text style={styles.ratingText}>
+                    {newRating === 5
+                      ? 'Excellent'
+                      : newRating === 4
+                      ? 'Good'
+                      : newRating === 3
+                      ? 'Average'
+                      : newRating === 2
+                      ? 'Poor'
+                      : newRating === 1
+                      ? 'Terrible'
+                      : 'Select a rating'}
+                  </Text>
+
+                  <Text style={styles.modalSubtitle}>
+                    Your Review{' '}
+                    {existingRating !== null ? '(Edit)' : '(Optional)'}
+                  </Text>
+                  <TextInput
+                    value={newComment}
+                    onChangeText={setNewComment}
+                    placeholderTextColor={Colors.text[200]}
+                    placeholder={
+                      existingRating !== null
+                        ? 'Update your review...'
+                        : 'Share your experience with this product...'
+                    }
+                    style={styles.reviewInput}
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                    blurOnSubmit={true}
+                  />
+                </ScrollView>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setWriteModalVisible(false);
+                      setNewComment('');
+                      setNewRating(5);
+                      setSelectedProductId('');
+                      setSelectedProductName('');
+                      setExistingRating(null);
+                      setExistingReviewId(null);
+                      setExistingComment('');
+                    }}
+                    style={styles.cancelButton}
+                    hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={PostReview}
+                    style={[
+                      styles.submitButton,
+                      !newRating && styles.submitButtonDisabled,
+                    ]}
+                    disabled={!newRating}
+                    hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                  >
+                    <Text style={styles.submitButtonText}>
+                      {existingRating !== null
+                        ? 'Update Review'
+                        : 'Submit Review'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    ),
+    [
+      writeModalVisible,
+      newRating,
+      newComment,
+      selectedProductName,
+      existingRating,
+      selectedProductId,
+      existingReviewId,
+    ],
+  );
+
+  const renderEmptyComponent = useMemo(
+    () => (
+      <View style={{ marginTop: 40, alignItems: 'center' }}>
+        <Text style={{ color: '#888', fontSize: 16 }}>
+          No orders found for "{activeTab}".
+        </Text>
+      </View>
+    ),
+    [activeTab],
   );
 
   return (
@@ -1062,11 +919,13 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         <KeyboardAwareScrollView
           keyboardShouldPersistTaps="handled"
           enableOnAndroid={true}
+          showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => navigation?.goBack()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Image
                 source={require('../../assets/Png/back.png')}
@@ -1107,6 +966,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                       styles.tabItem,
                       isActive ? styles.tabItemActive : null,
                     ]}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Text
                       style={[
@@ -1121,26 +981,39 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
               })}
             </View>
 
-            <FlatList
-              keyExtractor={item => String(item.id)}
-              data={filteredOrders}
-              renderItem={renderOrder}
-              contentContainerStyle={{
-                paddingHorizontal: 20,
-                paddingBottom: 20,
-              }}
-              ListEmptyComponent={
-                <View style={{ marginTop: 40, alignItems: 'center' }}>
-                  <Text style={{ color: '#888', fontSize: 16 }}>
-                    No orders found for "{activeTab}".
-                  </Text>
-                </View>
-              }
-            />
+            {isLoading ? (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginTop: 100,
+                }}
+              >
+                <Text style={{ color: '#888', fontSize: 16 }}>
+                  Loading orders...
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                keyExtractor={item => String(item.id)}
+                data={filteredOrders}
+                renderItem={renderOrder}
+                contentContainerStyle={{
+                  paddingHorizontal: 20,
+                  paddingBottom: 20,
+                }}
+                ListEmptyComponent={renderEmptyComponent}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={21}
+                removeClippedSubviews={true}
+              />
+            )}
           </View>
         </KeyboardAwareScrollView>
       </KeyboardAvoidingView>
-      {renderModal()}
+      {renderModal}
     </SafeAreaView>
   );
 };
@@ -1274,7 +1147,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   updateReviewButton: {
-    backgroundColor: '#FF9500', // Orange color for update
+    backgroundColor: '#FF9500',
   },
   reviewButtonText: {
     color: '#fff',

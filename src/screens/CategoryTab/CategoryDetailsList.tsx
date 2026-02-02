@@ -10,26 +10,23 @@ import {
   Dimensions,
   Animated,
   TextInput,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useCart } from '../../context/CartContext'; // adjust import path if needed
-import { UserService } from '../../service/ApiService'; // replace with your actual functions
+import { useCart } from '../../context/CartContext';
+import { UserService } from '../../service/ApiService';
 import {
   heightPercentageToDP,
   widthPercentageToDP,
 } from '../../constant/dimentions';
-import { Colors } from '../../constant';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
-import { HttpStatusCode } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 48) / 2;
-const LOADER_TIMEOUT = 10000; // 10 seconds timeout
+const LOADER_TIMEOUT = 10000;
 
 const CategoryDetailsList = ({ navigation, route }: any) => {
   const { addToCart, cart } = useCart();
@@ -59,11 +56,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
   // Set loader with timeout
   const showLoader = useCallback(() => {
     setIsLoading(true);
-
-    // Clear any existing timeout
     clearLoaderTimeout();
-
-    // Set new timeout
     loaderTimeoutRef.current = setTimeout(() => {
       setIsLoading(false);
       Toast.show({
@@ -163,13 +156,13 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             Array.isArray(product?.variants) && product.variants.length > 0
               ? product.variants
               : [
-                  {
-                    price: product?.price || 0,
-                    weight: product?.weight || '',
-                    unit: product?.unit || '',
-                    id: product?.variant_id || null,
-                  },
-                ],
+                {
+                  price: product?.price || 0,
+                  weight: product?.weight || '',
+                  unit: product?.unit || '',
+                  id: product?.variant_id || null,
+                },
+              ],
           stock_quantity: product?.stock_quantity || product?.quantity || 0,
           is_cart: cartIds.has(productId) ? 'true' : 'false',
         };
@@ -180,7 +173,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     [cart],
   );
 
-  // 🧩 Fetch products based on mode
+  // Fetch products based on mode
   const fetchProducts = async (filterParams: any = {}) => {
     showLoader();
 
@@ -238,12 +231,12 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     }
   };
 
-  // 🧠 Fetch products initially
+  // Fetch products initially
   useEffect(() => {
     fetchProducts();
   }, [categoryId, mode]);
 
-  // 🔁 Recalculate `is_cart` whenever cart changes
+  // Recalculate `is_cart` whenever cart changes
   useEffect(() => {
     if (apiProducts.length > 0) {
       const updatedProducts = normalizeProducts(apiProducts);
@@ -279,36 +272,152 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     }
   };
 
-  // 🧩 Handle sorting of products
-  const ApiSorting = async (sortType: string) => {
-    showLoader();
-
+  // Client-side sorting function - FIXED
+  const clientSideSorting = (sortType: string) => {
     try {
-      const res = await UserService.Sorting(sortType);
+      const sortedProducts = [...apiProducts].sort((a, b) => {
+        switch (sortType) {
+          case 'price_low_to_high': {
+            const priceA = a.variants?.[0]?.price || a.price || 0;
+            const priceB = b.variants?.[0]?.price || b.price || 0;
+            return priceA - priceB;
+          }
 
-      if (res?.status === HttpStatusCode.Ok) {
-        const sortedProducts = res?.data?.data || [];
-        const normalizedProducts = normalizeProducts(sortedProducts);
+          case 'price_high_to_low': {
+            const priceA = a.variants?.[0]?.price || a.price || 0;
+            const priceB = b.variants?.[0]?.price || b.price || 0;
+            return priceB - priceA;
+          }
 
-        setApiProducts(normalizedProducts);
-        setSortVisible(false);
+          case 'name_a_to_z': {
+            const nameA = a.name || '';
+            const nameB = b.name || '';
+            return nameA.localeCompare(nameB);
+          }
 
-        Toast.show({
-          type: 'success',
-          text1: 'Products sorted successfully',
-        });
-      } else {
-        throw new Error('Failed to sort products');
-      }
-    } catch (error: any) {
-      console.log('Sorting error:', error);
+          case 'name_z_to_a': {
+            const nameA = a.name || '';
+            const nameB = b.name || '';
+            return nameB.localeCompare(nameA);
+          }
+
+          case 'rating_high_to_low': {
+            const ratingA = a.average_rating || 0;
+            const ratingB = b.average_rating || 0;
+            return ratingB - ratingA;
+          }
+
+          case 'newest_first': {
+            const dateA = new Date(a.created_at || 0).getTime();
+            const dateB = new Date(b.created_at || 0).getTime();
+            return dateB - dateA;
+          }
+
+          default:
+            return 0;
+        }
+      });
+
+      setApiProducts(sortedProducts);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Products sorted',
+      });
+    } catch (error) {
+      console.log('Client-side sorting error:', error);
       Toast.show({
         type: 'error',
         text1: 'Failed to sort products',
-        text2: error.message || 'Please try again',
+      });
+    }
+  };
+
+  // Handle sorting of products - FIXED SIMPLE VERSION
+  const handleSorting = async (sortType: string) => {
+    // Close modal immediately
+    setSortVisible(false);
+
+    // Show loading indicator
+    setIsLoading(true);
+
+    try {
+      // Try API sorting first
+      try {
+        const response = await UserService.Sorting(sortType);
+
+        // Check if response is valid
+        if (response && response.data) {
+          let sortedProducts = [];
+
+          // Handle different response structures
+          if (response.data.data) {
+            sortedProducts = Array.isArray(response.data.data)
+              ? response.data.data
+              : [];
+          } else if (Array.isArray(response.data)) {
+            sortedProducts = response.data;
+          } else if (Array.isArray(response)) {
+            sortedProducts = response;
+          }
+
+          // Filter by category if needed
+          if (categoryId && !mode) {
+            sortedProducts = sortedProducts.filter(
+              (product: any) => product.category_id == categoryId
+            );
+          }
+
+          // Normalize and set products
+          const normalizedProducts = normalizeProducts(sortedProducts);
+          setApiProducts(normalizedProducts);
+
+          Toast.show({
+            type: 'success',
+            text1: 'Products sorted successfully',
+          });
+
+          setIsLoading(false);
+          return;
+        }
+      } catch (apiError) {
+        console.log('API sorting failed:', apiError);
+      }
+
+      // If API fails, use client-side sorting
+      clientSideSorting(sortType);
+
+    } catch (error: any) {
+      console.log('Sorting error:', error);
+
+      // Final fallback to client-side sorting
+      clientSideSorting(sortType);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle resetting sorting
+  const resetSorting = async () => {
+    // Close modal immediately
+    setSortVisible(false);
+
+    // Show loading
+    setIsLoading(true);
+
+    try {
+      await fetchProducts();
+      Toast.show({
+        type: 'success',
+        text1: 'Sorting reset',
+      });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to reset sorting',
       });
     } finally {
-      hideLoader();
+      setIsLoading(false);
     }
   };
 
@@ -539,7 +648,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                           style={[
                             styles.ratingOption,
                             filterRating === String(r) &&
-                              styles.ratingOptionSelected,
+                            styles.ratingOptionSelected,
                           ]}
                           onPress={() => setFilterRating(String(r))}
                         >
@@ -547,7 +656,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                             style={[
                               styles.ratingOptionText,
                               filterRating === String(r) &&
-                                styles.ratingOptionTextSelected,
+                              styles.ratingOptionTextSelected,
                             ]}
                           >
                             {r}★
@@ -620,9 +729,9 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                         styles.modalButton,
                         styles.applyButton,
                         filterMinPrice &&
-                          filterMaxPrice &&
-                          Number(filterMinPrice) > Number(filterMaxPrice) &&
-                          styles.applyButtonDisabled,
+                        filterMaxPrice &&
+                        Number(filterMinPrice) > Number(filterMaxPrice) &&
+                        styles.applyButtonDisabled,
                       ]}
                       onPress={async () => {
                         if (
@@ -663,20 +772,20 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           </TouchableOpacity>
         </Modal>
 
-        {/* Sort Modal */}
+        {/* Sort Modal - SIMPLIFIED */}
         <Modal
           visible={sortVisible}
           animationType="slide"
           transparent
           onRequestClose={() => setSortVisible(false)}
         >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setSortVisible(false)}
-          >
-            <View style={styles.modalContainer}>
-              <View style={styles.sortModalContent}>
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={styles.modalContainer}
+              activeOpacity={1}
+              onPress={() => setSortVisible(false)}
+            >
+              <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Sort By</Text>
                   <TouchableOpacity onPress={() => setSortVisible(false)}>
@@ -687,28 +796,40 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                   </TouchableOpacity>
                 </View>
 
+                {/* Reset Option */}
+                <TouchableOpacity
+                  style={[styles.sortOption, styles.resetSortOption]}
+                  onPress={() => {
+                    resetSorting();
+                  }}
+                >
+                  <Text style={[styles.sortOptionText, styles.resetSortOptionText]}>
+                    Reset to Default
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Sorting Options */}
                 {[
-                  'price_low_to_high',
-                  'price_high_to_low',
-                  'name_a_to_z',
-                  'name_z_to_a',
-                ].map(sortType => (
+                  { id: 'price_low_to_high', label: 'Price: Low to High' },
+                  { id: 'price_high_to_low', label: 'Price: High to Low' },
+                  { id: 'name_a_to_z', label: 'Name: A to Z' },
+                  { id: 'name_z_to_a', label: 'Name: Z to A' },
+                  { id: 'rating_high_to_low', label: 'Rating: High to Low' },
+                  { id: 'newest_first', label: 'Newest First' },
+                ].map(sortOption => (
                   <TouchableOpacity
-                    key={sortType}
+                    key={sortOption.id}
                     style={styles.sortOption}
-                    onPress={() => ApiSorting(sortType)}
+                    onPress={() => {
+                      handleSorting(sortOption.id);
+                    }}
                   >
-                    <Text style={styles.sortOptionText}>
-                      {sortType === 'price_low_to_high' && 'Price: Low to High'}
-                      {sortType === 'price_high_to_low' && 'Price: High to Low'}
-                      {sortType === 'name_a_to_z' && 'Name: A to Z'}
-                      {sortType === 'name_z_to_a' && 'Name: Z to A'}
-                    </Text>
+                    <Text style={styles.sortOptionText}>{sortOption.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </Modal>
       </LinearGradient>
     </SafeAreaView>
@@ -884,7 +1005,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   addButton: {
-    backgroundColor: '#2DA3C7',
+    backgroundColor: '#AEB254',
     borderRadius: 20,
     paddingVertical: 8,
     alignItems: 'center',
@@ -951,6 +1072,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   keyboardAvoidingView: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -958,11 +1083,6 @@ const styles = StyleSheet.create({
   modalTouchable: {
     flex: 1,
     justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   modalContent: {
     backgroundColor: '#fff',
@@ -972,14 +1092,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
     maxHeight: '80%',
-  },
-  sortModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1098,5 +1210,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '400',
+  },
+  resetSortOption: {
+    backgroundColor: '#f5f5f5',
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  resetSortOptionText: {
+    color: '#666',
+    fontWeight: '500',
   },
 });

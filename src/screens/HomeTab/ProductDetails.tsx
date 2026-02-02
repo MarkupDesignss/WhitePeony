@@ -42,8 +42,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import { convertAndFormatPrice } from '../../utils/currencyUtils';
-// Add FastImage for better image performance
-import FastImage from 'react-native-fast-image';
 
 const wp = widthPercentageToDP;
 const hp = heightPercentageToDP;
@@ -125,7 +123,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const autoplayRef = useRef<NodeJS.Timeout | null>(null);
   const isInteracting = useRef(false);
   const mountedRef = useRef(true);
-  const cartCheckingRef = useRef(false);
 
   // Selectors & Queries
   const selectedCurrency = useAppSelector(
@@ -142,6 +139,28 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   );
 
   const variants = useMemo(() => productData?.variants || [], [productData]);
+
+  // Check if selected variant is in cart - optimized and fixed
+  const checkSelectedVariantInCart = useMemo(() => {
+    if (!productData || !selectedVariant || !Array.isArray(cart)) return false;
+
+    const currentProductId = productData.id;
+    const currentVariantId = selectedVariant.id;
+
+    return cart.some((item: any) => {
+      const cartProductId = item.product_id ?? item.id;
+      const cartVariantId = item.variant_id ?? item.variantId ?? null;
+      return (
+        Number(cartProductId) === Number(currentProductId) &&
+        String(cartVariantId) === String(currentVariantId)
+      );
+    });
+  }, [productData, selectedVariant, cart]);
+
+  // Update isInCart when selectedVariant or cart changes
+  useEffect(() => {
+    setIsInCart(checkSelectedVariantInCart);
+  }, [checkSelectedVariantInCart]);
 
   const weightItems = useMemo(
     () =>
@@ -165,30 +184,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     (img: string) =>
       img.startsWith('http') ? { uri: img } : { uri: `${baseUrl}${img}` },
     [baseUrl],
-  );
-
-  // Check if variant is in cart - optimized
-  const checkVariantInCart = useCallback(
-    (productId: string | number, variantId: string | number) => {
-      if (!Array.isArray(cart) || cartCheckingRef.current) return false;
-
-      cartCheckingRef.current = true;
-      try {
-        return cart.some((item: any) => {
-          const cartProductId = item.product_id ?? item.id;
-          const cartVariantId = item.variant_id ?? item.variantId ?? null;
-          return (
-            Number(cartProductId) === Number(productId) &&
-            String(cartVariantId) === String(variantId)
-          );
-        });
-      } finally {
-        setTimeout(() => {
-          cartCheckingRef.current = false;
-        }, 100);
-      }
-    },
-    [cart],
   );
 
   // Process product data efficiently
@@ -328,26 +323,15 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   );
 
   // Helper to set variant data
-  const setVariantsData = useCallback(
-    (processed: any) => {
-      const { firstVariant, price, actual, unit, allVariants } = processed;
+  const setVariantsData = useCallback((processed: any) => {
+    const { firstVariant, price, actual, unit, allVariants } = processed;
 
-      setDisplayPrice(price);
-      setActualPrice(actual);
-      setDisplayUnit(unit);
-      setSelectedVariant(firstVariant);
-      setSelectedIndex(0);
-
-      if (firstVariant && processed.product.id) {
-        const inCart = checkVariantInCart(
-          processed.product.id,
-          firstVariant.id,
-        );
-        setIsInCart(inCart);
-      }
-    },
-    [checkVariantInCart],
-  );
+    setDisplayPrice(price);
+    setActualPrice(actual);
+    setDisplayUnit(unit);
+    setSelectedVariant(firstVariant);
+    setSelectedIndex(0);
+  }, []);
 
   const loadRelatedProducts = useCallback(
     async (categoryId: string | string[]) => {
@@ -450,7 +434,13 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     return () => {
       mountedRef.current = false;
       stopAutoplay();
-      productCache.clear(); // Consider keeping cache but with limit
+      // Clear cache entries older than 10 minutes
+      const now = Date.now();
+      for (const [key, value] of productCache.entries()) {
+        if (now - value.timestamp > 10 * 60 * 1000) {
+          productCache.delete(key);
+        }
+      }
     };
   }, [loadProduct, proDuctID, stopAutoplay]);
 
@@ -467,14 +457,6 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }, [productImages.length, startAutoplay, stopAutoplay]),
   );
 
-  useEffect(() => {
-    if (variants.length > 0 && productData && !cartCheckingRef.current) {
-      const firstVariant = variants[0];
-      const inCart = checkVariantInCart(productData.id, firstVariant.id);
-      setIsInCart(inCart);
-    }
-  }, [variants, productData, checkVariantInCart]);
-
   // Handlers
   const handleVariantSelect = useCallback(
     (index: number, variant: ProductVariant) => {
@@ -483,17 +465,13 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       setActualPrice(variant.actual_price || variant.price || '0');
       setDisplayUnit(variant.unit || productData?.unit || '');
       setSelectedVariant(variant);
-
-      if (productData) {
-        const inCart = checkVariantInCart(productData.id, variant.id);
-        setIsInCart(inCart);
-      }
+      // isInCart will update automatically via useEffect that watches selectedVariant
     },
-    [productData, checkVariantInCart],
+    [productData],
   );
 
   const handleCartAction = useCallback(async () => {
-    if (!productData) return;
+    if (!productData || !selectedVariant) return;
 
     if (isInCart) {
       navigation.navigate('CheckoutScreen');
@@ -501,8 +479,8 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }
 
     try {
-      await addToCart(productData.id, selectedVariant?.id || null);
-      setIsInCart(true);
+      await addToCart(productData.id, selectedVariant.id);
+      // setIsInCart will be updated automatically via checkSelectedVariantInCart
       Toast.show({
         type: 'success',
         text1: 'Added to cart successfully!',
@@ -518,9 +496,8 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       }
     }
   }, [productData, isInCart, selectedVariant, addToCart, navigation]);
-
   const checkoutAction = useCallback(async () => {
-    if (!productData) return;
+    if (!productData || !selectedVariant) return;
 
     if (isInCart) {
       navigation.navigate('CheckoutScreen');
@@ -528,8 +505,8 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }
 
     try {
-      await addToCart(productData.id, selectedVariant?.id);
-      setIsInCart(true);
+      await addToCart(productData.id, selectedVariant.id);
+      // setIsInCart will be updated automatically via checkSelectedVariantInCart
       Toast.show({
         type: 'success',
         text1: 'Added to cart successfully!',
@@ -556,8 +533,10 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     setZoomVisible(false);
   }, []);
 
-  const CartButton = useCallback(() => {
-    if (productData?.stock_quantity === 0) {
+  const CartButton = useMemo(() => {
+    if (!productData) return null;
+
+    if (productData.stock_quantity === 0) {
       return <Text style={styles.outOfStock}>Out of Stock</Text>;
     }
 
@@ -566,6 +545,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         <TouchableOpacity
           style={[styles.cartButton, isInCart && styles.cartButtonActive]}
           onPress={handleCartAction}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.cartButtonText}>
             {isInCart ? 'Go to Cart' : 'Add to Bag'}
@@ -577,6 +557,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           onPress={() =>
             isLoggedIn ? checkoutAction() : setModalVisible(true)
           }
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.checkoutButtonText}>Check-Out</Text>
         </TouchableOpacity>
@@ -601,6 +582,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
@@ -612,7 +594,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* Header - Optimized with memo */}
+      {/* Header */}
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -630,6 +612,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           style={styles.currencyButton}
           onPress={() => setCurrencyModalVisible(true)}
           activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <View style={styles.currencyButtonContent}>
             <Text style={styles.currencySymbolSmall}>
@@ -648,6 +631,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           onPress={() => toggleWishlist(productData.id)}
           activeOpacity={0.7}
           style={styles.wishlistButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           {isWishlisted(productData.id) ? (
             <Video
@@ -678,7 +662,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         updateCellsBatchingPeriod={50}
         windowSize={5}
       >
-        {/* Image Carousel - Optimized with FastImage */}
+        {/* Image Carousel */}
         <View style={styles.carouselContainer}>
           {productImages.length > 0 ? (
             <>
@@ -721,14 +705,13 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                     activeOpacity={0.9}
                     onPress={() => openZoom(index)}
                     style={{ width: ITEM_FULL_WIDTH }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <View style={styles.imageContainer}>
-                      <FastImage
+                      <Image
                         source={resolveImageSource(item)}
                         style={styles.productImage}
-                        resizeMode={FastImage.resizeMode.cover}
-                        priority={FastImage.priority.normal}
-                        cacheControl={FastImage.cacheControl.immutable}
+                        resizeMode="cover"
                       />
                     </View>
                   </TouchableOpacity>
@@ -747,6 +730,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                         });
                         setActiveIndex(i);
                       }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <View
                         style={[
@@ -789,7 +773,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             </Text>
           )}
 
-          {/* Variant Selection - Optimized */}
+          {/* Variant Selection */}
           {variants.length > 0 && (
             <View style={styles.variantSection}>
               <Text style={styles.variantTitle}>Select an Unit</Text>
@@ -808,6 +792,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                         styles.variantButton,
                         isSelected && styles.variantButtonSelected,
                       ]}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       {hasDiscount && (
                         <LinearGradient
@@ -837,7 +822,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           )}
 
           {/* Cart Buttons */}
-          <CartButton />
+          {CartButton}
 
           {/* Description */}
           <View style={styles.descriptionSection}>
@@ -852,6 +837,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
               <TouchableOpacity
                 onPress={() => setDescExpanded(prev => !prev)}
                 activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Text style={styles.readMoreText}>
                   {descExpanded ? 'Read less' : 'Read more'}
@@ -860,7 +846,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             )}
           </View>
 
-          {/* Recommended Products - Lazy loaded */}
+          {/* Recommended Products */}
           {relatedProducts.length > 0 && (
             <View style={styles.recommendedSection}>
               <Text style={styles.sectionTitle}>Recommended For You</Text>
@@ -885,7 +871,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             </View>
           )}
 
-          {/* Reviews Section - Optimized */}
+          {/* Reviews Section */}
           <View style={styles.reviewsSection}>
             <Text style={styles.sectionTitle}>Customer Reviews</Text>
             <View style={styles.reviewsContent}>
@@ -923,12 +909,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   <View key={star} style={styles.ratingRow}>
                     <Text style={styles.ratingLabel}>{star}</Text>
                     <View style={styles.ratingBarBg}>
-                      <View
-                        style={[
-                          styles.ratingBarFill,
-                          { width: '40%' }, // Simplified for performance
-                        ]}
-                      />
+                      <View style={[styles.ratingBarFill, { width: '40%' }]} />
                     </View>
                   </View>
                 ))}
@@ -942,6 +923,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   ? Toast.show({ type: 'info', text1: 'No Review Found' })
                   : setShowModalVisible(true);
               }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={styles.showReviewsButtonText}>Show Review</Text>
             </TouchableOpacity>
@@ -1031,7 +1013,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   );
 };
 
-export default ProductDetails;
+export default React.memo(ProductDetails);
 
 const styles = StyleSheet.create({
   container: {

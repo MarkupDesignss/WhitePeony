@@ -16,6 +16,7 @@ import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import { Colors } from '../../constant';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const CategoryScreen = ({ navigation }) => {
   const { showLoader, hideLoader } = CommonLoader();
@@ -65,7 +66,7 @@ const CategoryScreen = ({ navigation }) => {
     }
   };
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar
         barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'}
       />
@@ -102,7 +103,7 @@ const CategoryScreen = ({ navigation }) => {
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    marginTop: StatusBar.currentHeight,
+
   },
   header: {
     height: 80,

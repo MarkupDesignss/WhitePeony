@@ -1745,7 +1745,7 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
 
               <TouchableOpacity
-                onPress={() => navigation.navigate('CategoryScreen')}
+                onPress={() => navigation.navigate('Category')}
               >
                 <View
                   style={{

@@ -8,7 +8,7 @@ const CategoryStackNavigator: FC = () => {
 
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Category" component={CategoryScreen} />
+            <Stack.Screen  name="Category" component={CategoryScreen} />
             <Stack.Screen
                 name="CategoryDetailsList"
                 component={CategoryDetailsList}
