@@ -34,7 +34,10 @@ import LoginModal from '../../components/LoginModal';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
-import { convertAndFormatPrice, getPriceDisplay } from '../../utils/currencyUtils';
+import {
+  convertAndFormatPrice,
+  getPriceDisplay,
+} from '../../utils/currencyUtils';
 // import {
 //   convertAndFormatPrice,
 //   getPriceDisplay,
@@ -51,8 +54,8 @@ const BIG_HEIGHT = SMALL_HEIGHT * 2 + GAP;
 
 const HomeScreen1 = ({ navigation }: any) => {
   const selectedCurrency = useAppSelector(
-    state => state.currency.selectedCurrency
-  )
+    state => state.currency.selectedCurrency,
+  );
   // Fetch rates with caching
   const { data: rates } = useGetRatesQuery(undefined, {
     refetchOnMountOrArgChange: false,
@@ -292,7 +295,6 @@ const HomeScreen1 = ({ navigation }: any) => {
   //   }
   // };
 
-
   useFocusEffect(
     React.useCallback(() => {
       console.log('Home screen focused, refreshing data...');
@@ -328,8 +330,6 @@ const HomeScreen1 = ({ navigation }: any) => {
   // Inside your HomeScreen1 component, add these logs:
   // Replace your current useEffect debug logs with this more detailed version:
 
-
-
   const RecommendProductsWithoutLoader = async () => {
     try {
       const res = await UserService.recommended();
@@ -350,17 +350,17 @@ const HomeScreen1 = ({ navigation }: any) => {
       isLoading,
       sampleItem: wishlistItems?.[0]
         ? {
-          id: wishlistItems[0]?.id,
-          name: wishlistItems[0]?.name,
-          product_type: wishlistItems[0]?.product_type,
-          front_image: wishlistItems[0]?.front_image,
-          variants: wishlistItems[0]?.variants,
-          // Check all possible properties
-          hasProductProperty: !!wishlistItems[0]?.product,
-          productId: wishlistItems[0]?.product?.id,
-          productName: wishlistItems[0]?.product?.name,
-          productFrontImage: wishlistItems[0]?.product?.front_image,
-        }
+            id: wishlistItems[0]?.id,
+            name: wishlistItems[0]?.name,
+            product_type: wishlistItems[0]?.product_type,
+            front_image: wishlistItems[0]?.front_image,
+            variants: wishlistItems[0]?.variants,
+            // Check all possible properties
+            hasProductProperty: !!wishlistItems[0]?.product,
+            productId: wishlistItems[0]?.product?.id,
+            productName: wishlistItems[0]?.product?.name,
+            productFrontImage: wishlistItems[0]?.product?.front_image,
+          }
         : null,
     });
   }, [wishlistItems, isLoggedIn, userType, isLoading]);
@@ -565,8 +565,6 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
-
-
   const bigsaleWithoutLoader = async () => {
     try {
       const res = await UserService.bigsales();
@@ -657,8 +655,9 @@ const HomeScreen1 = ({ navigation }: any) => {
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
-              }`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${
+              item?.product_id || ''
+            }`}
             style={styles.page}
           >
             <Image
@@ -1009,7 +1008,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                                     alignSelf: 'center',
                                     padding: 5,
                                     justifyContent: 'center',
-                                    marginTop: 10
+                                    marginTop: 10,
                                   }}
                                 >
                                   <Text
@@ -1022,7 +1021,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                                       textAlignVertical: 'center',
                                     }}
                                   >
-                                    {displayPrice(availableProducts[0]?.variants?.[0]?.price)}
+                                    {displayPrice(
+                                      availableProducts[0]?.variants?.[0]
+                                        ?.price,
+                                    )}
                                   </Text>
                                 </View>
                                 <View
@@ -1044,8 +1046,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                                     }}
                                   >
                                     {displayPrice(
-                                      availableProducts[0]?.variants?.[0]?.actual_price ||
-                                      0
+                                      availableProducts[0]?.variants?.[0]
+                                        ?.actual_price || 0,
                                     )}
                                   </Text>
                                 </View>
@@ -1339,25 +1341,87 @@ const HomeScreen1 = ({ navigation }: any) => {
               keyExtractor={(item, index) =>
                 item?.id ? String(item.id) : String(index)
               }
+              contentContainerStyle={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+              }}
               renderItem={({ item }) => {
                 return (
                   <TouchableOpacity
+                    style={styles.productCard}
+                    activeOpacity={0.7}
                     onPress={() =>
                       navigation.navigate('ProductDetails', {
                         productId: item?.product?.id,
                       })
                     }
                   >
-                    <View style={styles.featuredCard}>
+                    <View style={styles.productContainer}>
                       <Image
                         source={{ uri: Image_url + item?.product?.front_image }}
-                        style={styles.featuredImage}
+                        style={styles.productImage}
+                        resizeMode="contain"
                       />
+
+                      {/* Sale/Discount Tag */}
                       {item.tag && (
-                        <View style={styles.tag}>
-                          <Text style={styles.tagText}>{item.tag}</Text>
+                        <View style={styles.discountBadge}>
+                          <Text style={styles.discountText}>{item.tag}</Text>
                         </View>
                       )}
+
+                      {/* Product Info Container */}
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productName} numberOfLines={2}>
+                          {item.product?.name || 'Product Name'}
+                        </Text>
+
+                        {/* Price Container */}
+                        <View style={styles.priceContainer}>
+                          <Text style={styles.currentPrice}>
+                            {displayPrice(
+                              Math.round(item.product.price_range.min || 0),
+                            )}{' '}
+                            -{' '}
+                            {displayPrice(
+                              Math.round(item.product.price_range.max || 0),
+                            )}
+                          </Text>
+                          {item.product?.originalPrice && (
+                            <Text style={styles.originalPrice}>
+                              {displayPrice(item.product.originalPrice)}
+                            </Text>
+                          )}
+                          {item.product?.discount && (
+                            <Text style={styles.discountPercent}>
+                              {item.product.discount}% off
+                            </Text>
+                          )}
+                        </View>
+
+                        {/* Rating */}
+                        <View style={styles.ratingContainer}>
+                          <View style={styles.stars}>
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <Text key={star} style={styles.star}>
+                                ★
+                              </Text>
+                            ))}
+                          </View>
+                          <Text style={styles.ratingCount}>
+                            ({item.product?.ratingCount || '4.2'})
+                          </Text>
+                        </View>
+
+                        {/* Quick Delivery Badge */}
+                        {item.product?.fastDelivery && (
+                          <View style={styles.deliveryBadge}>
+                            <Text style={styles.deliveryText}>
+                              Free Delivery
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   </TouchableOpacity>
                 );
@@ -1384,8 +1448,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                 style={{ position: 'absolute', top: 10, alignItems: 'center' }}
               >
                 <Image
+                
                   source={require('../../assets/bigsales.png')}
-                  style={{ width: 75, height: 65, resizeMode: 'cover' }}
+                  style={{ width: 75, height: 65, resizeMode: 'contain' }}
                 />
                 <Text
                   style={{ fontSize: 12, fontWeight: '700', marginTop: 15 }}
@@ -1488,7 +1553,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                 paddingHorizontal: widthPercentageToDP(3),
               }}
             >
-              <Text style={[styles.sectionTitle, { alignSelf: 'center', }]}>
+              <Text style={[styles.sectionTitle, { alignSelf: 'center' }]}>
                 LOWEST PRICES EVER
               </Text>
               <FlatList
@@ -1525,12 +1590,20 @@ const HomeScreen1 = ({ navigation }: any) => {
                     }
 
                     // If no discounted price but we have main_price, use that as original
-                    if (!discountedPrice && !originalPrice && product?.main_price) {
+                    if (
+                      !discountedPrice &&
+                      !originalPrice &&
+                      product?.main_price
+                    ) {
                       originalPrice = product.main_price;
                     }
 
                     // If we have discounted price but no original, use main_price as original
-                    if (discountedPrice && !originalPrice && product?.main_price) {
+                    if (
+                      discountedPrice &&
+                      !originalPrice &&
+                      product?.main_price
+                    ) {
                       originalPrice = product.main_price;
                     }
 
@@ -1538,7 +1611,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                   };
 
                   const { discountedPrice, originalPrice } = getPriceInfo(item);
-                  const hasDiscount = discountedPrice && originalPrice && discountedPrice !== originalPrice;
+                  const hasDiscount =
+                    discountedPrice &&
+                    originalPrice &&
+                    discountedPrice !== originalPrice;
 
                   return (
                     <TouchableOpacity
@@ -1996,7 +2072,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                         style={{ flexDirection: 'row', alignItems: 'center' }}
                       >
                         <Text style={styles.smallPrice}>
-                          {displayPrice(item.variants[0]?.actual_price || item.variants[0]?.price)}
+                          {displayPrice(
+                            item.variants[0]?.actual_price ||
+                              item.variants[0]?.price,
+                          )}
                         </Text>
                         {item.variants[0]?.price && (
                           <Text style={styles.smallOldPrice}>
@@ -2211,7 +2290,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginVertical: heightPercentageToDP(1),
-    fontFamily: "REDHATDISPLAY-ITALIC"
+    fontFamily: 'REDHATDISPLAY-ITALIC',
   },
 
   freqCard: {
@@ -2336,5 +2415,128 @@ const styles = StyleSheet.create({
     width: 30,
     height: 6,
     borderRadius: 6,
+  },
+
+  productCard: {
+    width: 160,
+    marginRight: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+
+  productContainer: {
+    flex: 1,
+    padding: 12,
+  },
+
+  productImage: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+
+  discountBadge: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: '#FF3E6C',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    zIndex: 1,
+  },
+
+  discountText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: Fonts.Anciza_Medium_Italic,
+  },
+
+  productInfo: {
+    flex: 1,
+  },
+
+  productName: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#212121',
+    marginBottom: 6,
+    lineHeight: 18,
+    fontFamily: Fonts.Anciza_Medium_Italic,
+  },
+
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+
+  currentPrice: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#212121',
+    marginRight: 8,
+  },
+
+  originalPrice: {
+    fontSize: 13,
+    color: '#878787',
+    textDecorationLine: 'line-through',
+    marginRight: 6,
+  },
+
+  discountPercent: {
+    fontSize: 11,
+    color: '#388E3C',
+    fontWeight: '600',
+  },
+
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  stars: {
+    flexDirection: 'row',
+    marginRight: 4,
+  },
+
+  star: {
+    fontSize: 12,
+    color: '#FFD700',
+  },
+
+  ratingCount: {
+    fontSize: 11,
+    color: '#878787',
+  },
+
+  deliveryBadge: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+
+  deliveryText: {
+    fontSize: 10,
+    color: '#212121',
+    fontWeight: '500',
   },
 });

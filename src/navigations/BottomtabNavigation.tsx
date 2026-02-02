@@ -9,7 +9,7 @@ import EventScreen from '../screens/EventTab/EventScreen';
 import AccountScreen from '../screens/AccountTab/AccountScreen';
 import ArticleScreen from '../screens/ArticleTab/ArticleScreen';
 import HomeScreen1 from '../screens/HomeTab/HomeScreen1';
-
+import CategoryStackNavigator from './CategoryStackNavigation';
 const Tab = createBottomTabNavigator();
 
 interface CustomTabBarIconProps {
@@ -114,7 +114,7 @@ const BottomTabScreen = () => {
       />
       <Tab.Screen
         name="Category"
-        component={CategoryScreen}
+        component={CategoryStackNavigator}
         options={{ headerShown: false }}
       />
       <Tab.Screen

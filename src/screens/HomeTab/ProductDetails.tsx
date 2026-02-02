@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useContext,
+  useCallback,
+  useMemo,
+} from 'react';
 import {
   View,
   Text,
@@ -9,24 +16,21 @@ import {
   Dimensions,
   FlatList,
   Modal,
-  TextInput,
   ActivityIndicator,
   Animated,
-  Alert,
   StatusBar,
 } from 'react-native';
-// gesture handling for custom zoom removed in favor of `react-native-image-viewing`
 import { Colors } from '../../constant';
 import ImageView from 'react-native-image-viewing';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
-import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import Toast from 'react-native-toast-message';
 import { formatDate } from '../../helpers/helpers';
 import { WishlistContext } from '../../context';
 import { useCart } from '../../context/CartContext';
 import RecommendedProductCard from './RecommendedProductCard';
+import CurrencySelectorModal from '../../components/CurrencySelectorModal';
 import {
   heightPercentageToDP,
   widthPercentageToDP,
@@ -35,370 +39,460 @@ import LinearGradient from 'react-native-linear-gradient';
 import Video from 'react-native-video';
 import LoginModal from '../../components/LoginModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// Add these imports
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import { convertAndFormatPrice } from '../../utils/currencyUtils';
+// Add FastImage for better image performance
+import FastImage from 'react-native-fast-image';
+
 const wp = widthPercentageToDP;
 const hp = heightPercentageToDP;
-const HERO_HEIGHT = hp(28); // ✅ recommended
-
+const HERO_HEIGHT = hp(28);
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SIDE_SPACING = wp(4);
 const ITEM_SPACING = wp(3);
-
 const BANNER_WIDTH = SCREEN_WIDTH - SIDE_SPACING * 2;
 const ITEM_FULL_WIDTH = BANNER_WIDTH + ITEM_SPACING;
 
-
+// Cache for product data to avoid re-fetching
+const productCache = new Map();
 
 type ProductDetailsProps = {
   route: { params: { productId: string } };
 };
 
+interface ProductVariant {
+  id: string | number;
+  price: string;
+  actual_price?: string;
+  unit?: string;
+  weight?: string;
+  name?: string;
+  percentage?: number;
+  stock_quantity?: number;
+}
+
+interface ProductData {
+  id: string | number;
+  name: string;
+  description: string;
+  front_image?: string;
+  back_image?: string;
+  side_image?: string;
+  images: string[];
+  main_price?: string;
+  unit?: string;
+  category_id: string | string[];
+  variants: ProductVariant[];
+  average_rating?: number;
+  is_cart?: boolean;
+  stock_quantity?: number;
+}
+
 const ProductDetails = ({ route }: ProductDetailsProps) => {
-  const selectedCurrency = useAppSelector(
-    state => state.currency.selectedCurrency
-  );
-
-  // Fetch rates with caching
-  const { data: rates } = useGetRatesQuery(undefined, {
-    refetchOnMountOrArgChange: false,
-    refetchOnReconnect: true,
-  });
-
-  // Price display helper
-  const displayPrices = (priceEUR: any): string => {
-    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
-  };
-  const { addToCart, cart, isLoggedIn } = useCart(); // ✅ hook at top
   const { productId: proDuctID } = route.params;
   const navigation = useNavigation<any>();
-  const { showLoader, hideLoader } = CommonLoader();
   const { toggleWishlist, isWishlisted } = useContext(WishlistContext);
-  const [productData, setProductData] = useState<any>(null);
+  const { addToCart, cart, isLoggedIn } = useCart();
+
+  // State
+  const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
+  const [productData, setProductData] = useState<ProductData | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
-  const [baseUrl, setBaseUrl] = useState<string>(
+  const [baseUrl, setBaseUrl] = useState(
     'https://www.markupdesigns.net/whitepeony/storage/',
   );
-  const [selectedIndex, setSelectedIndex] = useState(null);
-  const [displayPrice, setDisplayPrice] = useState<any>('0');
-  const [actualPrice, setActualPrice] = useState<any>('0');
-  const [displayUnit, setDisplayUnit] = useState<string>('');
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [displayPrice, setDisplayPrice] = useState('0');
+  const [actualPrice, setActualPrice] = useState('0');
+  const [displayUnit, setDisplayUnit] = useState('');
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
+    null,
+  );
   const [isInCart, setIsInCart] = useState(false);
-  const [cartLoading, setCartLoading] = useState(false);
-  useEffect(() => {
-    // When variants load, check if first variant is in cart
-    if (variants.length > 0 && productData) {
-      const firstVariant = variants[0];
-      const present = Array.isArray(cart)
-        ? cart.some((c: any) => {
-          const cartProductId = c.product_id ?? c.id;
-          const cartVariantId = c.variant_id ?? null;
-          return (
-            Number(cartProductId) === Number(productData.id) &&
-            String(cartVariantId) === String(firstVariant.id)
-          );
-        })
-        : false;
-      setIsInCart(Boolean(present));
-    }
-  }, [variants, productData, cart]);
-
-  // Load a product by id and set up state (images, variants, related products, reviews)
-  const loadProduct = async (productId: any) => {
-    showLoader();
-    try {
-      const res = await UserService.productDetail(productId);
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        hideLoader();
-        const fetchedProducts = res.data?.data || [];
-        const resolvedBase = res.data?.base_url || baseUrl;
-        setBaseUrl(resolvedBase);
-
-        const first = Array.isArray(fetchedProducts)
-          ? fetchedProducts[0]
-          : fetchedProducts;
-
-        if (first) {
-          const images = [first.front_image, first.back_image, first.side_image]
-            .filter(Boolean)
-            .map((img: string) =>
-              img.startsWith('http') ? img : `${resolvedBase}${img}`,
-            );
-
-          const extraImgs = (first.images || []).map((img: string) =>
-            img.startsWith('http') ? img : `${resolvedBase}${img}`,
-          );
-          const allImages = extraImgs.length ? extraImgs : images;
-
-          const allVariants = first.variants || [];
-          setVariants(allVariants);
-
-          const variantItems = allVariants.map((v: any, index: number) => ({
-            label: `${v.weight || v.unit || v.name} - ₹${v.price}`,
-            value: v.id,
-            discount: v.percentage,
-          }));
-          setWeightItems(allVariants);
-          console.log('varients', allVariants);
-
-          const variant0 = allVariants.length ? allVariants[0] : null;
-          const price = variant0?.price || first.main_price || '0';
-          const actualPrice = variant0?.actual_price ?? variant0?.price ?? '0';
-          const unit = variant0?.unit || '';
-          const normalized = { ...first, images: allImages, price, unit };
-          setProductData(normalized);
-          setDisplayPrice(price);
-          setActualPrice(actualPrice);
-          setDisplayUnit(unit);
-
-          // fetch related products using first category if available
-          try {
-            const firstCategory = Array.isArray(normalized.category_id)
-              ? normalized.category_id[0]
-              : normalized.category_id;
-            if (firstCategory) await CategorieProduct(firstCategory);
-          } catch (e) {
-            hideLoader();
-          }
-          try {
-            const variantId = variant0?.id ?? null;
-            const present = Array.isArray(cart)
-              ? cart.some(
-                (c: any) =>
-                  (c.id ?? c.product_id) === normalized.id &&
-                  (c.variant_id ?? c.variantId ?? null) ===
-                  (variantId || null),
-              )
-              : false;
-            setIsInCart(Boolean(present || normalized?.is_cart));
-          } catch {
-            hideLoader();
-          }
-
-          if (variant0) {
-            setSelectedVariant(variant0);
-            setWeightValue(variant0.id);
-          }
-
-          // fetch reviews for this product
-          ShowReview(productId);
-        } else {
-          setProductData(null);
-        }
-      }
-    } catch (err) {
-      console.log('Product fetch error:', err);
-    }
-  };
-
-  const CategorieProduct = async (categoryIdParam?: any) => {
-    // Accept either an array or a single id (string/number)
-    try {
-      const categoryIdRaw = categoryIdParam || productData?.category_id;
-      let categoryId: any = null;
-      if (Array.isArray(categoryIdRaw)) categoryId = categoryIdRaw[0];
-      else if (typeof categoryIdRaw === 'string') {
-        try {
-          const parsed = JSON.parse(categoryIdRaw);
-          categoryId = Array.isArray(parsed) ? parsed[0] : parsed;
-        } catch {
-          categoryId = categoryIdRaw;
-        }
-      } else categoryId = categoryIdRaw;
-      if (!categoryId) {
-        setRelatedProducts([]);
-        return;
-      }
-      const res = await UserService.CatbyProduct(categoryId);
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res.data?.data || [];
-        console.log('Related products fetched for category:', categoryId);
-        const resolvedBase = res.data?.base_url || baseUrl;
-        setBaseUrl(resolvedBase);
-
-        const mapped = (
-          Array.isArray(fetchedProducts) ? fetchedProducts : [fetchedProducts]
-        ).map((p: any) => {
-          const images = [p.front_image, p.back_image, p.side_image]
-            .filter(Boolean)
-            .map((img: string) =>
-              img.startsWith('http') ? img : `${resolvedBase}${img}`,
-            );
-          const extraImgs = (p.images || []).map((img: string) =>
-            img.startsWith('http') ? img : `${resolvedBase}${img}`,
-          );
-          const allImages = extraImgs.length ? extraImgs : images;
-          const variant =
-            p.variants && p.variants.length ? p.variants[0] : null;
-          const price = variant?.price || p.main_price || p.price || '0';
-          const unit = variant?.unit || p.unit || '';
-          return { ...p, images: allImages, price, unit };
-        });
-        setRelatedProducts(mapped);
-      } else {
-        setRelatedProducts([]);
-      }
-    } catch (err) {
-      console.log('CategorieProduct error:', err);
-      setRelatedProducts([]);
-    }
-  };
-
-  const ShowReview = async (productIdParam?: any) => {
-    try {
-      const idToUse = productIdParam || proDuctID;
-      const res = await UserService.Reviewlist(idToUse);
-
-      if (res?.status === HttpStatusCode.Ok && res?.data) {
-        const { data } = res.data;
-        setReviews(data || []);
-        // console.log("review data", res?.data?.data[0]?.customer)
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: res?.data?.message || 'Something went wrong!',
-        });
-      }
-    } catch (e) {
-      hideLoader();
-      const error = e as any;
-      if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
-      } else {
-        // Toast.show({
-        //   type: 'error',
-        //   text1: error || 'Something went wrong!',
-        // });
-      }
-    }
-  };
-
-  useEffect(() => {
-    loadProduct(proDuctID);
-  }, []);
-
-  const productImages: any[] =
-    productData?.images && productData.images.length ? productData.images : [];
-
-  // helper to convert string URLs into image sources
-  const resolveImageSource = (img: any) =>
-    typeof img === 'string' ? { uri: img } : img;
-
-  // Reviews modal state
   const [showModalVisible, setShowModalVisible] = useState(false);
-  const [reviews, setReviews] = useState<Array<any>>([]);
-  // description expand/collapse
-  const [descExpanded, setDescExpanded] = useState<boolean>(false);
-  // weight dropdown state
-  const [weightValue, setWeightValue] = useState('0');
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [descExpanded, setDescExpanded] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [zoomVisible, setZoomVisible] = useState(false);
+  const [zoomIndex, setZoomIndex] = useState(0);
 
-  const [weightItems, setWeightItems] = useState<any[]>([]);
-  const [variants, setVariants] = useState<any[]>([]);
+  // Refs
+  const flatListRef = useRef<FlatList<any>>(null);
+  const animOpacity = useRef(new Animated.Value(1)).current;
+  const autoplayRef = useRef<NodeJS.Timeout | null>(null);
+  const isInteracting = useRef(false);
+  const mountedRef = useRef(true);
+  const cartCheckingRef = useRef(false);
 
-  // when productData changes, populate weightItems from variants
-  useEffect(() => {
-    if (productData && Array.isArray(productData.variants)) {
-      const items = productData.variants.map((v: any, i: number) => ({
+  // Selectors & Queries
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency,
+  );
+  const { data: rates } = useGetRatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+  });
+
+  // Memoized values
+  const productImages = useMemo(
+    () => (productData?.images?.length ? productData.images : []),
+    [productData],
+  );
+
+  const variants = useMemo(() => productData?.variants || [], [productData]);
+
+  const weightItems = useMemo(
+    () =>
+      variants.map((v, i) => ({
         label: v.unit || v.weight || `Option ${i + 1}`,
-        price: v.price,
-        unit: v.unit,
         value: v.id,
         discount: v.percentage,
-      }));
-      setWeightItems(items);
-      setVariants(productData.variants);
+      })),
+    [variants],
+  );
 
-      if (items.length) {
-        setSelectedIndex(0); // Set initial index to 0
-        const firstVariant = productData.variants[0];
-        setWeightValue(firstVariant.id);
-        setDisplayPrice(firstVariant.price ?? productData.main_price ?? '0');
-        setActualPrice(firstVariant.actual_price ?? firstVariant.price ?? '0');
-        setDisplayUnit(firstVariant.unit ?? productData.unit ?? '');
-        setSelectedVariant(firstVariant);
+  // Helper functions
+  const displayPrices = useCallback(
+    (priceEUR: any): string => {
+      return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+    },
+    [selectedCurrency, rates],
+  );
+
+  const resolveImageSource = useCallback(
+    (img: string) =>
+      img.startsWith('http') ? { uri: img } : { uri: `${baseUrl}${img}` },
+    [baseUrl],
+  );
+
+  // Check if variant is in cart - optimized
+  const checkVariantInCart = useCallback(
+    (productId: string | number, variantId: string | number) => {
+      if (!Array.isArray(cart) || cartCheckingRef.current) return false;
+
+      cartCheckingRef.current = true;
+      try {
+        return cart.some((item: any) => {
+          const cartProductId = item.product_id ?? item.id;
+          const cartVariantId = item.variant_id ?? item.variantId ?? null;
+          return (
+            Number(cartProductId) === Number(productId) &&
+            String(cartVariantId) === String(variantId)
+          );
+        });
+      } finally {
+        setTimeout(() => {
+          cartCheckingRef.current = false;
+        }, 100);
       }
+    },
+    [cart],
+  );
+
+  // Process product data efficiently
+  const processProductData = useCallback(
+    (product: any, resolvedBase: string) => {
+      // Process images - only get first 3 initially
+      const mainImages = [
+        product.front_image,
+        product.back_image,
+        product.side_image,
+      ]
+        .filter(Boolean)
+        .slice(0, 3)
+        .map(img => (img.startsWith('http') ? img : `${resolvedBase}${img}`));
+
+      const allVariants = product.variants || [];
+      const firstVariant = allVariants[0] || null;
+      const price = firstVariant?.price || product.main_price || '0';
+      const actual = firstVariant?.actual_price || price || '0';
+      const unit = firstVariant?.unit || '';
+
+      // Lazy load extra images
+      const extraImages = product.images
+        ? product.images
+            .slice(0, 3)
+            .map((img: string) =>
+              img.startsWith('http') ? img : `${resolvedBase}${img}`,
+            )
+        : [];
+
+      const allImages = extraImages.length ? extraImages : mainImages;
+
+      return {
+        product: {
+          ...product,
+          images: allImages,
+          price,
+          unit,
+        },
+        firstVariant,
+        price,
+        actual,
+        unit,
+        allVariants,
+        allImages,
+      };
+    },
+    [],
+  );
+
+  // Load product data - PARALLEL loading
+  const loadProduct = useCallback(
+    async (productId: string) => {
+      if (!mountedRef.current) return;
+
+      setLoading(true);
+
+      // Check cache first
+      const cacheKey = `product_${productId}`;
+      const cachedData = productCache.get(cacheKey);
+
+      if (cachedData && Date.now() - cachedData.timestamp < 5 * 60 * 1000) {
+        // 5 minute cache
+        const { data, baseUrl: cachedBase } = cachedData;
+        setBaseUrl(cachedBase);
+
+        const processed = processProductData(data, cachedBase);
+        setProductData(processed.product);
+        setVariantsData(processed);
+
+        // Load related products and reviews in parallel
+        Promise.all([
+          loadRelatedProducts(data.category_id),
+          loadReviews(productId),
+        ]).finally(() => {
+          if (mountedRef.current) {
+            setLoading(false);
+          }
+        });
+
+        return;
+      }
+
+      try {
+        const res = await UserService.productDetail(productId);
+
+        if (res?.status === HttpStatusCode.Ok && res.data?.data) {
+          const fetchedProducts = Array.isArray(res.data.data)
+            ? res.data.data
+            : [res.data.data];
+          const resolvedBase = res.data.base_url || baseUrl;
+
+          // Cache the data
+          productCache.set(cacheKey, {
+            data: fetchedProducts[0],
+            baseUrl: resolvedBase,
+            timestamp: Date.now(),
+          });
+
+          setBaseUrl(resolvedBase);
+          const product = fetchedProducts[0];
+
+          if (!product) {
+            setProductData(null);
+            setLoading(false);
+            return;
+          }
+
+          const processed = processProductData(product, resolvedBase);
+          setProductData(processed.product);
+          setVariantsData(processed);
+
+          // Load related products and reviews IN PARALLEL
+          const promises = [];
+
+          if (product.category_id) {
+            promises.push(loadRelatedProducts(product.category_id));
+          }
+
+          promises.push(loadReviews(productId));
+
+          await Promise.all(promises);
+        }
+      } catch (error) {
+        console.error('Product fetch error:', error);
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to load product',
+        });
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [processProductData],
+  );
+
+  // Helper to set variant data
+  const setVariantsData = useCallback(
+    (processed: any) => {
+      const { firstVariant, price, actual, unit, allVariants } = processed;
+
+      setDisplayPrice(price);
+      setActualPrice(actual);
+      setDisplayUnit(unit);
+      setSelectedVariant(firstVariant);
+      setSelectedIndex(0);
+
+      if (firstVariant && processed.product.id) {
+        const inCart = checkVariantInCart(
+          processed.product.id,
+          firstVariant.id,
+        );
+        setIsInCart(inCart);
+      }
+    },
+    [checkVariantInCart],
+  );
+
+  const loadRelatedProducts = useCallback(
+    async (categoryId: string | string[]) => {
+      try {
+        let categoryIdToUse: string | undefined;
+
+        if (Array.isArray(categoryId)) {
+          categoryIdToUse = categoryId[0];
+        } else if (typeof categoryId === 'string') {
+          try {
+            const parsed = JSON.parse(categoryId);
+            categoryIdToUse = Array.isArray(parsed) ? parsed[0] : parsed;
+          } catch {
+            categoryIdToUse = categoryId;
+          }
+        } else {
+          categoryIdToUse = String(categoryId);
+        }
+
+        if (!categoryIdToUse) return;
+
+        const res = await UserService.CatbyProduct(categoryIdToUse);
+        if (res?.status === HttpStatusCode.Ok && res.data?.data) {
+          const fetchedProducts = Array.isArray(res.data.data)
+            ? res.data.data
+            : [res.data.data];
+          const resolvedBase = res.data.base_url || baseUrl;
+
+          // Only process first 5 related products initially
+          const initialProducts = fetchedProducts.slice(0, 5).map((p: any) => {
+            const mainImages = [p.front_image, p.back_image, p.side_image]
+              .filter(Boolean)
+              .slice(0, 1)
+              .map(img =>
+                img.startsWith('http') ? img : `${resolvedBase}${img}`,
+              );
+
+            const variant = p.variants?.[0] || null;
+            const price = variant?.price || p.main_price || p.price || '0';
+            const unit = variant?.unit || p.unit || '';
+
+            return { ...p, images: mainImages, price, unit };
+          });
+
+          setRelatedProducts(initialProducts);
+        }
+      } catch (error) {
+        console.error('Related products error:', error);
+      }
+    },
+    [baseUrl],
+  );
+
+  const loadReviews = useCallback(async (productId: string) => {
+    try {
+      const res = await UserService.Reviewlist(productId);
+      if (res?.status === HttpStatusCode.Ok && res.data?.data) {
+        // Only show first 3 reviews initially
+        setReviews(res.data.data.slice(0, 3) || []);
+      }
+    } catch (error) {
+      console.error('Reviews fetch error:', error);
     }
-  }, [productData]);
-  // carousel state
-  const [activeIndex, setActiveIndex] = useState<number>(0);
-  const flatListRef = useRef<FlatList<any> | null>(null);
-  const animOpacity = useRef(new Animated.Value(1)).current;
-  const autoplayRef = useRef<number | null>(null);
+  }, []);
 
-  const [isInteracting, setIsInteracting] = useState(false);
+  // Carousel autoplay - optimized
+  const startAutoplay = useCallback(() => {
+    if (
+      autoplayRef.current ||
+      isInteracting.current ||
+      productImages.length <= 1
+    )
+      return;
 
-  useEffect(() => {
-    startAutoplay();
-    return () => stopAutoplay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex, isInteracting]);
+    autoplayRef.current = setTimeout(() => {
+      const nextIndex = (activeIndex + 1) % productImages.length;
 
-  // reset active index when product images change
-  useEffect(() => {
-    setActiveIndex(0);
-    stopAutoplay();
-    startAutoplay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productImages.length]);
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setActiveIndex(nextIndex);
 
-  const startAutoplay = () => {
-    if (autoplayRef.current != null) return;
-    if (isInteracting) return;
-    // do not start autoplay if there's 0 or 1 image
-    if (!productImages || productImages.length <= 1) return;
-    autoplayRef.current = setInterval(() => {
-      const next = (activeIndex + 1) % productImages.length;
-      animateToIndex(next);
-    }, 3000) as unknown as number;
-  };
+      // Restart autoplay
+      startAutoplay();
+    }, 3000);
+  }, [activeIndex, productImages.length]);
 
-  const stopAutoplay = () => {
+  const stopAutoplay = useCallback(() => {
     if (autoplayRef.current) {
-      clearInterval(autoplayRef.current as any);
+      clearTimeout(autoplayRef.current);
       autoplayRef.current = null;
     }
-  };
+  }, []);
 
-  const animateToIndex = (nextIndex: number) => {
-    // fade out
-    Animated.timing(animOpacity, {
-      toValue: 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: false });
-      setActiveIndex(nextIndex);
-      // fade in
-      Animated.timing(animOpacity, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    });
-  };
+  // Effects with cleanup
+  useEffect(() => {
+    mountedRef.current = true;
 
-  // zoom modal state
-  const [zoomVisible, setZoomVisible] = useState<boolean>(false);
-  const [zoomIndex, setZoomIndex] = useState<number>(0);
-  const [zoomScale, setZoomScale] = useState<number>(1);
+    // Load product immediately
+    loadProduct(proDuctID);
 
-  const openZoom = (index: number) => {
-    setZoomIndex(index);
-    setZoomScale(1);
-    setZoomVisible(true);
-  };
+    return () => {
+      mountedRef.current = false;
+      stopAutoplay();
+      productCache.clear(); // Consider keeping cache but with limit
+    };
+  }, [loadProduct, proDuctID, stopAutoplay]);
 
-  const closeZoom = () => {
-    setZoomVisible(false);
-    setZoomScale(1);
-  };
+  useFocusEffect(
+    useCallback(() => {
+      // Restart autoplay when screen is focused
+      if (productImages.length > 1) {
+        startAutoplay();
+      }
 
-  // Unified cart action handler for main product
-  const handleCartAction = async () => {
+      return () => {
+        stopAutoplay();
+      };
+    }, [productImages.length, startAutoplay, stopAutoplay]),
+  );
+
+  useEffect(() => {
+    if (variants.length > 0 && productData && !cartCheckingRef.current) {
+      const firstVariant = variants[0];
+      const inCart = checkVariantInCart(productData.id, firstVariant.id);
+      setIsInCart(inCart);
+    }
+  }, [variants, productData, checkVariantInCart]);
+
+  // Handlers
+  const handleVariantSelect = useCallback(
+    (index: number, variant: ProductVariant) => {
+      setSelectedIndex(index);
+      setDisplayPrice(variant.price || productData?.main_price || '0');
+      setActualPrice(variant.actual_price || variant.price || '0');
+      setDisplayUnit(variant.unit || productData?.unit || '');
+      setSelectedVariant(variant);
+
+      if (productData) {
+        const inCart = checkVariantInCart(productData.id, variant.id);
+        setIsInCart(inCart);
+      }
+    },
+    [productData, checkVariantInCart],
+  );
+
+  const handleCartAction = useCallback(async () => {
     if (!productData) return;
 
     if (isInCart) {
@@ -407,17 +501,15 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     }
 
     try {
-      // Pass the selected variant id
       await addToCart(productData.id, selectedVariant?.id || null);
-      setProductData((prev: any) => (prev ? { ...prev, is_cart: true } : prev));
+      setIsInCart(true);
       Toast.show({
         type: 'success',
         text1: 'Added to cart successfully!',
       });
-    } catch (e) {
-      const error = e as any;
+    } catch (error: any) {
       if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
+        setModalVisible(true);
       } else {
         Toast.show({
           type: 'error',
@@ -425,9 +517,9 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         });
       }
     }
-  };
+  }, [productData, isInCart, selectedVariant, addToCart, navigation]);
 
-  const checkoutAction = async () => {
+  const checkoutAction = useCallback(async () => {
     if (!productData) return;
 
     if (isInCart) {
@@ -437,43 +529,40 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
 
     try {
       await addToCart(productData.id, selectedVariant?.id);
-      // mark in-cart immediately without waiting for API flag
-      setProductData((prev: any) => (prev ? { ...prev, is_cart: true } : prev));
-      // Show success message
+      setIsInCart(true);
       Toast.show({
         type: 'success',
         text1: 'Added to cart successfully!',
       });
       navigation.navigate('CheckoutScreen');
-    } catch (e) {
-      const error = e as any;
+    } catch (error: any) {
       if (error.status === 401) {
-        console.log('Unauthorized access - perhaps token expired');
+        setModalVisible(true);
       } else {
         Toast.show({
           type: 'error',
-          text1: error || 'Something went wrong!',
+          text1: error?.message || 'Something went wrong!',
         });
       }
     }
-  };
+  }, [productData, isInCart, selectedVariant, addToCart, navigation]);
 
-  // Replace existing cart button with new component
-  // Replace existing cart button with new component
-  const CartButton = () => {
+  const openZoom = useCallback((index: number) => {
+    setZoomIndex(index);
+    setZoomVisible(true);
+  }, []);
+
+  const closeZoom = useCallback(() => {
+    setZoomVisible(false);
+  }, []);
+
+  const CartButton = useCallback(() => {
     if (productData?.stock_quantity === 0) {
       return <Text style={styles.outOfStock}>Out of Stock</Text>;
     }
 
     return (
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          marginTop: heightPercentageToDP(3),
-          width: '100%',
-        }}
-      >
+      <View style={styles.cartButtonContainer}>
         <TouchableOpacity
           style={[styles.cartButton, isInCart && styles.cartButtonActive]}
           onPress={handleCartAction}
@@ -484,583 +573,460 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => {
-            if (isLoggedIn) {
-              checkoutAction();
-            } else {
-              setModalVisible(true);
-            }
-          }}
+          style={styles.checkoutButton}
+          onPress={() =>
+            isLoggedIn ? checkoutAction() : setModalVisible(true)
+          }
         >
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: '#999',
-              borderRadius: 20,
-              height: 45,
-              justifyContent: 'center',
-              width: widthPercentageToDP(40),
-            }}
-          >
-            <Text
-              style={{ fontSize: 12, fontWeight: '700', alignSelf: 'center' }}
-            >
-              Check-Out
-            </Text>
-          </View>
+          <Text style={styles.checkoutButtonText}>Check-Out</Text>
         </TouchableOpacity>
       </View>
     );
-  };
+  }, [productData, isInCart, handleCartAction, checkoutAction, isLoggedIn]);
 
-  // Example review data (from backend)
-  const reviewStats = {
-    average_rating: productData?.average_rating || 0,
-    total_reviews: productData?.reviews?.length || 0,
-    breakdown: {
-      5: 2,
-      4: 1,
-      3: 0,
-      2: 0,
-      1: 0,
-    },
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.button[100]} />
+        <Text style={styles.loadingText}>Loading product...</Text>
+      </SafeAreaView>
+    );
+  }
 
-  const total = Object.values(reviewStats.breakdown).reduce((a, b) => a + b, 0);
-  const average = reviewStats.average_rating || 0;
+  if (!productData) {
+    return (
+      <SafeAreaView style={styles.errorContainer}>
+        <Text style={styles.errorText}>Product not found</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+      {/* Header - Optimized with memo */}
       <View style={styles.headerRow}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Image
             source={require('../../assets/Png/back.png')}
-            style={{ width: 20, height: 20 }}
+            style={styles.backIcon}
+            resizeMode="contain"
           />
         </TouchableOpacity>
 
-        <View style={styles.headerRightVideo}>
-          <TouchableOpacity
-            onPress={() => toggleWishlist(productData?.id)}
-            activeOpacity={0.7}
-            style={{ position: 'absolute', top: 10, right: 10 }}
-          >
-            {isWishlisted(productData?.id) ? (
-              <Video
-                source={require('../../assets/Png/splash.mp4')}
-                style={{
-                  width: 25,
-                  height: 25,
-                  borderRadius: 15,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-                muted={true}
-                repeat={false}
-                resizeMode="cover"
-                onError={e => console.log('Video error', e)}
+        <TouchableOpacity
+          style={styles.currencyButton}
+          onPress={() => setCurrencyModalVisible(true)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.currencyButtonContent}>
+            <Text style={styles.currencySymbolSmall}>
+              {selectedCurrency === 'USD'
+                ? '$'
+                : selectedCurrency === 'EUR'
+                ? '€'
+                : 'Kč'}
+            </Text>
+            <Text style={styles.currencyCodeText}>{selectedCurrency}</Text>
+            <Text style={styles.arrowDown}>▼</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => toggleWishlist(productData.id)}
+          activeOpacity={0.7}
+          style={styles.wishlistButton}
+        >
+          {isWishlisted(productData.id) ? (
+            <Video
+              source={require('../../assets/Png/splash.mp4')}
+              style={styles.wishlistVideo}
+              muted
+              repeat={false}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.wishlistIconContainer}>
+              <Image
+                source={require('../../assets/Png/heart-1.png')}
+                style={styles.wishlistIcon}
+                resizeMode="contain"
               />
-            ) : (
-              // Use the outline heart image for non-wishlisted state so touch events are not intercepted
-              <View
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 15,
-                  backgroundColor: Colors.button[100],
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Image
-                  source={require('../../assets/Png/heart-1.png')}
-                  style={{
-                    position: 'absolute',
-                    width: 15,
-                    height: 15,
-                    alignSelf: 'center',
-                  }}
-                />
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={{ paddingHorizontal: 12 }}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        windowSize={5}
       >
-
-        {/* Image carousel with dots */}
+        {/* Image Carousel - Optimized with FastImage */}
         <View style={styles.carouselContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={productImages}
-            horizontal
-            pagingEnabled={false}
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={ITEM_FULL_WIDTH}
-            decelerationRate="fast"
-            disableIntervalMomentum
-            contentContainerStyle={{
-
-            }}
-            keyExtractor={(_, i) => String(i)}
-            getItemLayout={(_, index) => ({
-              length: ITEM_FULL_WIDTH,
-              offset: ITEM_FULL_WIDTH * index,
-              index,
-            })}
-            onMomentumScrollEnd={e => {
-              const index = Math.round(
-                e.nativeEvent.contentOffset.x / ITEM_FULL_WIDTH,
-              );
-              setActiveIndex(index);
-            }}
-            renderItem={({ item, index }) => (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => openZoom(index)}
-                onPressIn={() => {
-                  setIsInteracting(true);
+          {productImages.length > 0 ? (
+            <>
+              <FlatList
+                ref={flatListRef}
+                data={productImages}
+                horizontal
+                pagingEnabled={false}
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={ITEM_FULL_WIDTH}
+                decelerationRate="fast"
+                disableIntervalMomentum
+                contentContainerStyle={styles.carouselContent}
+                keyExtractor={(_, i) => `image_${i}`}
+                getItemLayout={(_, index) => ({
+                  length: ITEM_FULL_WIDTH,
+                  offset: ITEM_FULL_WIDTH * index,
+                  index,
+                })}
+                initialNumToRender={2}
+                maxToRenderPerBatch={3}
+                windowSize={3}
+                removeClippedSubviews={true}
+                onMomentumScrollEnd={e => {
+                  const index = Math.round(
+                    e.nativeEvent.contentOffset.x / ITEM_FULL_WIDTH,
+                  );
+                  setActiveIndex(index);
+                }}
+                onScrollBeginDrag={() => {
+                  isInteracting.current = true;
                   stopAutoplay();
                 }}
-                onPressOut={() => {
-                  setIsInteracting(false);
+                onScrollEndDrag={() => {
+                  isInteracting.current = false;
                   startAutoplay();
                 }}
-                style={{ width: ITEM_FULL_WIDTH }}
-              >
-                <View
-                  style={{
-                    width: BANNER_WIDTH,
-                    height: HERO_HEIGHT,
-                    marginRight: ITEM_SPACING,
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    backgroundColor: '#f4f4f4',
-                  }}
-                >
-                  <Animated.View style={{ flex: 1, opacity: animOpacity }}>
-                    <Image
-                      source={resolveImageSource(item)}
-                      style={{
-                        width: '100%',
-                        height: '100%',
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => openZoom(index)}
+                    style={{ width: ITEM_FULL_WIDTH }}
+                  >
+                    <View style={styles.imageContainer}>
+                      <FastImage
+                        source={resolveImageSource(item)}
+                        style={styles.productImage}
+                        resizeMode={FastImage.resizeMode.cover}
+                        priority={FastImage.priority.normal}
+                        cacheControl={FastImage.cacheControl.immutable}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+
+              {productImages.length > 1 && (
+                <View style={styles.dotsContainer}>
+                  {productImages.map((_, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      onPress={() => {
+                        flatListRef.current?.scrollToIndex({
+                          index: i,
+                          animated: true,
+                        });
+                        setActiveIndex(i);
                       }}
-                      resizeMode="cover"
-                    />
-                  </Animated.View>
+                    >
+                      <View
+                        style={[
+                          styles.dot,
+                          i === activeIndex
+                            ? styles.dotActive
+                            : styles.dotInactive,
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </TouchableOpacity>
-            )}
-          />
-
-
-          {/* Dots Indicator - Only show if more than 1 image */}
-          {productImages.length > 1 && (
-            <View style={styles.dotsContainer}>
-              {productImages.map((_, i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => {
-                    if (flatListRef.current) {
-                      flatListRef.current.scrollToIndex({
-                        index: i,
-                        animated: true,
-                      });
-                      setActiveIndex(i);
-                    }
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.dot,
-                      i === activeIndex ? styles.dotActive : styles.dotInactive,
-                    ]}
-                  />
-                </TouchableOpacity>
-              ))}
+              )}
+            </>
+          ) : (
+            <View style={styles.noImageContainer}>
+              <Text style={styles.noImageText}>No images available</Text>
             </View>
           )}
         </View>
 
-        {/* No Images Placeholder */}
-        {(!productImages || productImages.length === 0) && (
-          <View style={styles.noImageContainer}>
-            <Text style={styles.noImageText}>No images available</Text>
-          </View>
-        )}
-
-        {/* Zoom viewer using react-native-image-viewing */}
-        <ImageView
-          images={productImages.map((img: any) =>
-            typeof img === 'string' ? { uri: img } : img,
-          )}
-          imageIndex={zoomIndex}
-          visible={zoomVisible}
-          onRequestClose={closeZoom}
-          swipeToCloseEnabled={true}
-          doubleTapToZoomEnabled={true}
-        />
-
-        <LoginModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          onGoogleLogin={() => Alert.alert('Google Login')}
-          onFacebookLogin={() => Alert.alert('Facebook Login')}
-          phoneNumber="email or phone number"
-        />
-
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: 16,
-          }}
-        >
-          <Text style={styles.title}>
-            {productData?.name !== null ? productData?.name : ''}
-          </Text>
-          <Text style={{ color: '#F0C419', fontSize: 14, fontWeight: '700' }}>
-            ★{' '}
-            <Text style={{ color: '#000', fontWeight: '500' }}>
-              ({productData?.average_rating})
+        {/* Product Info */}
+        <View style={styles.productInfo}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={2}>
+              {productData.name || ''}
             </Text>
-          </Text>
-        </View>
-        <Text style={styles.price}>{displayPrices(actualPrice)} </Text>
-        {actualPrice !== displayPrice && (
-          <Text
-            style={{
-              ...styles.price,
-              fontSize: 12,
-              textDecorationLine: 'line-through',
-              color: '#999',
-            }}
-          >
-            {displayPrices(displayPrice)}
-          </Text>
-        )}
-        <View style={{ marginTop: heightPercentageToDP(2) }}>
-          <Text style={{ fontWeight: '600', fontSize: 12 }}>
-            Select an Unit
-          </Text>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: 10,
-              marginTop: heightPercentageToDP(1),
-            }}
-          >
-            {weightItems.map((item, index) => {
-              const isSelected = selectedIndex === index;
-              const variant = variants[index];
-
-              return (
-                <TouchableOpacity
-                  key={item.value}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    if (variant) {
-                      setSelectedIndex(index);
-                      // Get prices from the variant, not from item
-                      setDisplayPrice(
-                        variant.price || productData?.main_price || '0',
-                      );
-                      setActualPrice(
-                        variant.actual_price || variant.price || '0',
-                      );
-                      setDisplayUnit(variant.unit || productData?.unit || '');
-                      setSelectedVariant(variant);
-                      setWeightValue(variant.id);
-
-                      // Check if this specific variant is in cart
-                      const present = Array.isArray(cart)
-                        ? cart.some((c: any) => {
-                          const cartProductId = c.product_id ?? c.id;
-                          const cartVariantId = c.variant_id ?? null;
-                          return (
-                            Number(cartProductId) ===
-                            Number(productData?.id) &&
-                            String(cartVariantId) === String(variant.id)
-                          );
-                        })
-                        : false;
-                      setIsInCart(Boolean(present));
-                    }
-                  }}
-                  style={{
-                    borderColor: isSelected ? '#000' : Colors.text[400],
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    height: item.discount != 0 || null ? 50 : 40,
-                    width: widthPercentageToDP(25),
-                    marginBottom: heightPercentageToDP(1),
-                    backgroundColor: '#FFF',
-                  }}
-                >
-                  {/* percentage badge */}
-                  {item.discount != 0 || null ? (
-                    <LinearGradient
-                      colors={[Colors.button[100], '#ffffff']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{
-                        borderTopLeftRadius: 6,
-                        borderTopRightRadius: 6,
-                        paddingVertical: 2,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          fontWeight: '500',
-                          paddingLeft: 8,
-                        }}
-                      >
-                        {item.discount}% OFF
-                      </Text>
-                    </LinearGradient>
-                  ) : null}
-
-                  {/* Unit */}
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      alignSelf: 'center',
-                      marginTop: item.discount != 0 || null ? 6 : 10,
-                      color: isSelected ? '#000' : '#333',
-                    }}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <CartButton />
-
-        <Text style={{ marginTop: 20, fontWeight: '700' }}>
-          Product Description
-        </Text>
-        <Text
-          style={{ marginTop: 8, lineHeight: 20, color: '#333' }}
-          numberOfLines={descExpanded ? undefined : 3}
-        >
-          {productData?.description ?? ''}
-        </Text>
-        {descExpanded ? (
-          <TouchableOpacity
-            onPress={() => setDescExpanded(prev => !prev)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={{
-                marginTop: 8,
-                color: Colors.button[100],
-                fontWeight: '700',
-              }}
-            >
-              {descExpanded ? 'Read less' : 'Read more'}
+            <Text style={styles.rating}>
+              ★{' '}
+              <Text style={styles.ratingCount}>
+                ({productData.average_rating || 0})
+              </Text>
             </Text>
-          </TouchableOpacity>
-        ) : null}
+          </View>
 
-        {/* recommended row placeholder */}
-        <Text style={{ marginTop: 20, fontWeight: '700', bottom: 10 }}>
-          Recommended For You
-        </Text>
-
-        <FlatList
-          data={relatedProducts}
-          keyExtractor={i => String(i.id)}
-          renderItem={({ item }) => (
-            <RecommendedProductCard
-              item={item}
-              navigation={navigation}
-              loadProduct={loadProduct}
-            />
+          <Text style={styles.price}>{displayPrices(actualPrice)}</Text>
+          {actualPrice !== displayPrice && (
+            <Text style={styles.originalPrice}>
+              {displayPrices(displayPrice)}
+            </Text>
           )}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
 
-        {/* Customer Reviews Section */}
-        <View style={styles.reviewsSection}>
-          <Text style={styles.reviewsTitle}>Customer Reviews</Text>
+          {/* Variant Selection - Optimized */}
+          {variants.length > 0 && (
+            <View style={styles.variantSection}>
+              <Text style={styles.variantTitle}>Select an Unit</Text>
+              <View style={styles.variantContainer}>
+                {variants.map((variant, index) => {
+                  const isSelected = selectedIndex === index;
+                  const hasDiscount =
+                    variant.percentage && variant.percentage > 0;
 
-          <View style={styles.reviewsRow}>
-            {/* LEFT SIDE: Average Score + Stars */}
-            <View style={styles.reviewsLeft}>
-              <Text style={styles.reviewsScore}>{average.toFixed(1)}</Text>
-
-              {/* Stars display (with half-star overlay trick) */}
-              <View style={{ flexDirection: 'row', marginTop: 6 }}>
-                {[1, 2, 3, 4, 5].map(r => {
-                  const isFull = average >= r;
-                  const isHalf = average >= r - 0.5 && average < r;
                   return (
-                    <View
-                      key={r}
-                      style={{ width: 18, height: 18, position: 'relative' }}
+                    <TouchableOpacity
+                      key={`variant_${variant.id}`}
+                      activeOpacity={0.8}
+                      onPress={() => handleVariantSelect(index, variant)}
+                      style={[
+                        styles.variantButton,
+                        isSelected && styles.variantButtonSelected,
+                      ]}
                     >
+                      {hasDiscount && (
+                        <LinearGradient
+                          colors={[Colors.button[100], '#ffffff']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.discountBadge}
+                        >
+                          <Text style={styles.discountText}>
+                            {variant.percentage}% OFF
+                          </Text>
+                        </LinearGradient>
+                      )}
                       <Text
-                        style={{
-                          color: '#ccc',
-                          fontSize: 18,
-                          position: 'absolute',
-                        }}
+                        style={[
+                          styles.variantText,
+                          isSelected && styles.variantTextSelected,
+                        ]}
                       >
-                        ★
+                        {variant.unit || variant.weight || variant.name}
                       </Text>
-                      <View
-                        style={{
-                          width: isFull ? '100%' : isHalf ? '50%' : '0%',
-                          overflow: 'hidden',
-                          position: 'absolute',
-                        }}
-                      >
-                        <Text style={{ color: '#F0C419', fontSize: 18 }}>
-                          ★
-                        </Text>
-                      </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
-              <Text style={styles.reviewsCount}>{total} Reviews</Text>
             </View>
+          )}
 
-            {/* RIGHT SIDE: Rating Breakdown Bars */}
-            <View style={styles.reviewsRight}>
-              {[5, 4, 3, 2, 1].map(star => {
-                const count = reviewStats.breakdown[star] || 0;
-                const percent = total ? count / total : 0;
+          {/* Cart Buttons */}
+          <CartButton />
 
-                return (
+          {/* Description */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.sectionTitle}>Product Description</Text>
+            <Text
+              style={styles.description}
+              numberOfLines={descExpanded ? undefined : 3}
+            >
+              {productData.description || ''}
+            </Text>
+            {productData.description?.length > 150 && (
+              <TouchableOpacity
+                onPress={() => setDescExpanded(prev => !prev)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.readMoreText}>
+                  {descExpanded ? 'Read less' : 'Read more'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Recommended Products - Lazy loaded */}
+          {relatedProducts.length > 0 && (
+            <View style={styles.recommendedSection}>
+              <Text style={styles.sectionTitle}>Recommended For You</Text>
+              <FlatList
+                data={relatedProducts}
+                keyExtractor={item => `recommended_${item.id}`}
+                renderItem={({ item }) => (
+                  <RecommendedProductCard
+                    item={item}
+                    navigation={navigation}
+                    loadProduct={loadProduct}
+                  />
+                )}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recommendedList}
+                initialNumToRender={3}
+                maxToRenderPerBatch={5}
+                windowSize={5}
+                removeClippedSubviews={true}
+              />
+            </View>
+          )}
+
+          {/* Reviews Section - Optimized */}
+          <View style={styles.reviewsSection}>
+            <Text style={styles.sectionTitle}>Customer Reviews</Text>
+            <View style={styles.reviewsContent}>
+              <View style={styles.reviewsLeft}>
+                <Text style={styles.reviewsScore}>
+                  {productData.average_rating?.toFixed(1) || '0.0'}
+                </Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map(star => {
+                    const rating = productData.average_rating || 0;
+                    const isFull = rating >= star;
+                    const isHalf = rating >= star - 0.5 && rating < star;
+                    return (
+                      <View key={star} style={styles.starContainer}>
+                        <Text style={styles.starOutline}>★</Text>
+                        <View
+                          style={[
+                            styles.starFill,
+                            { width: isFull ? '100%' : isHalf ? '50%' : '0%' },
+                          ]}
+                        >
+                          <Text style={styles.starFilled}>★</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+                <Text style={styles.reviewsCount}>
+                  {reviews.length} Reviews
+                </Text>
+              </View>
+
+              <View style={styles.reviewsRight}>
+                {[5, 4, 3, 2, 1].map(star => (
                   <View key={star} style={styles.ratingRow}>
                     <Text style={styles.ratingLabel}>{star}</Text>
                     <View style={styles.ratingBarBg}>
                       <View
                         style={[
                           styles.ratingBarFill,
-                          { width: `${percent * 100}%` },
+                          { width: '40%' }, // Simplified for performance
                         ]}
                       />
                     </View>
                   </View>
-                );
-              })}
+                ))}
+              </View>
             </View>
-          </View>
 
-          {/* Buttons */}
-          <View style={styles.reviewsButtons}>
             <TouchableOpacity
-              style={styles.showBtn}
+              style={styles.showReviewsButton}
               onPress={() => {
-                reviews.length == 0
+                reviews.length === 0
                   ? Toast.show({ type: 'info', text1: 'No Review Found' })
                   : setShowModalVisible(true);
               }}
             >
-              <Text style={styles.showBtnText}>Show Review</Text>
+              <Text style={styles.showReviewsButtonText}>Show Review</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Show Reviews Modal */}
-        {/* Show Reviews Modal */}
-        <Modal visible={showModalVisible} transparent animationType="slide">
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'flex-end',
-              backgroundColor: 'rgba(0,0,0,0.4)',
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: '#fff',
-                padding: 16,
-                borderTopLeftRadius: 12,
-                borderTopRightRadius: 12,
-                maxHeight: '70%',
-              }}
-            >
-              {/* Header with title and close icon */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ fontSize: 18, fontWeight: '700' }}>Reviews</Text>
-                <TouchableOpacity
-                  onPress={() => setShowModalVisible(false)}
-                  style={{
-                    padding: 8,
-                    marginRight: -8,
-                  }}
-                >
-                  <Image
-                    source={require('../../assets/Png/close.png')} // Add your close icon
-                    style={{ width: 24, height: 24 }}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                scrollEventThrottle={16}
-                style={{ marginTop: 0 }}
-              >
-                {reviews.map(r => (
-                  <View
-                    key={r.id}
-                    style={{
-                      paddingVertical: 8,
-                      borderBottomWidth: 1,
-                      borderBottomColor: '#eee',
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        flex: 1,
-                      }}
-                    >
-                      <Text style={{ fontWeight: '700' }}>
-                        {r.customer?.name}{' '}
-                      </Text>
-                      <Text style={{ fontWeight: '400' }}>
-                        {formatDate(r.updated_at)}
-                      </Text>
-                    </View>
-                    <Text style={{ color: '#F0C419' }}>
-                      {'★'.repeat(r.rating)}
-                    </Text>
-                    <Text style={{ marginTop: 4 }}>{r.review}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
       </ScrollView>
+
+      {/* Modals */}
+      <ImageView
+        images={productImages.map(resolveImageSource)}
+        imageIndex={zoomIndex}
+        visible={zoomVisible}
+        onRequestClose={closeZoom}
+        swipeToCloseEnabled
+        doubleTapToZoomEnabled
+      />
+
+      <LoginModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onGoogleLogin={() =>
+          Toast.show({ type: 'info', text1: 'Google Login' })
+        }
+        onFacebookLogin={() =>
+          Toast.show({ type: 'info', text1: 'Facebook Login' })
+        }
+        phoneNumber="email or phone number"
+      />
+
+      <CurrencySelectorModal
+        visible={currencyModalVisible}
+        onClose={() => setCurrencyModalVisible(false)}
+      />
+
+      {/* Reviews Modal */}
+      <Modal
+        visible={showModalVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reviews</Text>
+              <TouchableOpacity
+                onPress={() => setShowModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Image
+                  source={require('../../assets/Png/close.png')}
+                  style={styles.closeIcon}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={reviews}
+              keyExtractor={item => `review_${item.id}`}
+              renderItem={({ item }) => (
+                <View style={styles.reviewItem}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={styles.reviewerName}>
+                      {item.customer?.name || 'Anonymous'}
+                    </Text>
+                    <Text style={styles.reviewDate}>
+                      {formatDate(item.updated_at)}
+                    </Text>
+                  </View>
+                  <Text style={styles.reviewStars}>
+                    {'★'.repeat(item.rating)}
+                  </Text>
+                  <Text style={styles.reviewText}>{item.review}</Text>
+                </View>
+              )}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.reviewsList}
+              initialNumToRender={5}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1068,299 +1034,131 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
 export default ProductDetails;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  hero: {
-
-    height: HERO_HEIGHT,
-    justifyContent: 'flex-start',
-    marginTop: '5%',
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+    fontSize: 14,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: Colors.button[100],
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: StatusBar.currentHeight,
     paddingHorizontal: 12,
-  },
-  sideVideoWrapper: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  sideVideo: { width: '100%', height: '100%' },
-  sideVideoInner: { width: '100%', height: '100%' },
-  playOverlay: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 10,
   },
   backBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    padding: 8,
   },
-  backText: { fontSize: 18 },
-  headerRightVideo: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+  backIcon: {
+    width: 20,
+    height: 20,
   },
-  content: { flex: 1 },
-  title: { fontSize: 16, fontWeight: '700' },
-  price: { fontSize: 16, fontWeight: '600', marginTop: 8 },
-  actionsRow: { flexDirection: 'row', marginTop: 12, alignItems: 'center' },
-
-  card: {
-    paddingHorizontal: 8,
-  },
-  CateView: {
-    width: 'auto',
-    height: 32,
-    backgroundColor: Colors.button[100],
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 5,
-    paddingHorizontal: 10,
-    margin: 5,
-  },
-  cardImage: { width: 177, height: 245, borderRadius: 9, },
-  cardBody: { alignItems: 'center', justifyContent: 'center', },
-  cardTitle: { fontSize: 13, fontWeight: '600' },
-  cardPrice: {
-    marginTop: 6,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#000',
-  },
-
-  addBtn: {
-    marginTop: 10,
-    backgroundColor: Colors.button[100],
-    paddingVertical: 6,
-    paddingHorizontal: 18,
+  currencyButton: {
+    backgroundColor: '#f8f8f8',
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
-  addBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  qtyRow: {
+  currencyButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    backgroundColor: Colors.button[100],
-    borderRadius: 20,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
   },
-  qtyBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.button[100],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qtyText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  qtyCount: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginHorizontal: 12,
-    color: '#000',
-  },
-  outOfStock: {
-    marginTop: 10,
+  currencySymbolSmall: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'red',
+    color: Colors.button[100],
+    marginRight: 4,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '90%',
-    alignSelf: 'center',
-    justifyContent: 'space-around',
-    marginTop: 20,
-  },
-  filterBtn: {
-    marginRight: 8,
-    padding: 8,
-    backgroundColor: Colors.button[100],
-    borderRadius: 20,
-    width: '45%',
-    alignItems: 'center',
-  },
-  filterText: { color: Colors.text[300] },
-  sortBtn: {
-    padding: 8,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    width: '45%',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1E1E1E',
-  },
-  sortText: { color: Colors.text[300] },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    justifyContent: 'space-between',
-  },
-  dropdownWrapper: { width: 140 },
-  reviewsSection: {
-    marginTop: 20,
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-  },
-  reviewsTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  reviewsRow: { flexDirection: 'row' },
-  reviewsLeft: { width: 100, alignItems: 'center' },
-  reviewsScore: { fontSize: 32, fontWeight: '800' },
-  star: { color: '#F0C419', marginRight: 4 },
-  reviewsCount: { color: '#666', marginTop: 8 },
-  reviewsRight: { flex: 1, paddingLeft: 12, justifyContent: 'center' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  ratingLabel: { width: 18 },
-  ratingBarBg: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#eee',
-    borderRadius: 6,
-    marginLeft: 8,
-  },
-  ratingBarFill: { height: 8, backgroundColor: '#F0C419', borderRadius: 6 },
-  reviewsButtons: {
-    flexDirection: 'row',
-    marginTop: 12,
-    justifyContent: 'space-between',
-  },
-  writeBtn: {
-    backgroundColor: Colors.button[100],
-    padding: 12,
-    borderRadius: 20,
-    flex: 1,
-    marginRight: 8,
-    alignItems: 'center',
-  },
-  writeBtnText: { fontWeight: '700' },
-  showBtn: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 12,
-    borderRadius: 20,
-    flex: 1,
-    alignItems: 'center',
-  },
-  showBtnText: {},
-  dotsRow: {
-    position: 'absolute',
-    bottom: 12,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  cartButton: {
-    backgroundColor: Colors.button[100],
-    borderRadius: 20,
-    height: 45,
-    justifyContent: 'center',
-    width: widthPercentageToDP(40),
-  },
-  cartButtonActive: {
-    backgroundColor: Colors.button[100],
-  },
-  cartButtonDisabled: {
-    opacity: 0.7,
-  },
-  cartButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#000',
-    alignSelf: 'center',
-  },
-  cartPrice: {
+  currencyCodeText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#000',
+    marginRight: 4,
+  },
+  arrowDown: {
+    fontSize: 10,
     color: '#666',
   },
-  modalOverlay: {
+  wishlistButton: {
+    padding: 8,
+  },
+  wishlistVideo: {
+    width: 25,
+    height: 25,
+    borderRadius: 15,
+  },
+  wishlistIconContainer: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.button[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  wishlistIcon: {
+    width: 15,
+    height: 15,
+  },
+  content: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: '70%',
-    alignItems: 'center',
+  contentContainer: {
+    paddingBottom: 20,
   },
-
-
-
-  animatedImageWrapper: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-
-
-
-  noImageContainer: {
-
-    height: HERO_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f6f6f6',
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-
-  noImageText: {
-    color: '#999',
-    fontSize: 14,
-  },
-
-
-
-
-
-
-
-
-
   carouselContainer: {
     height: HERO_HEIGHT,
     marginTop: 10,
     position: 'relative',
-
   },
-
+  carouselContent: {
+    paddingHorizontal: SIDE_SPACING,
+  },
+  imageContainer: {
+    width: BANNER_WIDTH,
+    height: HERO_HEIGHT,
+    marginRight: ITEM_SPACING,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f4f4f4',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+  },
   dotsContainer: {
     position: 'absolute',
     bottom: 16,
@@ -1370,20 +1168,321 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     marginHorizontal: 4,
   },
-
   dotActive: {
     width: 20,
     backgroundColor: '#000',
   },
-
   dotInactive: {
     backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  noImageContainer: {
+    height: HERO_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f6f6f6',
+    borderRadius: 12,
+    marginHorizontal: 12,
+  },
+  noImageText: {
+    color: '#999',
+    fontSize: 14,
+  },
+  productInfo: {
+    paddingHorizontal: 12,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginTop: 16,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 10,
+  },
+  rating: {
+    color: '#F0C419',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  ratingCount: {
+    color: '#000',
+    fontWeight: '500',
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+    color: '#000',
+  },
+  originalPrice: {
+    fontSize: 12,
+    textDecorationLine: 'line-through',
+    color: '#999',
+    marginTop: 2,
+  },
+  variantSection: {
+    marginTop: hp(2),
+  },
+  variantTitle: {
+    fontWeight: '600',
+    fontSize: 12,
+    marginBottom: hp(1),
+  },
+  variantContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  variantButton: {
+    borderWidth: 1,
+    borderColor: Colors.text[400],
+    borderRadius: 8,
+    height: 40,
+    width: wp(25),
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  variantButtonSelected: {
+    borderColor: '#000',
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    paddingVertical: 2,
+  },
+  discountText: {
+    fontSize: 10,
+    fontWeight: '500',
+    paddingLeft: 8,
+  },
+  variantText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#333',
+  },
+  variantTextSelected: {
+    color: '#000',
+  },
+  cartButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: hp(3),
+    width: '100%',
+  },
+  cartButton: {
+    backgroundColor: Colors.button[100],
+    borderRadius: 20,
+    height: 45,
+    justifyContent: 'center',
+    width: wp(40),
+    alignItems: 'center',
+  },
+  cartButtonActive: {
+    backgroundColor: Colors.button[100],
+  },
+  cartButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000',
+  },
+  checkoutButton: {
+    borderWidth: 1,
+    borderColor: '#999',
+    borderRadius: 20,
+    height: 45,
+    justifyContent: 'center',
+    width: wp(40),
+    alignItems: 'center',
+  },
+  checkoutButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  outOfStock: {
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'red',
+    textAlign: 'center',
+  },
+  descriptionSection: {
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontWeight: '700',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  description: {
+    lineHeight: 20,
+    color: '#333',
+    fontSize: 12,
+  },
+  readMoreText: {
+    marginTop: 8,
+    color: Colors.button[100],
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  recommendedSection: {
+    marginTop: 20,
+  },
+  recommendedList: {
+    paddingVertical: 10,
+  },
+  reviewsSection: {
+    marginTop: 20,
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+  },
+  reviewsContent: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  reviewsLeft: {
+    width: 100,
+    alignItems: 'center',
+  },
+  reviewsScore: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#000',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    marginTop: 6,
+  },
+  starContainer: {
+    width: 18,
+    height: 18,
+    position: 'relative',
+  },
+  starOutline: {
+    color: '#ccc',
+    fontSize: 18,
+    position: 'absolute',
+  },
+  starFill: {
+    overflow: 'hidden',
+    position: 'absolute',
+  },
+  starFilled: {
+    color: '#F0C419',
+    fontSize: 18,
+  },
+  reviewsCount: {
+    color: '#666',
+    marginTop: 8,
+    fontSize: 12,
+  },
+  reviewsRight: {
+    flex: 1,
+    paddingLeft: 12,
+    justifyContent: 'center',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  ratingLabel: {
+    width: 18,
+    fontSize: 12,
+  },
+  ratingBarBg: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#eee',
+    borderRadius: 6,
+    marginLeft: 8,
+    overflow: 'hidden',
+  },
+  ratingBarFill: {
+    height: 8,
+    backgroundColor: '#F0C419',
+    borderRadius: 6,
+  },
+  showReviewsButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  showReviewsButtonText: {
+    fontWeight: '500',
+    fontSize: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  closeIcon: {
+    width: 24,
+    height: 24,
+  },
+  reviewsList: {
+    paddingBottom: 20,
+  },
+  reviewItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reviewerName: {
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  reviewDate: {
+    fontWeight: '400',
+    fontSize: 10,
+    color: '#666',
+  },
+  reviewStars: {
+    color: '#F0C419',
+    fontSize: 12,
+    marginVertical: 4,
+  },
+  reviewText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

@@ -76,7 +76,7 @@ type Address = {
 
 const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const selectedCurrency = useAppSelector(
-    state => state.currency.selectedCurrency
+    state => state.currency.selectedCurrency,
   );
 
   // Fetch rates with caching
@@ -141,7 +141,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const getShippingCost = () => {
     if (selectedShippingId && shippingOptions.length > 0) {
       const selectedShipping = shippingOptions.find(
-        s => Number(s.id) === Number(selectedShippingId)
+        s => Number(s.id) === Number(selectedShippingId),
       );
       return selectedShipping?.cost || 0;
     }
@@ -155,7 +155,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     discountAmount || 0,
     getShippingCost(), // Get actual shipping cost
     selectedCurrency,
-    rates
+    rates,
   );
 
   const recalculateCoupon = () => {
@@ -549,18 +549,23 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       code: selectedPromoCode.code,
       discountType,
       discountValue,
-      maxDiscount
+      maxDiscount,
     });
 
     Toast.show({
       type: 'success',
-      text1: `Coupon applied! Saved ${displayPrice(calculatedDiscount)}`
+      text1: `Coupon applied! Saved ${displayPrice(calculatedDiscount)}`,
     });
     setPromoModalVisible(false);
   };
 
   const removeCoupon = () => {
-    setSelectedPromoCode({ code: '', type: '', discount: '', max_discount: '' });
+    setSelectedPromoCode({
+      code: '',
+      type: '',
+      discount: '',
+      max_discount: '',
+    });
     setAppliedPromo(null);
     setDiscountAmount(0);
     Toast.show({ type: 'info', text1: 'Coupon removed.' });
@@ -729,67 +734,79 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
 
+    if (!selectedShippingId) {
+      Toast.show({ type: 'error', text1: 'Please select a shipping method' });
+      return;
+    }
+
     // Calculate the amount to pay (rounded as shown to user)
     const shippingCost = getShippingCost();
-    const breakdown = calculateCheckout(
+
+    // ✅ CORRECT: Calculate checkoutBreakdown
+    const checkoutBreakdown = calculateCheckout(
       cartData?.subtotal_amount || 0,
       cartData?.total_savings || 0,
       discountAmount || 0,
       shippingCost,
       selectedCurrency,
-      rates
+      rates,
     );
+
+    console.log('Checkout breakdown:', checkoutBreakdown);
 
     // Show currency conversion warning
     if (selectedCurrency !== 'EUR') {
-      // Alert.alert(
-      //   'Currency Conversion Notice',
-      //   `Your order total: ${breakdown.displayAmountToPay}\n\n` +
-      //   `Payment will be processed in EUR: ${displayPrice(breakdown.grandTotalEUR)}\n\n` +
-      //   'Your bank/card will handle the currency conversion.\n' +
-      //   'The exact amount may vary based on your bank\'s exchange rate.',
-      //   [
-      //     { text: 'Cancel', style: 'cancel' },
-      //     {
-      //       text: 'Continue to Payment',
-      //       onPress: async () => {
-      //         await proceedWithPayment(breakdown);
-      //       },
-      //       style: 'default'
-      //     }
-      //   ]
-      // );
+      Alert.alert(
+        'Currency Conversion Notice',
+        `Your order total: ${checkoutBreakdown.displayAmountToPay}\n\n` +
+        `Payment will be processed in EUR: ${displayPrice(
+          checkoutBreakdown.grandTotalEUR,
+        )}\n\n` +
+        'Your bank/card will handle the currency conversion.\n' +
+        "The exact amount may vary based on your bank's exchange rate.",
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue to Payment',
+            onPress: async () => {
+              // ✅ CORRECT: Use checkoutBreakdown
+              await proceedWithPayment(checkoutBreakdown);
+            },
+            style: 'default',
+          },
+        ],
+      );
     } else {
-      await proceedWithPayment(breakdown);
+      // ✅ CORRECT: Use checkoutBreakdown
+      await proceedWithPayment(checkoutBreakdown);
     }
   };
 
   // Separate function for actual payment
   const proceedWithPayment = async (breakdown: any) => {
-    // Send both EUR amount and selected currency
     const payload = {
       cart_id: cartid,
       address_id: selectedAddress?.id,
       shipping_id: selectedShippingId || 1,
-      // Send promo code if applied
+      // ✅ Remove duplicate: currency: selectedCurrency,
       ...(appliedPromo && { promo_code: appliedPromo.code }),
-      // Send currency info for backend
-      currency: selectedCurrency,
-      // Send the amount that should be charged (in EUR for payment gateway)
-      amount_eur: breakdown.grandTotalEUR, // Important: Send EUR amount
-      amount_to_pay: breakdown.amountToPay, // Rounded amount in selected currency
+      currency: selectedCurrency, // Keep only one
+      grand_total: checkoutBreakdown.amountToPay,
+      amount_to_pay: checkoutBreakdown.amountToPay,
     };
 
     console.log('Payment calculation:', {
       userSees: breakdown.displayAmountToPay,
       gatewayReceives: `${breakdown.grandTotalEUR} EUR`,
       conversionRate: rates?.[selectedCurrency],
-      difference: `${breakdown.amountToPay} ${selectedCurrency} = ${breakdown.grandTotalEUR} EUR`
+      difference: `${breakdown.amountToPay} ${selectedCurrency} = ${breakdown.grandTotalEUR} EUR`,
     });
 
     try {
       showLoader();
       const res = await UserService.Placeorder(payload);
+
+      // PROBLEM: You're not checking if the response has data properly
       if (
         res &&
         res.data &&
@@ -800,21 +817,46 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
         if (res.data.payment_url) {
           setPaymentUrl(res.data.payment_url);
-          setShowWebView(true);
+          setShowWebView(true); // This should open WebView
+
+          // Add a console log to debug
+          console.log('Setting WebView URL:', res.data.payment_url);
 
           // Log for debugging
           console.log('Payment gateway should show:', {
             expectedEUR: breakdown.grandTotalEUR,
             userCurrency: selectedCurrency,
             convertedAmount: breakdown.amountToPay,
-            conversionNote: `Gateway shows EUR, user sees ${selectedCurrency}`
+            conversionNote: `Gateway shows EUR, user sees ${selectedCurrency}`,
           });
         } else {
-          // ... success without payment
+          // You're missing error handling here
+          Toast.show({
+            type: 'error',
+            text1: 'No payment URL received from server',
+          });
+          console.error('No payment_url in response:', res.data);
         }
+      } else {
+        // Handle non-200 responses
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to create payment',
+        });
       }
     } catch (err: any) {
-      // ... error handling
+      // IMPORTANT: Add proper error logging
+      console.error('Payment error:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+
+      Toast.show({
+        type: 'error',
+        text1: 'Payment failed',
+        text2: err.response?.data?.message || 'Please try again',
+      });
     } finally {
       hideLoader();
     }
@@ -1064,9 +1106,12 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                         // Prepare description text
                         let discountText = '';
                         if (item.discount_type === 'percentage') {
-                          discountText = `${item.discount_value}% off (max ${displayPrice(item.max_discount)})`;
+                          discountText = `${item.discount_value
+                            }% off (max ${displayPrice(item.max_discount)})`;
                         } else {
-                          discountText = `${displayPrice(item.discount_value)} off`;
+                          discountText = `${displayPrice(
+                            item.discount_value,
+                          )} off`;
                         }
 
                         return (
@@ -1076,14 +1121,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                                 code: item.coupon_code,
                                 type: item.discount_type,
                                 discount: item.discount_value,
-                                max_discount: item.max_discount
+                                max_discount: item.max_discount,
                               });
 
                               setSelectedPromoCode({
-                                code: item.coupon_code,  // Your API uses "coupon_code"
+                                code: item.coupon_code, // Your API uses "coupon_code"
                                 type: item.discount_type, // "percentage"
                                 discount: item.discount_value, // "10.00"
-                                max_discount: item.max_discount // "20"
+                                max_discount: item.max_discount, // "20"
                               });
                             }}
                             style={{
@@ -1097,20 +1142,42 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                           >
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontWeight: '700' }}>{code}</Text>
-                              <Text style={{ color: '#666', marginTop: 4, fontSize: 12 }}>
+                              <Text
+                                style={{
+                                  color: '#666',
+                                  marginTop: 4,
+                                  fontSize: 12,
+                                }}
+                              >
                                 {discountText}
                               </Text>
                               {item.description ? (
-                                <Text style={{ color: '#888', marginTop: 2, fontSize: 11 }}>
+                                <Text
+                                  style={{
+                                    color: '#888',
+                                    marginTop: 2,
+                                    fontSize: 11,
+                                  }}
+                                >
                                   {item.description}
                                 </Text>
                               ) : null}
                             </View>
                             <View style={{ alignItems: 'flex-end' }}>
                               <Text style={{ fontSize: 12, color: '#888' }}>
-                                {item.start_date ? new Date(item.start_date).toLocaleDateString() : ''}
+                                {item.start_date
+                                  ? new Date(
+                                    item.start_date,
+                                  ).toLocaleDateString()
+                                  : ''}
                               </Text>
-                              <Text style={{ fontSize: 10, color: '#5DA53B', marginTop: 2 }}>
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  color: '#5DA53B',
+                                  marginTop: 2,
+                                }}
+                              >
                                 {item.is_valid ? 'Valid' : 'Expired'}
                               </Text>
                             </View>
@@ -1185,26 +1252,44 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                       </View>
 
                       {/* Total savings */}
-                      {cartData?.total_savings && cartData.total_savings > 0 && (
-                        <View style={styles.billRow}>
-                          <Text style={[styles.billLabel, styles.savingsLabel]}>
-                            Total Savings
-                          </Text>
-                          <Text style={[styles.billValue, styles.savingsValue]}>
-                            {breakdown.displaySavings}
-                          </Text>
-                        </View>
-                      )}
+                      {cartData?.total_savings &&
+                        cartData.total_savings > 0 && (
+                          <View style={styles.billRow}>
+                            <Text
+                              style={[styles.billLabel, styles.savingsLabel]}
+                            >
+                              Total Savings
+                            </Text>
+                            <Text
+                              style={[styles.billValue, styles.savingsValue]}
+                            >
+                              {breakdown.displaySavings}
+                            </Text>
+                          </View>
+                        )}
 
                       {/* Coupon discount */}
                       {appliedPromo && (
                         <View style={styles.billRow}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={[styles.billLabel, styles.couponLabel]}>
-                              Coupon ({appliedPromo.code ?? appliedPromo.promo_code})
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text
+                              style={[styles.billLabel, styles.couponLabel]}
+                            >
+                              Coupon (
+                              {appliedPromo.code ?? appliedPromo.promo_code})
                             </Text>
-                            <TouchableOpacity onPress={removeCoupon} style={{ marginLeft: 6 }}>
-                              <Text style={{ color: '#FF0000', fontSize: 12 }}>Remove</Text>
+                            <TouchableOpacity
+                              onPress={removeCoupon}
+                              style={{ marginLeft: 6 }}
+                            >
+                              <Text style={{ color: '#FF0000', fontSize: 12 }}>
+                                Remove
+                              </Text>
                             </TouchableOpacity>
                           </View>
                           <Text style={[styles.billValue, styles.couponValue]}>
@@ -1227,10 +1312,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
                       {/* Grand total (with conversion) */}
                       <View style={styles.billRow}>
-                        <Text style={[styles.billLabel, styles.grandTotalLabel]}>
+                        <Text
+                          style={[styles.billLabel, styles.grandTotalLabel]}
+                        >
                           Grand total
                         </Text>
-                        <Text style={[styles.billValue, styles.grandTotalValue]}>
+                        <Text
+                          style={[styles.billValue, styles.grandTotalValue]}
+                        >
                           {breakdown.displayGrandTotal}
                         </Text>
                       </View>
@@ -1238,10 +1327,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                       {/* Optional: Show round off if you want */}
                       {Math.abs(breakdown.roundOffAmount) > 0.01 && (
                         <View style={styles.billRow}>
-                          <Text style={[styles.billLabel, styles.roundOffLabel]}>
+                          <Text
+                            style={[styles.billLabel, styles.roundOffLabel]}
+                          >
                             Round Off
                           </Text>
-                          <Text style={[styles.billValue, styles.roundOffValue]}>
+                          <Text
+                            style={[styles.billValue, styles.roundOffValue]}
+                          >
                             {breakdown.displayRoundOff}
                           </Text>
                         </View>
@@ -1249,7 +1342,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
                       {/* Amount to Pay (rounded) */}
                       <View style={[styles.billRow, styles.amountToPayRow]}>
-                        <Text style={styles.amountToPayLabel}>Amount to Pay</Text>
+                        <Text style={styles.amountToPayLabel}>
+                          Amount to Pay
+                        </Text>
                         <Text style={styles.amountToPayValue}>
                           {breakdown.displayAmountToPay}
                         </Text>
@@ -1323,10 +1418,19 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               style={styles.checkoutButton}
               activeOpacity={0.8}
               onPress={async () => {
+                console.log('Checkout button pressed');
+
                 if (!selectedAddress) {
                   Alert.alert('', 'Please, select Address');
                   return;
                 }
+
+                if (!selectedShippingId) {
+                  Alert.alert('', 'Please select a shipping method');
+                  return;
+                }
+
+                console.log('Calling PlaceOrder...');
                 await PlaceOrder();
               }}
             >
@@ -1375,130 +1479,137 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         )}
       </View>
 
-      {/* Shipping selection modal */}
+      {/* Shipping selection modal - PROPERLY FIXED */}
+      {/* Shipping selection modal - PROPERLY FIXED */}
       <Modal
         visible={shippingModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setShippingModalVisible(false)}
       >
-        <TouchableWithoutFeedback
-          onPress={() => setShippingModalVisible(false)}
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'flex-end',
+          }}
         >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <TouchableWithoutFeedback>
-              <View
+          {/* This handles tapping outside the modal to close */}
+          <TouchableWithoutFeedback onPress={() => setShippingModalVisible(false)}>
+            <View style={{ flex: 1 }} />
+          </TouchableWithoutFeedback>
+
+          {/* This prevents closing when tapping inside modal */}
+          <TouchableWithoutFeedback>
+            <View
+              style={{
+                backgroundColor: '#fff',
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                padding: 16,
+                maxHeight: '80%', // Increased from 70% to 80% for better visibility
+                minHeight: '40%', // Add minimum height
+              }}
+            >
+              {/* Drag handle */}
+              <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 5,
+                    backgroundColor: '#ccc',
+                    borderRadius: 3,
+                  }}
+                />
+              </View>
+
+              <Text
+                style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}
+              >
+                Delivery Method
+              </Text>
+
+              {isFetchingShipping ? (
+                <ActivityIndicator size="small" color="#E2E689" />
+              ) : (
+                <FlatList
+                  data={shippingOptions}
+                  keyExtractor={it => String(it.id)}
+                  renderItem={({ item }) => {
+                    const isSelected =
+                      Number(item.id) === Number(selectedShippingId);
+                    return (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedShippingId(Number(item.id));
+                          GetCartDetails();
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          borderWidth: 1,
+                          borderColor: isSelected ? '#AEB254' : '#EAEAEA',
+                          backgroundColor: isSelected ? '#F7F9E5' : '#fff',
+                          padding: 12,
+                          borderRadius: 8,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: '600', fontSize: 14 }}>
+                            {item.type}
+                          </Text>
+                          <Text
+                            style={{
+                              color: '#666',
+                              marginTop: 4,
+                              fontSize: 12,
+                            }}
+                          >
+                            Estimated Time: {item.estimated_time}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text
+                            style={{
+                              color: '#888',
+                              fontSize: 14,
+                              fontWeight: '600',
+                            }}
+                          >
+                            Cost
+                          </Text>
+                          <Text style={{ color: '#AEB254', fontSize: 12 }}>
+                            {displayPrice(item.cost)}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                />
+              )}
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShippingModalVisible(false);
+                  setModalAddress(true);
+                }}
                 style={{
-                  backgroundColor: '#fff',
-                  borderTopLeftRadius: 16,
-                  borderTopRightRadius: 16,
-                  padding: 16,
-                  maxHeight: '70%',
+                  backgroundColor: '#AEB254',
+                  paddingVertical: 14,
+                  borderRadius: 28,
+                  alignItems: 'center',
+                  marginTop: 8,
                 }}
               >
-                <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                  <View
-                    style={{
-                      width: 40,
-                      height: 5,
-                      backgroundColor: '#ccc',
-                      borderRadius: 3,
-                    }}
-                  />
-                </View>
-                <Text
-                  style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}
-                >
-                  Delivery Method
+                <Text style={{ color: '#000', fontWeight: '700' }}>
+                  Continue to Address
                 </Text>
-                {isFetchingShipping ? (
-                  <ActivityIndicator size="small" color="#E2E689" />
-                ) : (
-                  <FlatList
-                    data={shippingOptions}
-                    keyExtractor={it => String(it.id)}
-                    renderItem={({ item }) => {
-                      const isSelected =
-                        Number(item.id) === Number(selectedShippingId);
-                      return (
-                        <TouchableOpacity
-                          onPress={() => {
-                            setSelectedShippingId(Number(item.id)),
-                              GetCartDetails();
-                          }}
-                          style={{
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            borderWidth: 1,
-                            borderColor: isSelected ? '#AEB254' : '#EAEAEA',
-                            backgroundColor: isSelected ? '#F7F9E5' : '#fff',
-                            padding: 12,
-                            borderRadius: 8,
-                            marginBottom: 10,
-                          }}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontWeight: '600', fontSize: 14 }}>
-                              {item.type}
-                            </Text>
-                            <Text
-                              style={{
-                                color: '#666',
-                                marginTop: 4,
-                                fontSize: 12,
-                              }}
-                            >
-                              Estimated Time: {item.estimated_time}
-                            </Text>
-                          </View>
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <Text
-                              style={{
-                                color: '#888',
-                                fontSize: 14,
-                                fontWeight: '600',
-                              }}
-                            >
-                              Cost
-                            </Text>
-                            {/* ✅ FIXED: Shipping cost wrapped in displayPrice */}
-                            <Text style={{ color: '#AEB254', fontSize: 12 }}>
-                              {displayPrice(item.cost)}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    }}
-                    contentContainerStyle={{ paddingBottom: 10 }}
-                  />
-                )}
-
-                <TouchableOpacity
-                  onPress={() => {
-                    setShippingModalVisible(false), setModalAddress(true);
-                  }}
-                  style={{
-                    backgroundColor: '#AEB254',
-                    paddingVertical: 14,
-                    borderRadius: 28,
-                    alignItems: 'center',
-                    marginTop: 8,
-                  }}
-                >
-                  <Text style={{ color: '#000', fontWeight: '700' }}>
-                    Continue to Address
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
       </Modal>
 
       <LoginModal
@@ -1537,15 +1648,25 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               borderBottomColor: '#ddd',
             }}
           >
-            <View style={{ flex: 1, }}>
-              <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 4 }}>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{ fontSize: 18, fontWeight: '600', marginBottom: 4 }}
+              >
                 Payment Gateway
               </Text>
 
               {/* Show both amounts for clarity */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
                 <View>
-                  <Text style={{ fontSize: 14, color: '#333', fontWeight: '500' }}>
+                  <Text
+                    style={{ fontSize: 14, color: '#333', fontWeight: '500' }}
+                  >
                     Your order: {checkoutBreakdown.displayAmountToPay}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
@@ -1554,7 +1675,13 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 </View>
 
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 14, color: '#5DA53B', fontWeight: '600' }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      color: '#5DA53B',
+                      fontWeight: '600',
+                    }}
+                  >
                     ≈ {displayPrice(checkoutBreakdown.grandTotalEUR)}
                   </Text>
                   <Text style={{ fontSize: 10, color: '#666', marginTop: 2 }}>
@@ -1574,16 +1701,16 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     {
                       text: 'Yes',
                       onPress: () => setShowWebView(false),
-                      style: 'destructive'
-                    }
-                  ]
+                      style: 'destructive',
+                    },
+                  ],
                 );
               }}
               style={{ marginLeft: 10 }}
             >
               <Text style={{ fontSize: 18, color: '#000' }}>✕</Text>
             </TouchableOpacity>
-          </View   >
+          </View>
 
           <WebView
             style={{ flex: 1 }}
@@ -1606,7 +1733,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   shipping: getShippingCost(),
                   totalEUR: checkoutBreakdown.grandTotalEUR,
                   totalConverted: checkoutBreakdown.amountToPay,
-                }
+                },
               });
             }}
             onNavigationStateChange={navState => {
@@ -1624,7 +1751,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 'completed',
                 'order-confirmed',
                 'payment/complete',
-                'checkout/success'
+                'checkout/success',
               ];
 
               const cancelPatterns = [
@@ -1632,15 +1759,15 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 'cancelled',
                 'payment-cancelled',
                 'checkout/cancel',
-                'payment/failed'
+                'payment/failed',
               ];
 
               const isSuccess = successPatterns.some(pattern =>
-                navState.url.toLowerCase().includes(pattern.toLowerCase())
+                navState.url.toLowerCase().includes(pattern.toLowerCase()),
               );
 
               const isCancel = cancelPatterns.some(pattern =>
-                navState.url.toLowerCase().includes(pattern.toLowerCase())
+                navState.url.toLowerCase().includes(pattern.toLowerCase()),
               );
 
               if (isSuccess) {
@@ -1656,13 +1783,18 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   // Clear promo codes
                   setAppliedPromo(null);
                   setDiscountAmount(0);
-                  setSelectedPromoCode({ code: '', type: '', discount: '', max_discount: '' });
+                  setSelectedPromoCode({
+                    code: '',
+                    type: '',
+                    discount: '',
+                    max_discount: '',
+                  });
 
                   // Show success message
                   Toast.show({
                     type: 'success',
                     text1: 'Payment successful!',
-                    text2: 'Your order has been confirmed'
+                    text2: 'Your order has been confirmed',
                   });
 
                   // Navigate to confirmation screen
@@ -1675,16 +1807,18 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                           paymentSuccess: true,
                           timestamp: new Date().toISOString(),
                           orderAmount: checkoutBreakdown.displayAmountToPay,
-                          eurAmount: displayPrice(checkoutBreakdown.grandTotalEUR),
-                          currencyNote: selectedCurrency !== 'EUR' ?
-                            `Your card was charged in EUR and converted to ${selectedCurrency}` :
-                            null
-                        }
-                      }
+                          eurAmount: displayPrice(
+                            checkoutBreakdown.grandTotalEUR,
+                          ),
+                          currencyNote:
+                            selectedCurrency !== 'EUR'
+                              ? `Your card was charged in EUR and converted to ${selectedCurrency}`
+                              : null,
+                        },
+                      },
                     ],
                   });
                 }, 1500); // Slightly shorter delay
-
               } else if (isCancel) {
                 console.log('Payment cancelled, closing WebView...');
 
@@ -1693,13 +1827,15 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 Toast.show({
                   type: 'info',
                   text1: 'Payment cancelled',
-                  text2: 'You can try again when ready'
+                  text2: 'You can try again when ready',
                 });
-
               } else {
                 // Monitor URL changes for debugging
                 if (navState.url !== paymentUrl) {
-                  console.log('Navigated within payment gateway:', navState.url);
+                  console.log(
+                    'Navigated within payment gateway:',
+                    navState.url,
+                  );
 
                   // Check if the payment gateway shows amount in URL or title
                   if (navState.title) {
@@ -1746,7 +1882,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 }
               }
             }}
-            onError={(error) => {
+            onError={error => {
               console.error('WebView error:', error);
               Toast.show({
                 type: 'error',
@@ -1754,15 +1890,36 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 text2: 'Please try again or contact support',
               });
             }}
-            onHttpError={(error) => {
+            onHttpError={error => {
               console.error('WebView HTTP error:', error);
             }}
             renderError={(errorDomain, errorCode, errorDesc) => (
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-                <Text style={{ fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 10 }}>
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: '#fff',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: '600',
+                    color: '#333',
+                    marginBottom: 10,
+                  }}
+                >
                   Payment Gateway Error
                 </Text>
-                <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: '#666',
+                    textAlign: 'center',
+                    marginBottom: 20,
+                  }}
+                >
                   {errorDesc || 'Unable to load payment page'}
                 </Text>
                 <TouchableOpacity
@@ -1774,7 +1931,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   }}
                   onPress={() => setShowWebView(false)}
                 >
-                  <Text style={{ color: '#000', fontWeight: '600' }}>Close</Text>
+                  <Text style={{ color: '#000', fontWeight: '600' }}>
+                    Close
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
