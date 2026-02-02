@@ -138,37 +138,48 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
   // Normalize product data
   const normalizeProducts = useCallback(
     (products: any[]) => {
-      if (!Array.isArray(products)) return [];
+      if (!Array.isArray(products)) {
+        console.log('Warning: normalizeProducts received non-array:', products);
+        return [];
+      }
 
       const cartIds = new Set(
-        cart.map((c: any) => String(c.id || c.product_id || '')),
+        cart.map((c: any) => String(c.id || c.product_id || ''))
       );
 
-      return products.map(product => {
-        const productId = String(product?.id || product?.product_id || '');
-        const normalizedProduct = {
-          ...product,
-          id: productId,
-          name: product?.name || product?.product_name || 'Unnamed Product',
-          front_image: product?.front_image || product?.image || '',
-          average_rating: product?.average_rating || product?.rating || 0,
-          variants:
-            Array.isArray(product?.variants) && product.variants.length > 0
-              ? product.variants
-              : [
-                {
-                  price: product?.price || 0,
-                  weight: product?.weight || '',
-                  unit: product?.unit || '',
-                  id: product?.variant_id || null,
-                },
-              ],
-          stock_quantity: product?.stock_quantity || product?.quantity || 0,
-          is_cart: cartIds.has(productId) ? 'true' : 'false',
-        };
+      const normalized = products
+        .filter(product => product && typeof product === 'object')
+        .map(product => {
+          try {
+            const productId = String(product?.id || product?.product_id || '');
+            return {
+              ...product,
+              id: productId,
+              name: String(product?.name || product?.product_name || 'Unnamed Product'),
+              front_image: product?.front_image || product?.image || '',
+              average_rating: Number(product?.average_rating || product?.rating || 0),
+              variants:
+                Array.isArray(product?.variants) && product.variants.length > 0
+                  ? product.variants
+                  : [
+                    {
+                      price: Number(product?.price || 0),
+                      weight: String(product?.weight || ''),
+                      unit: String(product?.unit || ''),
+                      id: product?.variant_id || null,
+                    },
+                  ],
+              stock_quantity: Number(product?.stock_quantity || product?.quantity || 0),
+              is_cart: cartIds.has(productId) ? 'true' : 'false',
+            };
+          } catch (err) {
+            console.log('Error normalizing product:', product, err);
+            return null;
+          }
+        })
+        .filter(product => product !== null);
 
-        return normalizedProduct;
-      });
+      return normalized;
     },
     [cart],
   );
@@ -275,35 +286,43 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
   // Client-side sorting function - FIXED
   const clientSideSorting = (sortType: string) => {
     try {
-      const sortedProducts = [...apiProducts].sort((a, b) => {
+      // Create a copy of the current products
+      const productsToSort = [...apiProducts];
+
+      // Filter out any null or undefined products
+      const validProducts = productsToSort.filter(
+        product => product && typeof product === 'object'
+      );
+
+      const sortedProducts = validProducts.sort((a, b) => {
         switch (sortType) {
           case 'price_low_to_high': {
             const priceA = a.variants?.[0]?.price || a.price || 0;
             const priceB = b.variants?.[0]?.price || b.price || 0;
-            return priceA - priceB;
+            return Number(priceA) - Number(priceB);
           }
 
           case 'price_high_to_low': {
             const priceA = a.variants?.[0]?.price || a.price || 0;
             const priceB = b.variants?.[0]?.price || b.price || 0;
-            return priceB - priceA;
+            return Number(priceB) - Number(priceA);
           }
 
           case 'name_a_to_z': {
-            const nameA = a.name || '';
-            const nameB = b.name || '';
+            const nameA = String(a.name || '').toLowerCase();
+            const nameB = String(b.name || '').toLowerCase();
             return nameA.localeCompare(nameB);
           }
 
           case 'name_z_to_a': {
-            const nameA = a.name || '';
-            const nameB = b.name || '';
+            const nameA = String(a.name || '').toLowerCase();
+            const nameB = String(b.name || '').toLowerCase();
             return nameB.localeCompare(nameA);
           }
 
           case 'rating_high_to_low': {
-            const ratingA = a.average_rating || 0;
-            const ratingB = b.average_rating || 0;
+            const ratingA = Number(a.average_rating) || 0;
+            const ratingB = Number(b.average_rating) || 0;
             return ratingB - ratingA;
           }
 
@@ -319,7 +338,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       });
 
       setApiProducts(sortedProducts);
-
       Toast.show({
         type: 'success',
         text1: 'Products sorted',
@@ -333,7 +351,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     }
   };
 
-  // Handle sorting of products - FIXED SIMPLE VERSION
+  // Handle sorting of products - FIXED
   const handleSorting = async (sortType: string) => {
     // Close modal immediately
     setSortVisible(false);
@@ -347,11 +365,11 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         const response = await UserService.Sorting(sortType);
 
         // Check if response is valid
-        if (response && response.data) {
-          let sortedProducts = [];
+        if (response && (response.data || response.data === null)) {
+          let sortedProducts: any[] = [];
 
           // Handle different response structures
-          if (response.data.data) {
+          if (response.data?.data) {
             sortedProducts = Array.isArray(response.data.data)
               ? response.data.data
               : [];
@@ -359,13 +377,30 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             sortedProducts = response.data;
           } else if (Array.isArray(response)) {
             sortedProducts = response;
+          } else {
+            // If no valid data found, fall back to client-side sorting
+            throw new Error('No valid data in API response');
           }
 
           // Filter by category if needed
           if (categoryId && !mode) {
             sortedProducts = sortedProducts.filter(
-              (product: any) => product.category_id == categoryId
+              (product: any) =>
+                product &&
+                product.category_id &&
+                String(product.category_id) === String(categoryId)
             );
+          }
+
+          // If no products after filtering, show message
+          if (sortedProducts.length === 0) {
+            Toast.show({
+              type: 'info',
+              text1: 'No products found for this category',
+            });
+            // Fall back to client-side sorting
+            clientSideSorting(sortType);
+            return;
           }
 
           // Normalize and set products
@@ -376,20 +411,17 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             type: 'success',
             text1: 'Products sorted successfully',
           });
-
-          setIsLoading(false);
           return;
+        } else {
+          throw new Error('Invalid API response');
         }
-      } catch (apiError) {
-        console.log('API sorting failed:', apiError);
+      } catch (apiError: any) {
+        console.log('API sorting failed, using client-side sorting:', apiError);
+        // Use client-side sorting as fallback
+        clientSideSorting(sortType);
       }
-
-      // If API fails, use client-side sorting
-      clientSideSorting(sortType);
-
     } catch (error: any) {
-      console.log('Sorting error:', error);
-
+      console.log('Overall sorting error:', error);
       // Final fallback to client-side sorting
       clientSideSorting(sortType);
     } finally {
@@ -772,63 +804,70 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           </TouchableOpacity>
         </Modal>
 
-        {/* Sort Modal - SIMPLIFIED */}
+        {/* Sort Modal - FIXED STRUCTURE */}
         <Modal
           visible={sortVisible}
           animationType="slide"
-          transparent
+          transparent={true}
           onRequestClose={() => setSortVisible(false)}
         >
-          <View style={styles.modalOverlay}>
+          <View style={styles.modalOverlayContainer}>
+            {/* Overlay that closes the modal */}
             <TouchableOpacity
-              style={styles.modalContainer}
+              style={styles.modalOverlayTouchable}
               activeOpacity={1}
               onPress={() => setSortVisible(false)}
-            >
-              <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Sort By</Text>
-                  <TouchableOpacity onPress={() => setSortVisible(false)}>
-                    <Image
-                      source={require('../../assets/Png/close.png')}
-                      style={styles.closeIcon}
-                    />
-                  </TouchableOpacity>
-                </View>
+            />
 
-                {/* Reset Option */}
+            {/* Modal content */}
+            <View style={styles.sortModalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Sort By</Text>
                 <TouchableOpacity
-                  style={[styles.sortOption, styles.resetSortOption]}
-                  onPress={() => {
-                    resetSorting();
-                  }}
+                  onPress={() => setSortVisible(false)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text style={[styles.sortOptionText, styles.resetSortOptionText]}>
-                    Reset to Default
-                  </Text>
+                  <Image
+                    source={require('../../assets/Png/close.png')}
+                    style={styles.closeIcon}
+                  />
                 </TouchableOpacity>
-
-                {/* Sorting Options */}
-                {[
-                  { id: 'price_low_to_high', label: 'Price: Low to High' },
-                  { id: 'price_high_to_low', label: 'Price: High to Low' },
-                  { id: 'name_a_to_z', label: 'Name: A to Z' },
-                  { id: 'name_z_to_a', label: 'Name: Z to A' },
-                  { id: 'rating_high_to_low', label: 'Rating: High to Low' },
-                  { id: 'newest_first', label: 'Newest First' },
-                ].map(sortOption => (
-                  <TouchableOpacity
-                    key={sortOption.id}
-                    style={styles.sortOption}
-                    onPress={() => {
-                      handleSorting(sortOption.id);
-                    }}
-                  >
-                    <Text style={styles.sortOptionText}>{sortOption.label}</Text>
-                  </TouchableOpacity>
-                ))}
               </View>
-            </TouchableOpacity>
+
+              {/* Reset Option */}
+              <TouchableOpacity
+                style={[styles.sortOption, styles.resetSortOption]}
+                onPress={() => {
+                  resetSorting();
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.sortOptionText, styles.resetSortOptionText]}>
+                  Reset to Default
+                </Text>
+              </TouchableOpacity>
+
+              {/* Sorting Options */}
+              {[
+                { id: 'price_low_to_high', label: 'Price: Low to High' },
+                { id: 'price_high_to_low', label: 'Price: High to Low' },
+                { id: 'name_a_to_z', label: 'Name: A to Z' },
+                { id: 'name_z_to_a', label: 'Name: Z to A' },
+                { id: 'rating_high_to_low', label: 'Rating: High to Low' },
+                { id: 'newest_first', label: 'Newest First' },
+              ].map(sortOption => (
+                <TouchableOpacity
+                  key={sortOption.id}
+                  style={styles.sortOption}
+                  onPress={() => {
+                    handleSorting(sortOption.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.sortOptionText}>{sortOption.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </Modal>
       </LinearGradient>
@@ -1072,9 +1111,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
-  modalContainer: {
+  modalOverlayContainer: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  modalOverlayTouchable: {
+    flex: 1,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -1091,6 +1133,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
+    maxHeight: '80%',
+  },
+  sortModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 30,
     maxHeight: '80%',
   },
   modalHeader: {
@@ -1215,6 +1266,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     marginBottom: 8,
     borderRadius: 8,
+    borderBottomWidth: 0,
+    paddingHorizontal: 16,
   },
   resetSortOptionText: {
     color: '#666',

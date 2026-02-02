@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   StyleSheet,
-  Keyboard,
   StatusBar,
   Animated,
   Easing,
@@ -40,18 +39,27 @@ const Searchpage = ({ navigation }: any) => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [listening, setListening] = useState(false);
-  const [wishlistLoadingMap, setWishlistLoadingMap] = useState<Record<string, boolean>>({});
+  const [wishlistLoadingMap, setWishlistLoadingMap] = useState<
+    Record<string, boolean>
+  >({});
 
   // Use WishlistContext
-  const {
-    wishlistIds,
-    isWishlisted,
-    toggleWishlist,
-  } = useContext(WishlistContext);
+  const { wishlistIds, isWishlisted, toggleWishlist } =
+    useContext(WishlistContext);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const silenceTimer = useRef<any>(null);
   const debounceTimer = useRef<any>(null);
+
+  // Trending searches related to actual product categories
+  const trendingSearches = [
+    'Herbal Calm',
+    'Detox Tea',
+    'Golden Tea',
+    'Jamine Green',
+    'Organic Herbal',
+    'Grey Classic',
+  ];
 
   /* ---------------- VOICE EVENTS ---------------- */
   useEffect(() => {
@@ -108,13 +116,18 @@ const Searchpage = ({ navigation }: any) => {
       await Voice.start('en-IN');
     } catch (e) {
       console.log('Voice start error', e);
+      Toast.show({
+        type: 'error',
+        text1: 'Microphone Error',
+        text2: 'Please check microphone permissions',
+      });
     }
   };
 
   const stopListening = async () => {
     try {
       await Voice.stop();
-    } catch { }
+    } catch {}
 
     setListening(false);
     pulseAnim.stopAnimation();
@@ -124,54 +137,63 @@ const Searchpage = ({ navigation }: any) => {
   };
 
   /* ---------------- SEARCH API ---------------- */
-  const GetSearch = useCallback(async (word: string) => {
-    if (!word.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      setIsSearching(true);
-      const res = await UserService.search(word);
-
-      if (res?.data?.status) {
-        const products = Array.isArray(res.data.data) ? res.data.data : [];
-        const mapped = products.map((p: any) => {
-          const images = [p.front_image, p.back_image, p.side_image]
-            .filter(Boolean)
-            .map(img =>
-              img.startsWith('http') ? img : `${Image_url}${img}`,
-            );
-
-          const variant = p.variants?.[0];
-          const productId = String(p.id);
-
-          // Check if product is in wishlist using context
-          const isWishlistedItem = isWishlisted(productId);
-
-          return {
-            ID: p.id,
-            name: p.name,
-            images,
-            price:
-              variant?.actual_price ?? variant?.price ?? p.main_price ?? '0',
-            unit: variant?.unit ?? '',
-            brand: p.brand || 'Brand',
-            discount: variant?.discount || 0,
-            is_wishlist: isWishlistedItem,
-          };
-        });
-        setSearchResults(mapped);
-      } else {
+  const GetSearch = useCallback(
+    async (word: string) => {
+      if (!word.trim()) {
         setSearchResults([]);
+        return;
       }
-    } catch (error) {
-      console.log('Search error:', error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [isWishlisted]);
+
+      try {
+        setIsSearching(true);
+        const res = await UserService.search(word);
+
+        if (res?.data?.status) {
+          const products = Array.isArray(res.data.data) ? res.data.data : [];
+          const mapped = products.map((p: any) => {
+            const images = [p.front_image, p.back_image, p.side_image]
+              .filter(Boolean)
+              .map(img =>
+                img.startsWith('http') ? img : `${Image_url}${img}`,
+              );
+
+            const variant = p.variants?.[0];
+            const productId = String(p.id);
+
+            // Check if product is in wishlist using context
+            const isWishlistedItem = isWishlisted(productId);
+
+            return {
+              ID: p.id,
+              name: p.name,
+              images,
+              price:
+                variant?.actual_price ?? variant?.price ?? p.main_price ?? '0',
+              unit: variant?.unit ?? '',
+              brand: p.brand || 'Brand',
+              discount: variant?.discount || 0,
+              is_wishlist: isWishlistedItem,
+              productData: p, // Store original product data for navigation
+            };
+          });
+          setSearchResults(mapped);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (error) {
+        console.log('Search error:', error);
+        setSearchResults([]);
+        Toast.show({
+          type: 'error',
+          text1: 'Search Failed',
+          text2: 'Please try again',
+        });
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [isWishlisted],
+  );
 
   /* ---------------- DEBOUNCE INPUT CHANGE ---------------- */
   useEffect(() => {
@@ -224,6 +246,15 @@ const Searchpage = ({ navigation }: any) => {
     }
   };
 
+  /* ---------------- NAVIGATE TO PRODUCT DETAILS ---------------- */
+  const navigateToProductDetails = (item: any) => {
+    navigation.navigate('ProductDetails', {
+      productId: item.ID,
+      productData: item.productData || item, // Pass product data for immediate display
+    });
+  };
+
+  /* ---------------- RENDER PRODUCT ITEM ---------------- */
   const renderItem = ({ item, index }: any) => {
     const productId = String(item.ID);
     const isWishlistedItem = isWishlisted(productId);
@@ -232,9 +263,7 @@ const Searchpage = ({ navigation }: any) => {
     return (
       <TouchableOpacity
         style={[styles.card, { marginRight: index % 2 === 0 ? 8 : 0 }]}
-        onPress={() =>
-          navigation.navigate('ProductDetails', { productId: item.ID })
-        }
+        onPress={() => navigateToProductDetails(item)}
         activeOpacity={0.7}
       >
         <View style={styles.imageContainer}>
@@ -253,8 +282,14 @@ const Searchpage = ({ navigation }: any) => {
             </View>
           )}
           <TouchableOpacity
-            style={[styles.wishlistButton, isLoading && styles.wishlistButtonDisabled]}
-            onPress={() => handleToggleWishlist(item)}
+            style={[
+              styles.wishlistButton,
+              isLoading && styles.wishlistButtonDisabled,
+            ]}
+            onPress={e => {
+              e.stopPropagation(); // Prevent card press
+              handleToggleWishlist(item);
+            }}
             disabled={isLoading}
           >
             {isLoading ? (
@@ -306,13 +341,40 @@ const Searchpage = ({ navigation }: any) => {
             </Text>
           )}
 
-          <TouchableOpacity style={styles.addToCartButton}>
+          <TouchableOpacity
+            style={styles.addToCartButton}
+            onPress={e => {
+              e.stopPropagation(); // Prevent card press
+              navigateToProductDetails(item);
+            }}
+          >
             <Text style={styles.addToCartText}>GET DETAILS</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
   };
+
+  /* ---------------- RENDER TRENDING SEARCH ITEMS ---------------- */
+  const renderTrendingSearch = (tag: string, index: number) => (
+    <TouchableOpacity
+      key={`${tag}-${index}`}
+      style={styles.trendingTag}
+      onPress={() => {
+        setQuery(tag);
+        // Trigger search immediately
+        setTimeout(() => {
+          GetSearch(tag);
+        }, 100);
+      }}
+    >
+      <Image
+        source={require('../../assets/Png/search.png')}
+        style={styles.trendingTagIcon}
+      />
+      <Text style={styles.trendingTagText}>{tag}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -419,6 +481,23 @@ const Searchpage = ({ navigation }: any) => {
             <Text style={styles.emptySubtitle}>
               Try searching with different keywords
             </Text>
+            <View style={styles.suggestionsContainer}>
+              <Text style={styles.suggestionsTitle}>Try these instead:</Text>
+              <View style={styles.suggestionsList}>
+                {trendingSearches.slice(0, 5).map((tag, index) => (
+                  <TouchableOpacity
+                    key={tag}
+                    style={styles.suggestionTag}
+                    onPress={() => {
+                      setQuery(tag);
+                      GetSearch(tag);
+                    }}
+                  >
+                    <Text style={styles.suggestionTagText}>{tag}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </View>
         ) : (
           <View style={styles.initialContainer}>
@@ -433,17 +512,7 @@ const Searchpage = ({ navigation }: any) => {
             <View style={styles.trendingContainer}>
               <Text style={styles.trendingTitle}>Trending Searches</Text>
               <View style={styles.trendingTags}>
-                {['Lipstick', 'Skincare', 'Perfume', 'Makeup', 'Haircare'].map(
-                  tag => (
-                    <TouchableOpacity
-                      key={tag}
-                      style={styles.trendingTag}
-                      onPress={() => setQuery(tag)}
-                    >
-                      <Text style={styles.trendingTagText}>{tag}</Text>
-                    </TouchableOpacity>
-                  ),
-                )}
+                {trendingSearches.map(renderTrendingSearch)}
               </View>
             </View>
           </View>
@@ -744,6 +813,36 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 24,
+  },
+  suggestionsContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  suggestionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  suggestionsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  suggestionTag: {
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    marginBottom: 8,
+  },
+  suggestionTagText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
   },
   initialContainer: {
     flex: 1,
@@ -786,12 +885,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   trendingTag: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    marginHorizontal: 4,
-    marginBottom: 8,
+    marginHorizontal: 6,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  trendingTagIcon: {
+    width: 14,
+    height: 14,
+    marginRight: 6,
+    tintColor: Colors.button[100],
   },
   trendingTagText: {
     fontSize: 14,

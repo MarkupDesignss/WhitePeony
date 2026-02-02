@@ -3,8 +3,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Colors, Images } from '../constant';
 import { heightPercentageToDP } from '../constant/dimentions';
-import HomeScreen from '../screens/HomeTab/HomeScreen';
-import CategoryScreen from '../screens/CategoryTab/CategoryScreen';
+
 import EventScreen from '../screens/EventTab/EventScreen';
 import AccountScreen from '../screens/AccountTab/AccountScreen';
 import ArticleScreen from '../screens/ArticleTab/ArticleScreen';

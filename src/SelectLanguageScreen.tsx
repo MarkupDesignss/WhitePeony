@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { setLanguage, LanguageCode } from './redux/slices/languageSlice';
 import { RootState } from './redux/store';
@@ -9,22 +9,17 @@ const languages: { code: LanguageCode; label: string; flag: string }[] = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'de', label: 'German', flag: '🇩🇪' },
   { code: 'cs', label: 'Czech', flag: '🇨🇿' },
+  { code: 'hi', label: 'हिंदी', flag: '🇮🇳' }, // Added Hindi
 ];
 
 export default function SelectLanguageScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const selectedLanguage = useSelector((state: RootState) => state.language.code);
-  const [loading, setLoading] = useState(false);
 
   const handleSelectLanguage = (code: LanguageCode) => {
-    setLoading(true);
     dispatch(setLanguage(code));
-
-    setTimeout(() => {
-      setLoading(false);
-      navigation.goBack();
-    }, 2000);
+    navigation.goBack(); // Immediately go back without loading delay
   };
 
   return (
@@ -39,7 +34,6 @@ export default function SelectLanguageScreen() {
             selectedLanguage === lang.code && styles.selectedButton,
           ]}
           onPress={() => handleSelectLanguage(lang.code)}
-          disabled={loading}
         >
           <Text
             style={[
@@ -51,13 +45,6 @@ export default function SelectLanguageScreen() {
           </Text>
         </TouchableOpacity>
       ))}
-
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#28a745" />
-          <Text style={styles.loadingText}>Updating Language...</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -104,21 +91,5 @@ const styles = StyleSheet.create({
   },
   flag: {
     fontSize: 22,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: '#28a745',
-    fontWeight: '500',
   },
 });

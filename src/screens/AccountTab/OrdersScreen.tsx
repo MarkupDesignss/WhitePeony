@@ -86,6 +86,23 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   const [existingComment, setExistingComment] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Helper to parse quantities safely
+  const parseQuantity = useCallback((value: any): number => {
+    const qty = Number(value);
+    return Number.isFinite(qty) ? qty : 0;
+  }, []);
+
+
+  // Helper to calculate total quantity from items list
+  const calculateTotalQuantity = useCallback((items: any[]): number => {
+    if (!Array.isArray(items)) return 0;
+
+    return items.reduce((sum, item) => {
+      return sum + Number(item?.quantity || 0);
+    }, 0);
+  }, []);
+
+
   useEffect(() => {
     OrderList();
   }, []);
@@ -310,12 +327,17 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
 
   const getItemsList = useCallback((rawItems: any) => {
     if (!rawItems) return [];
+
+    // API always sends array of order items
     if (Array.isArray(rawItems)) {
-      if (rawItems.length > 0 && Array.isArray(rawItems[0])) {
-        return rawItems[0];
-      }
       return rawItems;
     }
+
+    // Sometimes wrapped inside { items: [] }
+    if (rawItems?.items && Array.isArray(rawItems.items)) {
+      return rawItems.items;
+    }
+
     return [];
   }, []);
 
@@ -438,8 +460,8 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 {item?.tracking_number
                   ? `${item.tracking_number}`
                   : item?.payment_status
-                  ? item.payment_status
-                  : 'No tracking info'}
+                    ? item.payment_status
+                    : 'No tracking info'}
               </Text>
             </View>
             <Image
@@ -463,19 +485,23 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
               />
             )}
             <View style={styles.productDetails}>
-              <Text style={styles.productName}>{productName || 'Item'}</Text>
-              <Text style={styles.productName}>
+              {/* Primary product */}
+              <Text style={styles.productName} numberOfLines={1}>
+                {productName || 'Item'}
+              </Text>
+
+              {/* Secondary summary */}
+              {itemsList.length > 1 && (
+                <Text style={styles.moreItemsText}>
+                  +{itemsList.length - 1} items
+                </Text>
+              )}
+
+              <Text style={styles.productPrice}>
                 {item?.total_amount ? displayPrice(item.total_amount) : ''}
               </Text>
-              <Text style={styles.productQty}>
-                Qty :{' '}
-                {itemsList?.reduce(
-                  (sum: number, it: any) =>
-                    sum + (it?.quantity || it?.qty || 1),
-                  1,
-                )}
-              </Text>
             </View>
+
           </View>
 
           <TouchableOpacity
@@ -617,7 +643,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                           {currentProductName}
                         </Text>
                         <Text style={{ color: '#666', fontSize: 13 }}>
-                          Qty: {it?.quantity || it?.qty || 1}{' '}
+                          Qty: {parseQuantity(it?.quantity)}{' '}
                           {p?.price ? `• ${displayPrice(p.price)}` : ''}
                         </Text>
 
@@ -672,7 +698,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                             style={[
                               styles.reviewButton,
                               userItemRating !== null &&
-                                styles.updateReviewButton,
+                              styles.updateReviewButton,
                             ]}
                             hitSlop={{
                               top: 10,
@@ -708,6 +734,8 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
       handleOpenReviewModal,
       toggleExpand,
       userData,
+      parseQuantity,
+      calculateTotalQuantity,
     ],
   );
 
@@ -817,14 +845,14 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                     {newRating === 5
                       ? 'Excellent'
                       : newRating === 4
-                      ? 'Good'
-                      : newRating === 3
-                      ? 'Average'
-                      : newRating === 2
-                      ? 'Poor'
-                      : newRating === 1
-                      ? 'Terrible'
-                      : 'Select a rating'}
+                        ? 'Good'
+                        : newRating === 3
+                          ? 'Average'
+                          : newRating === 2
+                            ? 'Poor'
+                            : newRating === 1
+                              ? 'Terrible'
+                              : 'Select a rating'}
                   </Text>
 
                   <Text style={styles.modalSubtitle}>
@@ -1197,6 +1225,19 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: '#f5f5f5',
   },
+  moreItemsText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+
+  productPrice: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#222',
+    marginTop: 4,
+  },
+
   closeButtonText: {
     fontSize: 22,
     color: '#666',

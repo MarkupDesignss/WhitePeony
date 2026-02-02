@@ -28,6 +28,7 @@ import { LocalStorage } from '../../helpers/localstorage';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 
 const { width } = Dimensions.get('window');
 
@@ -42,8 +43,40 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
     useContext<UserData>(UserDataContext);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [modalAddress, setModalAddress] = useState(false);
-  const [modalAddressADD, setmodalAddressADD] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Use the useAutoTranslate hook for each text
+  const { translatedText: accountTitle } = useAutoTranslate('Account');
+  const { translatedText: loginText } = useAutoTranslate('Login');
+  const { translatedText: logoutText } = useAutoTranslate('Logout');
+  const { translatedText: viewProfileText } =
+    useAutoTranslate('View Full Profile');
+  const { translatedText: myOrdersText } = useAutoTranslate('My Orders');
+  const { translatedText: myEventsText } = useAutoTranslate('My Events');
+  const { translatedText: myFavoritesText } = useAutoTranslate('My Favorites');
+  const { translatedText: myAddressText } = useAutoTranslate('My Address');
+  const { translatedText: notificationsText } =
+    useAutoTranslate('Notifications');
+  const { translatedText: policiesText } = useAutoTranslate('Policies');
+  const { translatedText: termsText } = useAutoTranslate('Terms & Conditions');
+  const { translatedText: languageChangeText } =
+    useAutoTranslate('Language Change');
+  const { translatedText: cookiesText } = useAutoTranslate('Cookies');
+  const { translatedText: privacyText } = useAutoTranslate('Privacy Policy');
+  const { translatedText: changeCurrencyText } =
+    useAutoTranslate('Change Currency');
+  const { translatedText: deleteAccountText } =
+    useAutoTranslate('Delete Account');
+  const { translatedText: memberSinceText } = useAutoTranslate('Member since');
+  const { translatedText: superShinyText } = useAutoTranslate('Super Shiny');
+  const { translatedText: growthValueText } = useAutoTranslate('Growth Value');
+  const { translatedText: privilegesText } = useAutoTranslate(
+    'Privileges In Total',
+  );
+  const { translatedText: unlockedText } = useAutoTranslate('Unlocked');
+  const { translatedText: notificationText } = useAutoTranslate('Notification');
+  const { translatedText: myFavoritiesText } =
+    useAutoTranslate('My Favorities');
 
   // Function to open external URLs with InAppBrowser
   const openInAppBrowser = async (url: string, title?: string) => {
@@ -112,10 +145,6 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
     }
 
     openInAppBrowser(url, title);
-  };
-
-  const openWebViewScreen = (url: string, title: string) => {
-    navigation.navigate('WebViewScreen', { url, title });
   };
 
   const signout = async () => {
@@ -190,7 +219,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Account</Text>
+        <Text style={styles.headerTitle}>{accountTitle || 'Account'}</Text>
         {isLoggedIn ? (
           <TouchableOpacity onPress={() => signout()} style={styles.logoutIcon}>
             <Image
@@ -203,7 +232,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
             onPress={() => setModalVisible(true)}
             style={styles.logoutIcon}
           >
-            <Text style={styles.loginText}>Login</Text>
+            <Text style={styles.loginText}>{loginText || 'Login'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -257,7 +286,8 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                   {userData?.name || 'User Name'}
                 </Text>
                 <Text style={styles.since}>
-                  Member since {formatDate(userData?.created_at)}
+                  {memberSinceText || 'Member since'}{' '}
+                  {formatDate(userData?.created_at)}
                 </Text>
               </View>
             </View>
@@ -267,9 +297,11 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 <View style={styles.separator} />
 
                 <View style={styles.superShinyContent}>
-                  <Text style={styles.superShinyTitle}>Super Shiny</Text>
+                  <Text style={styles.superShinyTitle}>
+                    {superShinyText || 'Super Shiny'}
+                  </Text>
                   <Text style={styles.growthValue}>
-                    Growth Value 10000€ / 2500012000€
+                    {growthValueText || 'Growth Value'} 10000€ / 2500012000€
                   </Text>
                   <View style={styles.progressBackground}>
                     <View style={[styles.progressFill, { width: '30%' }]} />
@@ -278,7 +310,8 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
 
                 <View style={styles.privilegesFooter}>
                   <Text style={styles.privilegesText}>
-                    4 Privileges In Total, 1 Unlocked
+                    4 {privilegesText || 'Privileges In Total'}, 1{' '}
+                    {unlockedText || 'Unlocked'}
                   </Text>
                 </View>
               </>
@@ -296,7 +329,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 source={require('../../assets/Png/user.png')}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuButtonText}>View Full Profile</Text>
+              <Text style={styles.menuButtonText}>
+                {viewProfileText || 'View Full Profile'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -314,7 +349,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                     source={require('../../assets/Png/order.png')}
                     style={styles.menuIcon}
                   />
-                  <Text style={styles.menuItemText}>My Orders</Text>
+                  <Text style={styles.menuItemText}>
+                    {myOrdersText || 'My Orders'}
+                  </Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
@@ -328,7 +365,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                     source={require('../../assets/Png/events.png')}
                     style={styles.menuIcon}
                   />
-                  <Text style={styles.menuItemText}>My Events</Text>
+                  <Text style={styles.menuItemText}>
+                    {myEventsText || 'My Events'}
+                  </Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
@@ -344,7 +383,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 source={require('../../assets/Png/star.png')}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuItemText}>My Favorities</Text>
+              <Text style={styles.menuItemText}>
+                {myFavoritiesText || 'My Favorities'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -359,14 +400,19 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                   source={require('../../assets/Png/paymentmethod.png')}
                   style={styles.menuIcon}
                 />
-                <Text style={styles.menuItemText}>My Address</Text>
+                <Text style={styles.menuItemText}>
+                  {' '}
+                  {myAddressText || 'My Address'}
+                </Text>
               </View>
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
-        <Text style={styles.sectionTitle}>Notifications</Text>
+        <Text style={styles.sectionTitle}>
+          {notificationsText || 'Notifications'}
+        </Text>
         <TouchableOpacity
           onPress={() => navigation.navigate('NotificationScreen')}
           style={styles.notificationButton}
@@ -376,7 +422,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
               source={require('../../assets/Png/bellnoti.png')}
               style={styles.menuIcon}
             />
-            <Text style={styles.menuItemText}>Notification</Text>
+            <Text style={styles.menuItemText}>
+              {notificationText || 'Notification'}
+            </Text>
           </View>
           <View style={styles.switchContainer}>
             <Switch
@@ -390,7 +438,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Policies</Text>
+        <Text style={styles.sectionTitle}>{policiesText || 'Policies'}</Text>
         <View style={styles.policiesCard}>
           <TouchableOpacity
             onPress={() => handlePolicyLink('terms')}
@@ -401,7 +449,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 source={require('../../assets/Png/task.png')}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuItemText}>Terms & Conditions</Text>
+              <Text style={styles.menuItemText}>
+                {termsText || 'Terms & Conditions'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -412,10 +462,12 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           >
             <View style={styles.menuItemLeft}>
               <Image
-                source={require('../../assets/Png/cookies.png')}
+                source={require('../../assets/Png/translate.png')}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuItemText}>Language Change</Text>
+              <Text style={styles.menuItemText}>
+                {languageChangeText || 'Language Change'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -429,26 +481,32 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 source={require('../../assets/Png/cookies.png')}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuItemText}>Cookies</Text>
+              <Text style={styles.menuItemText}>
+                {cookiesText || 'Cookies'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => handlePolicyLink('privacy')}
-            style={[styles.menuItem, styles.lastMenuItem, { borderBottomWidth: 1 }]}
+            style={[
+              styles.menuItem,
+              styles.lastMenuItem,
+              { borderBottomWidth: 1 },
+            ]}
           >
             <View style={styles.menuItemLeft}>
               <Image
                 source={require('../../assets/Png/shieldpro.png')}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuItemText}>Privacy Policy</Text>
+              <Text style={styles.menuItemText}>
+                {privacyText || 'Privacy Policy'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-
-
 
           <TouchableOpacity
             onPress={() => navigation.navigate('CurrencyScreen')}
@@ -456,14 +514,15 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           >
             <View style={styles.menuItemLeft}>
               <Image
-                source={require('../../assets/Png/shieldpro.png')} // add icon
+                source={require('../../assets/Png/shieldpro.png')}
                 style={styles.menuIcon}
               />
-              <Text style={styles.menuItemText}>Change Currency</Text>
+              <Text style={styles.menuItemText}>
+                {changeCurrencyText || 'Change Currency'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-
         </View>
 
         {isLoggedIn ? (
@@ -475,14 +534,16 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
               source={require('../../assets/Png/delete.png')}
               style={styles.deleteIcon}
             />
-            <Text style={styles.deleteButtonText}>Delete Account</Text>
+            <Text style={styles.deleteButtonText}>
+              {deleteAccountText || 'Delete Account'}
+            </Text>
           </TouchableOpacity>
         ) : null}
       </ScrollView>
       <AddressModal
         visible={modalAddress}
         onClose={() => setModalAddress(false)}
-        onSelect={(address) => {
+        onSelect={address => {
           console.log('Selected address:', address);
           // Handle selected address if needed
           setModalAddress(false);

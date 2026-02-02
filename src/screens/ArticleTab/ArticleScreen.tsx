@@ -50,12 +50,36 @@ const ArticleScreen = ({ navigation }: any) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const viewRef = useRef<any>(null);
   const [sampleArticle, setsampleArticle] = React.useState<any[]>([]);
+  const [filteredArticles, setFilteredArticles] = React.useState<any[]>([]);
   const [justForYouModalVisible, setJustForYouModalVisible] = useState(false);
   const [trendingModalVisible, setTrendingModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     ArticleList();
   }, []);
+
+  useEffect(() => {
+    // Reset filtered articles when search query is empty
+    if (!searchQuery.trim()) {
+      setFilteredArticles([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Filter articles based on search query
+    const filtered = sampleArticle.filter(article => {
+      const query = searchQuery.toLowerCase().trim();
+      return (
+        article.title?.toLowerCase().includes(query) ||
+        article.content?.toLowerCase().includes(query)
+      );
+    });
+
+    setFilteredArticles(filtered);
+    setIsSearching(true);
+  }, [searchQuery, sampleArticle]);
 
   const ArticleList = async () => {
     try {
@@ -105,9 +129,9 @@ const ArticleScreen = ({ navigation }: any) => {
           </View>
         </View>
         <View style={styles.upTitleWrap}>
-          {/* <Text numberOfLines={2} style={styles.upTitleWhite}>
-            {item.content}
-          </Text> */}
+          <Text numberOfLines={2} style={styles.upTitleWhite}>
+            {item.title}
+          </Text>
         </View>
       </ImageBackground>
     </TouchableOpacity>
@@ -130,14 +154,14 @@ const ArticleScreen = ({ navigation }: any) => {
           <View style={{ flex: 1 }}>
             <View style={styles.nearBody}>
               <Text numberOfLines={2} style={styles.nearTitle}>
-                {' '}
-                {item.title}{' '}
+                {item.title}
               </Text>
-
             </View>
-            <Text numberOfLines={1.75} style={{ color: 'black', marginTop: 3, fontSize: 12 }}>
-              {' '}
-              {item.content}{' '}
+            <Text
+              numberOfLines={1.75}
+              style={{ color: 'black', marginTop: 3, fontSize: 12 }}
+            >
+              {item.content}
             </Text>
             <View
               style={{
@@ -182,6 +206,18 @@ const ArticleScreen = ({ navigation }: any) => {
     </>
   );
 
+  // Function to clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+    setIsSearching(false);
+  };
+
+  // Data to display based on search state
+  const displayArticles = isSearching ? filteredArticles : sampleArticle;
+  const displayJustForYouArticles = isSearching
+    ? filteredArticles.slice(0, 3)
+    : sampleArticle.slice(0, 3);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar
@@ -196,8 +232,7 @@ const ArticleScreen = ({ navigation }: any) => {
             onPress={() => navigation.goBack()}
           >
             <Image
-            
-              source={require('../../assets/Png/back.png')} // Adjust path as needed
+              source={require('../../assets/Png/back.png')}
               style={styles.backIcon}
             />
           </TouchableOpacity>
@@ -210,15 +245,40 @@ const ArticleScreen = ({ navigation }: any) => {
             placeholder="Search Articles...."
             placeholderTextColor={Colors.text[200]}
             style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
-          <TouchableOpacity style={styles.microphone}>
-            <Image
-              source={require('../../assets/Png/search.png')}
-              style={styles.iconSmall}
-            />
-          </TouchableOpacity>
+          {searchQuery ? (
+            <TouchableOpacity onPress={clearSearch} style={styles.microphone}>
+              <Image
+                source={require('../../assets/Png/search.png')} // Add a clear icon
+                style={[styles.iconSmall, { tintColor: '#fff' }]}
+              />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.microphone}>
+              <Image
+                source={require('../../assets/Png/search.png')}
+                style={[styles.iconSmall, { tintColor: '#fff' }]}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
+
+      {/* Search Results Section */}
+      {isSearching && (
+        <View style={styles.searchResultsHeader}>
+          <Text style={styles.searchResultsTitle}>
+            Search Results ({filteredArticles.length})
+          </Text>
+          <TouchableOpacity onPress={clearSearch}>
+            <Text style={styles.clearSearchText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Just For You modal */}
       <Modal visible={justForYouModalVisible} transparent animationType="slide">
@@ -242,11 +302,18 @@ const ArticleScreen = ({ navigation }: any) => {
             </View>
 
             <FlatList
-              data={sampleArticle}
+              data={isSearching ? filteredArticles : sampleArticle}
               keyExtractor={i => String(i.id)}
               renderItem={renderUpcoming}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingTop: 12 }}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    {isSearching ? 'No articles found' : 'No articles available'}
+                  </Text>
+                </View>
+              }
             />
           </View>
         </View>
@@ -271,11 +338,18 @@ const ArticleScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={sampleArticle}
+              data={isSearching ? filteredArticles : sampleArticle}
               keyExtractor={i => String(i.id)}
               renderItem={renderNear}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingTop: 12 }}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    {isSearching ? 'No articles found' : 'No articles available'}
+                  </Text>
+                </View>
+              }
             />
           </View>
         </View>
@@ -285,70 +359,109 @@ const ArticleScreen = ({ navigation }: any) => {
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Just For You</Text>
-          <TouchableOpacity onPress={() => setJustForYouModalVisible(true)}>
-            <Text style={styles.seeMore}>View All</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ marginTop: 10 }}>
-          <FlatList
-            ref={viewRef}
-            data={sampleArticle}
-            keyExtractor={i => i.id}
-            renderItem={renderUpcoming}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={ev => {
-              const newIndex = Math.round(
-                ev.nativeEvent.contentOffset.x / (width - 64 + 12),
-              );
-              if (!isNaN(newIndex)) setActiveIndex(newIndex);
-            }}
-          />
-
-          <View style={styles.dotsRow}>
-            {sampleArticle.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  i === activeIndex ? styles.dotActive : null,
-                ]}
+        {/* Show search results if searching */}
+        {isSearching ? (
+          <View style={styles.searchResultsContainer}>
+            {filteredArticles.length > 0 ? (
+              <FlatList
+                data={filteredArticles}
+                keyExtractor={i => i.id}
+                renderItem={renderNear}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                scrollEnabled={false}
+                ListHeaderComponent={
+                  <Text style={styles.resultsCount}>
+                    Found {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''}
+                  </Text>
+                }
               />
-            ))}
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Image
+                  source={require('../../assets/Png/search.png')} // Add a no results icon
+                  style={styles.emptyIcon}
+                />
+                <Text style={styles.emptyText}>No articles found</Text>
+                <Text style={styles.emptySubText}>
+                  Try different keywords or check back later
+                </Text>
+              </View>
+            )}
           </View>
-        </View>
+        ) : (
+          <>
+            {/* Just For You Section - Only show when not searching */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Just For You</Text>
+              <TouchableOpacity onPress={() => setJustForYouModalVisible(true)}>
+                <Text style={styles.seeMore}>View All</Text>
+              </TouchableOpacity>
+            </View>
 
-        <View style={[styles.sectionHeader, { marginTop: 16 }]}>
-          <Text style={styles.sectionTitle}>Trending Articles</Text>
-          <TouchableOpacity onPress={() => setTrendingModalVisible(true)}>
-            <Text style={styles.seeMore}>View all</Text>
-          </TouchableOpacity>
-        </View>
-        <View
-          style={{
-            width: '90%',
-            alignSelf: 'center',
-            justifyContent: 'center',
-            height: 'auto',
-            borderWidth: 1,
-            borderColor: Colors.text[400],
-            borderRadius: 10,
-            marginTop: 10,
-          }}
-        >
-          <FlatList
-            data={sampleArticle}
-            keyExtractor={i => i.id}
-            renderItem={renderNear}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            scrollEnabled={false}
-          />
-        </View>
+            <View style={{ marginTop: 10 }}>
+              {displayJustForYouArticles.length > 0 ? (
+                <>
+                  <FlatList
+                    ref={viewRef}
+                    data={displayJustForYouArticles}
+                    keyExtractor={i => i.id}
+                    renderItem={renderUpcoming}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={ev => {
+                      const newIndex = Math.round(
+                        ev.nativeEvent.contentOffset.x / (width - 64 + 12),
+                      );
+                      if (!isNaN(newIndex)) setActiveIndex(newIndex);
+                    }}
+                  />
+
+                  <View style={styles.dotsRow}>
+                    {displayJustForYouArticles.map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.dot,
+                          i === activeIndex ? styles.dotActive : null,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <View style={styles.emptySection}>
+                  <Text style={styles.emptySectionText}>No articles available</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Trending Articles Section - Only show when not searching */}
+            <View style={[styles.sectionHeader, { marginTop: 16 }]}>
+              <Text style={styles.sectionTitle}>Trending Articles</Text>
+              <TouchableOpacity onPress={() => setTrendingModalVisible(true)}>
+                <Text style={styles.seeMore}>View all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.trendingContainer}>
+              {sampleArticle.length > 0 ? (
+                <FlatList
+                  data={sampleArticle.slice(0, 5)} // Show first 5 trending articles
+                  keyExtractor={i => i.id}
+                  renderItem={renderNear}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                  scrollEnabled={false}
+                />
+              ) : (
+                <View style={styles.emptySection}>
+                  <Text style={styles.emptySectionText}>No trending articles</Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -382,7 +495,7 @@ const styles = StyleSheet.create({
   backIcon: {
     width: 24,
     height: 24,
-    tintColor:'#000', // Optional: adjust color
+    tintColor: '#000',
   },
   headerTitle: {
     fontSize: 18,
@@ -391,7 +504,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerRightPlaceholder: {
-    width: 40, // Same as backButton for symmetry
+    width: 40,
   },
   searchRow: {
     flexDirection: 'row',
@@ -408,14 +521,74 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EAEAEA',
   },
-  searchBtn: {
-    marginLeft: 8,
-    width: 44,
-    height: 42,
-    borderRadius: 20,
-    backgroundColor: Colors.button[100],
+  searchResultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EAEAEA',
+  },
+  searchResultsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  clearSearchText: {
+    color: Colors.button[100],
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  searchResultsContainer: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingTop: 20,
+  },
+  resultsCount: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 50,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    marginBottom: 20,
+    opacity: 0.5,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  emptySection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    marginHorizontal: 12,
+    marginTop: 10,
+  },
+  emptySectionText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -458,7 +631,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   upTitleWrap: { flex: 1, justifyContent: 'flex-end', padding: 12 },
-  upTitleWhite: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  upTitleWhite: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
+  },
   dotsRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
   dot: {
     width: 8,
@@ -503,6 +683,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EAEAEA',
     marginLeft: 8,
+  },
+  trendingContainer: {
+    width: '90%',
+    alignSelf: 'center',
+    justifyContent: 'center',
+    height: 'auto',
+    borderWidth: 1,
+    borderColor: Colors.text[400],
+    borderRadius: 10,
+    marginTop: 10,
   },
 });
 

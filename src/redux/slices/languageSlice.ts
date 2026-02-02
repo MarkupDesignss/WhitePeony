@@ -1,11 +1,13 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-export type LanguageCode = 'en' | 'de' | 'cs';
+// Add 'hi' for Hindi language code
+export type LanguageCode = 'en' | 'de' | 'cs' | 'hi';
 
 interface LanguageState {
   code: LanguageCode;
 }
 
+// English as default
 const initialState: LanguageState = {
   code: 'en',
 };
