@@ -23,6 +23,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TransletText from '../../components/TransletText';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 48) / 2;
@@ -540,12 +541,12 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
 
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No Products Found</Text>
+        <TransletText  text="No Products Found" style={styles.emptyText} />
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => fetchProducts()}
         >
-          <Text style={styles.retryButtonText}>Retry</Text>
+          <TransletText text="Retry" style={styles.retryButtonText} />
         </TouchableOpacity>
       </View>
     );
@@ -557,7 +558,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#AEB254" style={styles.loader} />
-        <Text style={styles.loaderText}>Loading products...</Text>
+        <TransletText text="Loading products..." style={styles.loaderText} />
       </View>
     );
   };
@@ -577,9 +578,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {categoryTitle || 'Products'}
-          </Text>
+          <TransletText text={categoryTitle || 'Products'} style={styles.headerTitle} numberOfLines={1} /> 
 
           <TouchableOpacity
             onPress={() => navigation.navigate('CheckoutScreen')}
@@ -605,7 +604,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             style={styles.filterButton}
             onPress={() => setFilterVisible(true)}
           >
-            <Text style={styles.filterButtonText}>Filters ▾</Text>
+            <TransletText text="Filters ▾" style={styles.filterButtonText} />
           </TouchableOpacity>
 
           <TouchableOpacity

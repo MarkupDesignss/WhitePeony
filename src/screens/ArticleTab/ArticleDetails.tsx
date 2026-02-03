@@ -20,6 +20,7 @@ import { formatDate } from '../../helpers/helpers';
 import { Colors, Images } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import TransletText from '../../components/TransletText';
 
 const { width, height } = Dimensions.get('window');
 
@@ -146,13 +147,11 @@ const ArticleDetails = ({ navigation, route }: any) => {
         </TouchableOpacity>
 
         <View style={styles.titleContainer}>
-          <Text
+          <TransletText
+            text={airtcleDetails?.title || 'Article Details'}
             style={styles.headerTitle}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {airtcleDetails?.title || 'Article Details'}
-          </Text>
+          />
+
         </View>
 
         {/* Optional: Add share button */}
@@ -170,7 +169,7 @@ const ArticleDetails = ({ navigation, route }: any) => {
   return (
     <View style={styles.container}>
       <CustomHeader />
-
+  
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -184,47 +183,57 @@ const ArticleDetails = ({ navigation, route }: any) => {
             resizeMode="cover"
           />
         </View>
-
+  
         <View style={styles.contentContainer}>
           <View style={styles.titleWrapper}>
-            <Text style={styles.articleTitle} numberOfLines={3}>
-              {airtcleDetails?.title}
-            </Text>
+            <TransletText
+              text={airtcleDetails?.title || 'Article Title'}
+              style={styles.articleTitle}
+              numberOfLines={3}
+            />
           </View>
-
+  
           <View style={styles.metaInfoRow}>
             <View style={styles.metaItem}>
               <View style={styles.statusDot} />
-              <Text style={styles.metaText}>
-                {getTimeAgo(airtcleDetails?.created_at)}
-              </Text>
+              <TransletText
+                text={getTimeAgo(airtcleDetails?.created_at) || 'Just now'}
+                style={styles.metaText}
+              />
             </View>
-
+  
             <View style={styles.metaItem}>
               <Image source={Images.date} style={styles.metaIcon} />
-              <Text style={styles.metaText}>
-                {formatDate(airtcleDetails?.created_at)?.slice(0, -9)}
-              </Text>
+              <TransletText
+                text={formatDate(airtcleDetails?.created_at)?.slice(0, -9) || ''}
+                style={styles.metaText}
+              />
             </View>
-
+  
             <View style={styles.metaItem}>
               <Image source={Images.views} style={styles.metaIcon} />
-              <Text style={styles.metaText}>
-                {airtcleDetails?.views || 0} views
-              </Text>
+              <TransletText
+                text={`${airtcleDetails?.views || 0} views`}
+                style={styles.metaText}
+              />
             </View>
           </View>
-
+  
           <View style={styles.contentBody}>
-            <Text style={styles.contentLead}>{airtcleDetails?.title}</Text>
-            <Text style={styles.contentParagraph}>
-              {airtcleDetails?.content}
-            </Text>
+            <TransletText
+              text={airtcleDetails?.title || 'Article Title'}
+              style={styles.contentLead}
+            />
+            <TransletText
+              text={airtcleDetails?.content || 'No content available.'}
+              style={styles.contentParagraph}
+            />
           </View>
         </View>
       </ScrollView>
     </View>
   );
+  
 };
 
 export default ArticleDetails;

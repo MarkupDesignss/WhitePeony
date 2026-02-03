@@ -9,10 +9,15 @@ import AccountScreen from '../screens/AccountTab/AccountScreen';
 import ArticleScreen from '../screens/ArticleTab/ArticleScreen';
 import HomeScreen1 from '../screens/HomeTab/HomeScreen1';
 import CategoryStackNavigator from './CategoryStackNavigation';
+import { useAutoTranslate } from '../hooks/useAutoTranslate';
+import TransletText from '../components/TransletText';
+
+
+
 const Tab = createBottomTabNavigator();
 
 interface CustomTabBarIconProps {
-  source: any; // Replace 'any' with the specific type if known, e.g., ImageSourcePropType
+  source: any; 
   focused: boolean;
   name: string; // Added name prop for potential future use
 }
@@ -50,36 +55,53 @@ const CustomTabBarIcon: React.FC<CustomTabBarIconProps> = ({
 };
 
 const BottomTabScreen = () => {
+
+const { translatedText: homeText } = useAutoTranslate('Home');
+const { translatedText: categoryText } = useAutoTranslate('Category');
+const { translatedText: eventsText } = useAutoTranslate('Events');
+const { translatedText: articlesText } = useAutoTranslate('Articles');
+const { translatedText: accountsText } = useAutoTranslate('Accounts');
+
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarStyle: styles.tabBar,
         tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: "#AEB254", // active color
-        tabBarInactiveTintColor: "#999", // inactive color
+        tabBarActiveTintColor: "#AEB254",
+        tabBarInactiveTintColor: "#999", 
         tabBarLabelStyle: {
           fontSize: 12,
-          marginTop: 10, // Updated active tint color
+          marginTop: 10,
         },
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
         tabBarIcon: ({ focused, color }) => {
           let iconSource;
-
+          let labelText;
+          
           if (route.name === 'Home') {
-            iconSource = focused ? Images.homeC : Images.home; // Replace with your image path
+            iconSource = focused ? Images.homeC : Images.home;
+            labelText = homeText || 'Home';
+          
           } else if (route.name === 'Category') {
-            iconSource = focused ? Images.shoppingc : Images.category; // Replace with your image path
+            iconSource = focused ? Images.shoppingc : Images.category;
+            labelText = categoryText || 'Category';
+          
           } else if (route.name === 'Events') {
-            iconSource = focused ? Images.eventC : Images.event; // Updated image path for Events
+            iconSource = focused ? Images.eventC : Images.event;
+            labelText = eventsText || 'Events';
+          
           } else if (route.name === 'Articles') {
-            iconSource = focused ? Images.blogC : Images.article; // Updated image path for Articles
+            iconSource = focused ? Images.blogC : Images.article;
+            labelText = articlesText || 'Articles';
+          
           } else if (route.name === 'Accounts') {
-            iconSource = focused ? Images.GroupC : Images.account; // Updated image path for Accounts
+            iconSource = focused ? Images.GroupC : Images.account;
+            labelText = accountsText || 'Accounts';
           }
-
+          
           return (
             <View style={{ alignItems: "center" }}>
-              {/* 🔹 Top indicator line */}
               {focused && (
                 <View
                   style={{
@@ -91,16 +113,15 @@ const BottomTabScreen = () => {
                   }}
                 />
               )}
-
+          
               <CustomTabBarIcon
                 source={iconSource}
                 focused={focused}
-                color={color}
-              //   name={route.name}
+                name={labelText}   // ✅ FIX HERE
               />
             </View>
-
           );
+          
 
 
         },

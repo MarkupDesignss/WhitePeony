@@ -3,11 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ImageBackground,
   FlatList,
-  Dimensions,
   Image,
   StatusBar,
   Platform,
@@ -17,11 +15,38 @@ import { HttpStatusCode } from 'axios';
 import { Colors } from '../../constant';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
+import TransletText from '../../components/TransletText';
 
 const CategoryScreen = ({ navigation }) => {
   const { showLoader, hideLoader } = CommonLoader();
+  const { translatedText: searchCategoryText } =
+    useAutoTranslate('Search Category....');
 
-  const renderItem = ({ item }: { item: any }) => (
+  const [category, setApiCateProducts] = useState([]);
+
+  useEffect(() => {
+    GetCategoryProducts();
+  }, []);
+
+  const GetCategoryProducts = async () => {
+    try {
+      showLoader();
+      const res = await UserService.GetCategory();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res.data?.categories || [];
+        console.log(fetchedProducts)
+        setApiCateProducts(fetchedProducts);
+
+      }
+    } catch (err) {
+      // error handling
+    } finally {
+      hideLoader();
+    }
+  };
+
+  const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.tile}
       activeOpacity={0.9}
@@ -38,58 +63,46 @@ const CategoryScreen = ({ navigation }) => {
         imageStyle={{ borderRadius: 10 }}
       >
         <View style={styles.tileOverlay}>
-          <Text style={styles.tileText}>{item.name}</Text>
+          <TransletText
+            text={item.name}
+            style={styles.tileText}
+          />
+
+          {/* <Text style={styles.tileText}>{item.name}</Text> */}
         </View>
       </ImageBackground>
     </TouchableOpacity>
   );
 
-  const [category, setApiCateProducts] = useState([]);
-  useEffect(() => {
-    GetCategoryProducts();
-  }, []);
-
-  const GetCategoryProducts = async () => {
-    try {
-      showLoader();
-      const res = await UserService.GetCategory();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res.data?.categories || [];
-        setApiCateProducts(fetchedProducts);
-      } else {
-        // handle non-OK response if needed
-      }
-    } catch (err) {
-      // handle network/error
-    } finally {
-      hideLoader();
-    }
-  };
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar
         barStyle={Platform.OS === 'ios' ? 'dark-content' : 'default'}
       />
+
       <View style={{ backgroundColor: '#FFFFF', height: 160 }}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Categories</Text>
+          <TransletText
+            text="Categories"
+            style={styles.headerTitle}
+          />
         </View>
+
         <TouchableOpacity onPress={() => navigation.navigate('Searchpage')}>
           <View style={styles.searchRow}>
-            <Text
+            <TransletText
+              text="Search Category...."
               style={[
                 styles.searchInput,
                 { color: Colors.text[200], textAlignVertical: 'center' },
               ]}
-            >
-              Search Category....
-            </Text>
-            <TouchableOpacity style={styles.microphone}>
+            />
+            <View style={styles.microphone}>
               <Image
                 source={require('../../assets/Png/search.png')}
                 style={styles.iconSmall}
               />
-            </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
       </View>
@@ -97,9 +110,12 @@ const CategoryScreen = ({ navigation }) => {
       <View style={{ marginTop: 16, marginBottom: 8 }}>
         <FlatList
           data={category}
-          keyExtractor={i => i.id}
+          keyExtractor={item => String(item.id)}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 200 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: 200,
+          }}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         />
       </View>

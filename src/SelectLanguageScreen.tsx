@@ -19,7 +19,7 @@ export default function SelectLanguageScreen() {
 
   const handleSelectLanguage = (code: LanguageCode) => {
     dispatch(setLanguage(code));
-    navigation.goBack(); // Immediately go back without loading delay
+   navigation.goBack();
   };
 
   return (

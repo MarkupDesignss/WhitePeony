@@ -34,6 +34,8 @@ import LoginModal from '../../components/LoginModal';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import TransletText from '../../components/TransletText';
+
 import {
   convertAndFormatPrice,
   getPriceDisplay,
@@ -350,17 +352,17 @@ const HomeScreen1 = ({ navigation }: any) => {
       isLoading,
       sampleItem: wishlistItems?.[0]
         ? {
-            id: wishlistItems[0]?.id,
-            name: wishlistItems[0]?.name,
-            product_type: wishlistItems[0]?.product_type,
-            front_image: wishlistItems[0]?.front_image,
-            variants: wishlistItems[0]?.variants,
-            // Check all possible properties
-            hasProductProperty: !!wishlistItems[0]?.product,
-            productId: wishlistItems[0]?.product?.id,
-            productName: wishlistItems[0]?.product?.name,
-            productFrontImage: wishlistItems[0]?.product?.front_image,
-          }
+          id: wishlistItems[0]?.id,
+          name: wishlistItems[0]?.name,
+          product_type: wishlistItems[0]?.product_type,
+          front_image: wishlistItems[0]?.front_image,
+          variants: wishlistItems[0]?.variants,
+          // Check all possible properties
+          hasProductProperty: !!wishlistItems[0]?.product,
+          productId: wishlistItems[0]?.product?.id,
+          productName: wishlistItems[0]?.product?.name,
+          productFrontImage: wishlistItems[0]?.product?.front_image,
+        }
         : null,
     });
   }, [wishlistItems, isLoggedIn, userType, isLoading]);
@@ -655,9 +657,8 @@ const HomeScreen1 = ({ navigation }: any) => {
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${
-              item?.product_id || ''
-            }`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
+              }`}
             style={styles.page}
           >
             <Image
@@ -675,12 +676,16 @@ const HomeScreen1 = ({ navigation }: any) => {
                 paddingHorizontal: 20,
               }}
             >
-              <Text style={styles.bannertittle}>White Peony Tea Co</Text>
-              <Text
+              <TransletText
+                text="White Peony Tea Co"
+                style={styles.bannertittle}
+              />
+
+              <TransletText
+                text={item?.title || ''}
                 style={[styles.bannertittle, { fontSize: 18, marginTop: 7 }]}
-              >
-                {item?.title}
-              </Text>
+              />
+
               <TouchableOpacity
                 style={styles.button}
                 onPress={() =>
@@ -689,7 +694,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                   })
                 }
               >
-                <Text style={styles.buttonText}>Shop Now</Text>
+                <TransletText text="Shop Now" style={styles.buttonText} />
               </TouchableOpacity>
             </View>
           </View>
@@ -775,7 +780,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                 alignSelf: 'center',
               }}
             />
-            <Text
+            <TransletText
+              text='Search "Products"'
               style={{
                 alignSelf: 'center',
                 color: '#A7A7A7',
@@ -783,9 +789,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                 flex: 1,
                 marginLeft: 10,
               }}
-            >
-              Search "Products"
-            </Text>
+            />
+
             <View
               style={{
                 borderWidth: 1,
@@ -843,16 +848,15 @@ const HomeScreen1 = ({ navigation }: any) => {
                         transform: [{ scale: isActive ? 1.05 : 1 }],
                       }}
                     />
-                    <Text
+                    <TransletText
+                      text={item?.name}
                       style={{
                         fontWeight: '700',
                         fontSize: 12,
                         marginTop: heightPercentageToDP(1),
                         color: isActive ? '#000' : '#A7A7A7',
                       }}
-                    >
-                      {item?.name}
-                    </Text>
+                    />
                     <View
                       style={{
                         marginTop: 6,
@@ -877,8 +881,7 @@ const HomeScreen1 = ({ navigation }: any) => {
             }}
           />
           {/* Categories Grid */}
-          {/* Categories Grid */}
-          // Update the Categories Grid section with this code:
+
           {isLoadingCategory ? (
             <View style={styles.container}>
               <View style={[styles.row, { justifyContent: 'center' }]}>
@@ -892,9 +895,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                     minHeight: BIG_HEIGHT,
                   }}
                 >
-                  <Text style={[styles.title, { marginTop: 10 }]}>
-                    Loading products...
-                  </Text>
+                  <TransletText
+                    text="Loading products..."
+                    style={[styles.title, { marginTop: 10 }]}
+                  />
+
                 </View>
               </View>
             </View>
@@ -919,22 +924,21 @@ const HomeScreen1 = ({ navigation }: any) => {
                         padding: 20,
                       }}
                     >
-                      <Text
+                      <TransletText
+                        text="No Products Found"
                         style={[
                           styles.title,
                           { fontSize: 16, marginBottom: 10 },
                         ]}
-                      >
-                        No Products Found
-                      </Text>
-                      <Text
+                      />
+
+                      <TransletText
+                        text="Try selecting a different category or check back later."
                         style={[
                           styles.title,
                           { color: '#666', textAlign: 'center' },
                         ]}
-                      >
-                        Try selecting a different category or check back later.
-                      </Text>
+                      />
                     </View>
                   );
                 }
@@ -988,16 +992,17 @@ const HomeScreen1 = ({ navigation }: any) => {
                           }
                         >
                           <View style={[styles.card, { height: '100%' }]}>
-                            <Text style={{ ...styles.title }}>All</Text>
-                            <Text
+                            <TransletText
+                              text="All"
+                              style={{ ...styles.title }}
+                            />
+
+                            <TransletText
+                              text={availableProducts[0]?.name || 'Product'}
+                              style={[styles.title, { color: '#000', marginTop: 8 }]}
                               numberOfLines={2}
-                              style={[
-                                styles.title,
-                                { color: '#000', marginTop: 8 },
-                              ]}
-                            >
-                              {availableProducts[0]?.name || 'Product'}
-                            </Text>
+                            />
+
                             {availableProducts[0]?.variants?.[0]?.price && (
                               <>
                                 <View
@@ -1079,7 +1084,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                           alignItems: 'center',
                         }}
                       >
-                        <Text style={styles.title}>No Product Available</Text>
+                        <TransletText
+                          text="No Product Available"
+                          style={styles.title}
+                        />
+
                       </LinearGradient>
                     )}
 
@@ -1110,9 +1119,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                               style={{ flex: 1 }}
                             >
                               <View style={[styles.card, { height: '100%' }]}>
-                                <Text numberOfLines={2} style={styles.title}>
-                                  {availableProducts[1].name}
-                                </Text>
+                                <TransletText
+                                  text={availableProducts[1].name || 'Product'}
+                                  style={styles.title}
+                                />
+
                                 <Image
                                   source={{
                                     uri:
@@ -1145,9 +1156,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                               style={{ flex: 1 }}
                             >
                               <View style={[styles.card, { height: '100%' }]}>
-                                <Text numberOfLines={2} style={styles.title}>
-                                  {availableProducts[2].name}
-                                </Text>
+                                <TransletText
+                                  text={availableProducts[2].name || 'Product'}
+                                  style={[styles.title,]}
+                                />
+
                                 <Image
                                   source={{
                                     uri:
@@ -1189,9 +1202,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                               style={{ flex: 1 }}
                             >
                               <View style={[styles.card, { height: '100%' }]}>
-                                <Text numberOfLines={2} style={styles.title}>
-                                  {availableProducts[3].name}
-                                </Text>
+                                <TransletText
+                                  text={availableProducts[3].name || 'Product'}
+                                  style={[styles.title, { numberOfLines: 2 }]}
+                                />
+
                                 <Image
                                   source={{
                                     uri:
@@ -1224,9 +1239,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                               style={{ flex: 1 }}
                             >
                               <View style={[styles.card, { height: '100%' }]}>
-                                <Text numberOfLines={2} style={styles.title}>
-                                  {availableProducts[4].name}
-                                </Text>
+                                <TransletText
+                                  text={availableProducts[4].name || 'Product'}
+                                  style={[styles.title, { numberOfLines: 2 }]}
+                                />
+
                                 <Image
                                   source={{
                                     uri:
@@ -1260,16 +1277,15 @@ const HomeScreen1 = ({ navigation }: any) => {
                   padding: 20,
                 }}
               >
-                <Text
+                <TransletText
+                  text="No Products Found"
                   style={[styles.title, { fontSize: 16, marginBottom: 10 }]}
-                >
-                  No Products Found
-                </Text>
-                <Text
+                />
+                <TransletText
+                  text="Try selecting a different category or check back later."
                   style={[styles.title, { color: '#666', textAlign: 'center' }]}
-                >
-                  Try selecting a different category or check back later.
-                </Text>
+                />
+
               </View>
             </View>
           )}
@@ -1282,7 +1298,11 @@ const HomeScreen1 = ({ navigation }: any) => {
           >
             {orderitem?.some(order => order.items?.length > 0) ? (
               <>
-                <Text style={styles.sectionTitle}>Frequently Bought</Text>
+                <TransletText
+                  text="Frequently Bought"
+                  style={styles.sectionTitle}
+                />
+
                 <FlatList
                   data={orderitem}
                   keyExtractor={item => String(item.id)}
@@ -1321,9 +1341,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                               style={styles.freqImage}
                             />
                           </View>
-                          <Text style={styles.freqText}>
-                            {item?.items[0]?.product?.name}
-                          </Text>
+                          <TransletText
+                            text={item?.items[0]?.product?.name || ''}
+                            style={styles.freqText}
+                          />
+
                         </View>
                       </TouchableOpacity>
                     );
@@ -1333,7 +1355,11 @@ const HomeScreen1 = ({ navigation }: any) => {
             ) : null}
 
             {/* Featured This Week */}
-            <Text style={styles.sectionTitle}>Featured This Week</Text>
+            <TransletText
+              text="Featured This Week"
+              style={styles.sectionTitle}
+            />
+
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1372,9 +1398,11 @@ const HomeScreen1 = ({ navigation }: any) => {
 
                       {/* Product Info Container */}
                       <View style={styles.productInfo}>
-                        <Text style={styles.productName} numberOfLines={2}>
-                          {item.product?.name || 'Product Name'}
-                        </Text>
+                        <TransletText
+                          text={item.product?.name || 'Product Name'}
+                          style={[styles.productName]}
+                          numberOfLines={2}
+                        />
 
                         {/* Price Container */}
                         <View style={styles.priceContainer}>
@@ -1448,16 +1476,15 @@ const HomeScreen1 = ({ navigation }: any) => {
                 style={{ position: 'absolute', top: 10, alignItems: 'center' }}
               >
                 <Image
-                
+
                   source={require('../../assets/bigsales.png')}
                   style={{ width: 75, height: 65, resizeMode: 'contain' }}
                 />
-                <Text
+                <TransletText
+                  text={`${formatDate(salesProduct[0]?.start_date).slice(0, 13)} - ${formatDate(salesProduct[0]?.end_date).slice(0, 13)}`}
                   style={{ fontSize: 12, fontWeight: '700', marginTop: 15 }}
-                >
-                  {formatDate(salesProduct[0]?.start_date).slice(0, 13)} -{' '}
-                  {formatDate(salesProduct[0]?.end_date).slice(0, 13)}
-                </Text>
+                />
+
                 <FlatList
                   data={salesProduct}
                   horizontal
@@ -1497,16 +1524,16 @@ const HomeScreen1 = ({ navigation }: any) => {
                               justifyContent: 'center',
                             }}
                           >
-                            <Text
+                            <TransletText
+                              text={`Upto ${item?.percentage}% Off`}
                               style={{
                                 fontSize: 8,
                                 fontWeight: '700',
                                 alignSelf: 'center',
                                 padding: 2,
                               }}
-                            >
-                              Upto {item?.percentage}% Off
-                            </Text>
+                            />
+
                           </View>
                           <Image
                             resizeMode="contain"
@@ -1553,9 +1580,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                 paddingHorizontal: widthPercentageToDP(3),
               }}
             >
-              <Text style={[styles.sectionTitle, { alignSelf: 'center' }]}>
-                LOWEST PRICES EVER
-              </Text>
+              <TransletText
+                text="LOWEST PRICES EVER"
+                style={[styles.sectionTitle, { alignSelf: 'center' }]}
+              />
               <FlatList
                 data={lowestitem}
                 horizontal
@@ -1631,15 +1659,14 @@ const HomeScreen1 = ({ navigation }: any) => {
                           source={{ uri: Image_url + item?.front_image }}
                           style={styles.smallImage}
                         />
-                        <Text
-                          numberOfLines={2}
+                        <TransletText
+                          text={item?.name || ''}
                           style={[
                             styles.smallTitle,
                             { height: heightPercentageToDP(4) },
                           ]}
-                        >
-                          {item?.name}
-                        </Text>
+                          numberOfLines={2}
+                        />
 
                         {/* PRICE DISPLAY - Updated with currency conversion */}
                         <View
@@ -1679,9 +1706,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                               {displayPrice(originalPrice)}
                             </Text>
                           ) : (
-                            <Text style={{ fontSize: 12, color: '#666' }}>
-                              Price not available
-                            </Text>
+                            <TransletText
+                              text="Price not available"
+                              style={{ fontSize: 12, color: '#666' }}
+                            />
+
                           )}
                         </View>
 
@@ -1697,9 +1726,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                           }}
                         >
                           <Text style={{ fontSize: 10, color: '#000' }}>
-                            see more like this{' '}
-                            <Text style={{ color: '#008009' }}>▶</Text>{' '}
+                            <TransletText text="see more like this" style={{ fontSize: 10, color: '#000' }} />
+                            <Text style={{ color: '#008009', fontSize: 10 }}> ▶</Text>
                           </Text>
+
                         </View>
 
                         <TouchableOpacity
@@ -1767,14 +1797,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                       right: 10,
                     }}
                   />
-                  <Text
-                    style={[
-                      styles.moveToWishlistText,
-                      { alignSelf: 'center', color: '#000' },
-                    ]}
-                  >
-                    See all products
-                  </Text>
+                  <TransletText
+                    text="See all products"
+                    style={[styles.moveToWishlistText, { alignSelf: 'center', color: '#000' }]}
+                  />
                   <Image
                     source={require('../../assets/Png/next.png')}
                     style={{
@@ -1789,6 +1815,7 @@ const HomeScreen1 = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
           </View>
+
           // Wishlist Section - Replace your current wishlist section with this
           {wishlistItems && wishlistItems.length > 0 ? (
             <View
@@ -1797,9 +1824,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                 marginTop: heightPercentageToDP(2),
               }}
             >
-              <Text style={styles.sectionTitle}>
-                Your Wishlist ({wishlistItems.length})
-              </Text>
+              <TransletText
+                text={`Your Wishlist (${wishlistItems.length})`}
+                style={styles.sectionTitle}
+              />
+
 
               <FlatList
                 data={wishlistItems}
@@ -1894,8 +1923,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                         )}
 
                         {/* Product Name */}
-                        <Text
-                          numberOfLines={2}
+                        <TransletText
+                          text={productName}
                           style={[
                             styles.wishlistTitle,
                             {
@@ -1904,9 +1933,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                               marginTop: 8,
                             },
                           ]}
-                        >
-                          {productName}
-                        </Text>
+                          numberOfLines={2}
+                        />
+
 
                         {/* Price */}
                         {correctPrice !== null ? (
@@ -1922,15 +1951,15 @@ const HomeScreen1 = ({ navigation }: any) => {
                             </Text>
                           </View>
                         ) : (
-                          <Text
+                          <TransletText
+                            text="Loading price..."
                             style={{
                               fontSize: 12,
                               color: '#666',
                               marginTop: 4,
                             }}
-                          >
-                            Loading price...
-                          </Text>
+                          />
+
                         )}
 
                         {/* Wishlist Heart Button */}
@@ -1982,7 +2011,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                 marginTop: heightPercentageToDP(2),
               }}
             >
-              <Text style={styles.sectionTitle}>Your Wishlist (0)</Text>
+              <TransletText
+                text={`Your Wishlist (${wishlistItems.length})`}
+                style={styles.sectionTitle}
+              />
+
               <View
                 style={{
                   padding: 20,
@@ -1991,9 +2024,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                   borderRadius: 10,
                 }}
               >
-                <Text style={{ color: '#666', marginBottom: 10 }}>
-                  No items in your wishlist
-                </Text>
+                <TransletText
+                  text="No items in your wishlist"
+                  style={{ color: '#666', marginBottom: 10 }}
+                />
+
                 <TouchableOpacity
                   onPress={() => navigation.navigate('CategoryScreen')}
                   style={{
@@ -2003,9 +2038,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>
-                    Browse Products →
-                  </Text>
+                  <TransletText
+                    text="Browse Products →"
+                    style={{ color: '#fff', fontWeight: '600' }}
+                  />
+
                 </TouchableOpacity>
               </View>
             </View>
@@ -2023,7 +2060,7 @@ const HomeScreen1 = ({ navigation }: any) => {
               marginBottom: heightPercentageToDP(4),
             }}
           >
-            <Text style={styles.sectionTitle}>Recommended For You</Text>
+            <TransletText text="Recommended For You" style={styles.sectionTitle} />
             <FlatList
               ref={recRef}
               data={apiRecommend}
@@ -2056,8 +2093,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                         source={{ uri: Image_url + item?.front_image }}
                         style={styles.wishlistImage}
                       />
-                      <Text
-                        numberOfLines={2}
+                      <TransletText
+                        text={item?.name || ''}
                         style={[
                           styles.wishlistTitle,
                           {
@@ -2065,16 +2102,15 @@ const HomeScreen1 = ({ navigation }: any) => {
                             height: heightPercentageToDP(4),
                           },
                         ]}
-                      >
-                        {item?.name}
-                      </Text>
+                      />
+
                       <View
                         style={{ flexDirection: 'row', alignItems: 'center' }}
                       >
                         <Text style={styles.smallPrice}>
                           {displayPrice(
                             item.variants[0]?.actual_price ||
-                              item.variants[0]?.price,
+                            item.variants[0]?.price,
                           )}
                         </Text>
                         {item.variants[0]?.price && (
