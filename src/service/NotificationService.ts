@@ -1,6 +1,6 @@
 // src/services/NotificationService.js
 import messaging from '@react-native-firebase/messaging';
-import { Alert, Platform } from 'react-native';
+import { Alert,  } from 'react-native';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { LocalStorage } from '../helpers/localstorage';
 import { EventType } from '@notifee/react-native';

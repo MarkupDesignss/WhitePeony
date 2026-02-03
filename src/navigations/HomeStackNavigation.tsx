@@ -27,6 +27,9 @@ import OnBoardingScreen from '../screens/Onboarding';
 import Searchpage from '../screens/HomeTab/Searchpage';
 import CurrencyScreen from '../screens/currency/CurrencyScreen';
 import PermissionService from '../service/PermissionService';
+import FCMService from '../service/FCMService';
+import PushNotificationService from '../service/PushNotificationService';
+import { getToken } from '@react-native-firebase/messaging';
 const HomeStackNavigator: FC = () => {
   const Stack = createNativeStackNavigator();
 
@@ -49,12 +52,43 @@ const HomeStackNavigator: FC = () => {
     init();
   }, []);
 
-  // Notification permission logic (SAFE)
   useEffect(() => {
-    if (!showSplash && isFirstLaunch !== null) {
-      PermissionService.requestPermissions();
-    }
+    let mounted = true;
+
+    const requestNotificationPermission = async () => {
+      try {
+        if (!showSplash && isFirstLaunch !== null) {
+          const alreadyGranted = await PermissionService.checkPermissions();
+
+          if (!alreadyGranted) {
+            const granted = await PermissionService.requestPermissions();
+
+            if (mounted && granted) {
+              console.log('✅ Notification permission granted');
+
+              await PushNotificationService.createDefaultChannel();
+              await FCMService.init();
+            }
+          } else {
+            console.log('ℹ️ Notification permission already granted');
+
+            await PushNotificationService.createDefaultChannel();
+            await FCMService.init();
+          }
+
+        }
+      } catch (error) {
+        console.log('Notification permission error:', error);
+      }
+    };
+
+    requestNotificationPermission();
+
+    return () => {
+      mounted = false;
+    };
   }, [showSplash, isFirstLaunch]);
+
 
   // UI decision AFTER hooks
   if (showSplash || isFirstLaunch === null) {

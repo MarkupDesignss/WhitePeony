@@ -1,4 +1,4 @@
-import React, { FC, useContext, useEffect, useState } from 'react';
+import React, { FC, } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CategoryDetailsList from '../screens/CategoryTab/CategoryDetailsList';
