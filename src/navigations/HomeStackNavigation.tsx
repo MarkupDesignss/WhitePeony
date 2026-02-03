@@ -92,6 +92,7 @@ const HomeStackNavigator: FC = () => {
       <Stack.Screen name="Searchpage" component={Searchpage} />
       <Stack.Screen name="Slugs" component={Slugs} />
       <Stack.Screen name="CurrencyScreen" component={CurrencyScreen} />
+      <Stack.Screen name="SelectLanguageScreen" component={SelectLanguageScreen} />
     </Stack.Navigator>
   );
 };
