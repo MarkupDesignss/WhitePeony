@@ -147,7 +147,7 @@ const Searchpage = ({ navigation }: any) => {
       try {
         setIsSearching(true);
         const res = await UserService.search(word);
-
+console.log("effe",res)
         if (res?.data?.status) {
           const products = Array.isArray(res.data.data) ? res.data.data : [];
           const mapped = products.map((p: any) => {

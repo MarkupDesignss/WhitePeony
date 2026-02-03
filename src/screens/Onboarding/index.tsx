@@ -106,17 +106,19 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 24,
-    color: Colors.text[200],
-    marginBottom: hp(3),
+    fontSize: 25,
+    color: '#fff',
+
     textAlign: 'center',
+    fontWeight: '700',
+    marginTop: 46,
   },
 
   list: {
     width: '90%',
     alignItems: 'center',
     position: 'absolute',
-    bottom: 0,
+    bottom: 80,
   },
 
   card: {
@@ -164,11 +166,12 @@ const styles = StyleSheet.create({
   },
 
   nextButton: {
-    marginTop: hp(3),
     backgroundColor: Colors.button[100],
     borderRadius: 12,
     paddingHorizontal: 40,
     paddingVertical: 10,
+    position: 'absolute',
+    bottom: 20,
   },
 
   nextText: {
