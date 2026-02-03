@@ -194,7 +194,7 @@ const MyEventsScreen = ({ navigation }) => {
                                 <Text style={styles.modalDetail}>
                                     💵 Total: ₹{selectedBooking.total_price}
                                 </Text>
-                                <Text
+                                {/* <Text
                                     style={[
                                         styles.modalDetail,
                                         selectedBooking.payment_status === 'paid'
@@ -204,7 +204,7 @@ const MyEventsScreen = ({ navigation }) => {
                                 >
                                     💳 Payment Status:{' '}
                                     {selectedBooking.payment_status.toUpperCase()}
-                                </Text>
+                                </Text> */}
 
                                 <Text style={styles.modalDescription}>
                                     {selectedBooking.description}

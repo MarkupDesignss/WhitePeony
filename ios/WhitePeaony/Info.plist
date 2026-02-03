@@ -26,6 +26,8 @@
 	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	
+	<!-- App Transport Security -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -33,43 +35,107 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>This app requires Bluetooth access for device communication.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>This app requires camera access to scan QR codes and upload photos.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We need your location to provide location-based services.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We need your location to provide location-based services even in the background.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to provide location-based services.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app requires microphone access for recording audio.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app requires photo library access to upload images.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Voice search needs speech recognition</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>This app collects usage data to improve your experience.</string>
-	<key>RCTNewArchEnabled</key>
+	
+	<!-- Firebase Cloud Messaging Permissions -->
+	<key>FirebaseMessagingAutoInitEnabled</key>
 	<true/>
+	
+	<!-- Push Notification Permission (Required for Firebase Messaging) -->
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>fetch</string>
 		<string>remote-notification</string>
+		<string>fetch</string>
 	</array>
+	
+	<!-- Notification Permission Description (iOS 10+) -->
+	<key>UNUserNotificationCenter</key>
+	<dict>
+		<key>UNAuthorizationOptions</key>
+		<array>
+			<string>badge</string>
+			<string>sound</string>
+			<string>alert</string>
+			<string>provisional</string>
+			<string>providesAppNotificationSettings</string>
+		</array>
+	</dict>
+	
+	<!-- Notification Permission Description (Legacy - for older iOS versions) -->
+	<key>UIRemoteNotification</key>
+	<dict>
+		<key>UIRemoteNotificationType</key>
+		<array>
+			<string>alert</string>
+			<string>badge</string>
+			<string>sound</string>
+		</array>
+	</dict>
+	
+	<!-- User-facing permission descriptions -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app requires Bluetooth access for device communication.</string>
+	
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires camera access to scan QR codes and upload photos.</string>
+	
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to provide location-based services.</string>
+	
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need your location to provide location-based services even in the background.</string>
+	
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to provide location-based services.</string>
+	
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires microphone access for recording audio.</string>
+	
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires photo library access to upload images.</string>
+	
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Voice search needs speech recognition</string>
+	
+	<!-- Notification Permission Description (required for iOS 10-14) -->
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>This app needs permission to send you notifications for important updates.</string>
+	
+	<!-- Critical Alert Permission (if needed for critical notifications) -->
+	<key>NSUserNotificationsCriticalAlertUsageDescription</key>
+	<string>This app needs permission to send critical alerts for emergency notifications.</string>
+	
+	<!-- Provisional Notification Permission (for iOS 12+) -->
+	<key>NSProvisionalUserNotification</key>
+	<true/>
+	
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This app collects usage data to improve your experience.</string>
+	
+	<!-- Firebase Analytics (optional but recommended) -->
+	<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED</key>
+	<true/>
+	<key>FIREBASE_ANALYTICS_COLLECTION_DEACTIVATED</key>
+	<false/>
+	
+	<key>RCTNewArchEnabled</key>
+	<true/>
+	
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
+	
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
 	</array>
+	
 	<key>UIStatusBarStyle</key>
 	<string></string>
+	
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 </dict>

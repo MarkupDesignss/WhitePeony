@@ -80,7 +80,7 @@ android {
 
     namespace "com.whitepeaony"
     defaultConfig {
-        applicationId "com.whitepeaony"
+        applicationId "com.whitepeony"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
