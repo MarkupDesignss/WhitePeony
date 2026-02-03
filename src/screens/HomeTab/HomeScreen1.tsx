@@ -2187,7 +2187,7 @@ const HomeScreen1 = ({ navigation }: any) => {
   );
 };
 
-export default HomeScreen1;
+export default React.memo(HomeScreen1);
 
 const styles = StyleSheet.create({
   container: {
@@ -2398,14 +2398,14 @@ const styles = StyleSheet.create({
   },
   smallPrice: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 11,
     color: '#333',
   },
   smallOldPrice: {
     textDecorationLine: 'line-through',
     color: '#999',
     marginLeft: 8,
-    fontSize: 12,
+    fontSize: 9,
   },
 
   /* Wishlist / recommended cards */
@@ -2527,7 +2527,7 @@ const styles = StyleSheet.create({
   },
 
   originalPrice: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#878787',
     textDecorationLine: 'line-through',
     marginRight: 6,
