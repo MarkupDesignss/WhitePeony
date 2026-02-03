@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   backIcon: {
     width: 24,
     height: 24,
-    tintColor: Colors.button[100], // Optional: adjust color
+    tintColor: "#000", // Optional: adjust color
   },
   headerTitle: {
     fontSize: 18,
