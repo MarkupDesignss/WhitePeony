@@ -3002,7 +3002,7 @@ PODS:
     - RNWorklets
     - SocketRocket
     - Yoga
-  - RNScreens (4.20.0):
+  - RNScreens (4.21.0):
     - boost
     - DoubleConversion
     - fast_float
@@ -3029,10 +3029,10 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNScreens/common (= 4.20.0)
+    - RNScreens/common (= 4.21.0)
     - SocketRocket
     - Yoga
-  - RNScreens/common (4.20.0):
+  - RNScreens/common (4.21.0):
     - boost
     - DoubleConversion
     - fast_float
@@ -3479,7 +3479,7 @@ SPEC CHECKSUMS:
   FBLazyVector: 309703e71d3f2f1ed7dc7889d58309c9d77a95a4
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
-  hermes-engine: f74f9794102b6ecb64a46af44a21d2b5a9078e6b
+  hermes-engine: 410563446858d754c0a554a9d6cf8b5fb1196f75
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   lottie-ios: a881093fab623c467d3bce374367755c272bdd59
   lottie-react-native: b01c4b468aed88931afefbde03d790fc4f8b010a
@@ -3570,7 +3570,7 @@ SPEC CHECKSUMS:
   RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNPermissions: c28bce4dc987ffce444ac818451f5fbbd05c96fc
   RNReanimated: fbcb7fd8da5b0b088401542c58fb5d266388f1cf
-  RNScreens: 0811c38c9b11745e0bdb52157421c87a79e3d8b1
+  RNScreens: ed8557455a1c9de16749334ed6ddfd523081ade5
   RNWorklets: 01efdd402d236a13651ea5ea5437ca85a44e7afa
   SDWebImage: a7f831e1a65eb5e285e3fb046a23fcfbf08e696d
   SDWebImageWebPCoder: 908b83b6adda48effe7667cd2b7f78c897e5111d
