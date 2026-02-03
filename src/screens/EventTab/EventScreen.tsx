@@ -220,7 +220,7 @@ const EventScreen = ({ navigation }: any) => {
               style={{ width: 15, height: 15, marginRight: 10 }}
             />
             <Text numberOfLines={1} style={styles.upMetaWhite}>
-              {item.address} • {item.remaining_seats} Seats Left
+              {item.address}
             </Text>
           </View>
           <View
@@ -241,7 +241,7 @@ const EventScreen = ({ navigation }: any) => {
               source={Images.officechair2}
               style={{ width: 15, height: 15, marginRight: 10 }}
             />
-            <Text style={styles.readBadgeText}>{'15 Seats Left'}</Text>
+            <Text style={styles.readBadgeText}>{item.remaining_seats} Seats Left</Text>
           </View>
         </View>
       </View>
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   backIcon: {
     width: 24,
     height: 24,
-    tintColor: Colors.button[100], // Optional: adjust color
+    tintColor: "#000", // Optional: adjust color
   },
   headerTitle: {
     fontSize: 18,

@@ -607,12 +607,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             <TransletText text="Filters ▾" style={styles.filterButtonText} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.sortButton}
-            onPress={() => setSortVisible(true)}
-          >
-            <Text style={styles.sortButtonText}>Sort ▾</Text>
-          </TouchableOpacity>
+        
         </View>
 
         {/* Products List */}
