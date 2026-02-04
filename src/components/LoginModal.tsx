@@ -205,95 +205,82 @@ const LoginModal: React.FC<AuthModalProps> = ({
         fcm_token: fcmToken || '',
       });
 
-      // Debug: Log the response structure
-      console.log('Full API Response:', res);
-      console.log('Response data:', res?.data);
+      console.log('Full API Response:', JSON.stringify(res, null, 2));
 
       hideLoader();
 
-      // Check response structure
-      if (!res) {
+      // Check response structure - simplified
+      if (!res || !res.data) {
         setError('No response from server');
         return;
       }
 
-      // Handle different response structures
-      let success = false;
-      let message = '';
-      let access_token = '';
-      let user = null;
-      let tiertype = '';
+      const responseData = res.data;
 
-      // Check if response has data property (axios wrapper)
-      if (res.data) {
-        // If it's the structure from your example
-        if (res.data.success !== undefined) {
-          success = res.data.success;
-          message = res.data.message || '';
-          access_token = res.data.access_token || '';
-          user = res.data.user || null;
-          tiertype = res.data.tiertype || '';
-        }
-        // If success is directly on res.data (alternative structure)
-        else if (res.success !== undefined) {
-          success = res.success;
-          message = res.message || '';
-          access_token = res.access_token || '';
-          user = res.user || null;
-          tiertype = res.tiertype || '';
-        }
-      }
-      // If response is directly the data
-      else if (res.success !== undefined) {
-        success = res.success;
-        message = res.message || '';
-        access_token = res.access_token || '';
-        user = res.user || null;
-        tiertype = res.tiertype || '';
-      }
+      if (responseData.success && responseData.user) {
+        const {
+          success,
+          message,
+          access_token,
+          user,
+          tiertype
+        } = responseData;
 
-      if (success && user) {
         const userType = user?.type;
 
-        // Store all user data
-        await LocalStorage.save('@login', 'true');
-        await LocalStorage.save('@user', user);
-        await LocalStorage.save('@token', access_token);
-        await LocalStorage.save('@userType', userType);
-        await LocalStorage.save('@tierType', tiertype);
+        try {
+          // STRINGIFY ALL OBJECTS BEFORE SAVING TO LOCALSTORAGE
+          await LocalStorage.save('@login', 'true');
+          await LocalStorage.save('@user', JSON.stringify(user)); // Stringify the object
+          await LocalStorage.save('@token', access_token || '');
+          await LocalStorage.save('@userType', userType || '');
+          await LocalStorage.save('@tierType', tiertype || '');
 
-        // Update context
-        setUserData(user);
-        setIsLoggedIn('true');
-        setUserType(userType);
+          console.log('✅ Data saved successfully');
 
-        syncCartAfterLogin?.();
+          // Update context
+          setUserData(user);
+          setIsLoggedIn('true');
+          setUserType(userType);
 
-        Toast.show({ type: 'success', text1: message });
+          // Sync cart if needed
+          if (syncCartAfterLogin) {
+            syncCartAfterLogin();
+          }
 
-        if (onSuccess) {
-          onSuccess(user);
+          Toast.show({
+            type: 'success',
+            text1: message || 'Login successful!'
+          });
+
+          if (onSuccess) {
+            onSuccess(user);
+          }
+
+          onClose();
+        } catch (storageError: any) {
+          console.error('❌ Storage error:', {
+            message: storageError.message,
+            error: storageError
+          });
+          setError('Failed to save user data. Please try again.');
         }
-
-        onClose();
       } else {
-        setError(message || otpErrorText || 'Invalid or expired OTP. Please try again.');
+        setError(
+          responseData.message ||
+          otpErrorText ||
+          'Invalid or expired OTP. Please try again.'
+        );
       }
     } catch (err: any) {
       hideLoader();
-      console.log('Verify OTP Error:', err);
-      console.log('Error Response:', err?.response);
+      console.log('❌ Verify OTP Error:', err);
 
-      // Better error handling
       if (err.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
         setError(err.response.data?.message || 'Server error occurred');
       } else if (err.request) {
-        // The request was made but no response was received
         setError('No response from server. Please check your connection.');
       } else {
-        // Something happened in setting up the request
         setError('Request failed. Please try again.');
       }
     } finally {

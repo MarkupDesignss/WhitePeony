@@ -69,9 +69,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { translatedText: deleteAccountText } =
     useAutoTranslate('Delete Account');
   const { translatedText: memberSinceText } = useAutoTranslate('Member since');
-  const { translatedText: superShinyText } = useAutoTranslate(
-    JSON.stringify(tierType),
-  );
+  const { translatedText: superShinyText } = useAutoTranslate(tierType);
   const { translatedText: growthValueText } = useAutoTranslate('Growth Value');
   const { translatedText: privilegesText } = useAutoTranslate(
     'Privileges In Total',
@@ -288,7 +286,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 )}
               </View>
               <View style={styles.profileInfo}>
-                <TransletText text={userData?.name || 'User Name'} style={styles.name} numberOfLines={1} />
+                <Text style={styles.name}>{userData?.name || 'User Name'}</Text>
 
                 <Text style={styles.since}>
                   {memberSinceText || 'Member since'}{' '}

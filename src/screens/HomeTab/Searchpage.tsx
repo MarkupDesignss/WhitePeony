@@ -31,11 +31,15 @@ import {
 import Voice from '@react-native-voice/voice';
 import Toast from 'react-native-toast-message';
 import { WishlistContext } from '../../context';
-
+import TransletText from '../../components/TransletText';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 const { width } = Dimensions.get('window');
 
 const Searchpage = ({ navigation }: any) => {
+  const { translatedText: searchPlace } =
+    useAutoTranslate("Search for products, brands and more");
   const [query, setQuery] = useState('');
+
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [listening, setListening] = useState(false);
@@ -127,7 +131,7 @@ const Searchpage = ({ navigation }: any) => {
   const stopListening = async () => {
     try {
       await Voice.stop();
-    } catch {}
+    } catch { }
 
     setListening(false);
     pulseAnim.stopAnimation();
@@ -147,7 +151,7 @@ const Searchpage = ({ navigation }: any) => {
       try {
         setIsSearching(true);
         const res = await UserService.search(word);
-console.log("effe",res)
+        console.log("effe", res)
         if (res?.data?.status) {
           const products = Array.isArray(res.data.data) ? res.data.data : [];
           const mapped = products.map((p: any) => {
@@ -372,7 +376,7 @@ console.log("effe",res)
         source={require('../../assets/Png/search.png')}
         style={styles.trendingTagIcon}
       />
-      <Text style={styles.trendingTagText}>{tag}</Text>
+      <TransletText style={styles.trendingTagText} text={tag} />
     </TouchableOpacity>
   );
 
@@ -411,7 +415,7 @@ console.log("effe",res)
           />
 
           <TextInput
-            placeholder="Search for products, brands and more"
+            placeholder={searchPlace}
             placeholderTextColor="#999"
             value={query}
             onChangeText={setQuery}
@@ -505,12 +509,11 @@ console.log("effe",res)
               source={require('../../assets/search_illustration.png')}
               style={styles.initialImage}
             />
-            <Text style={styles.initialTitle}>What are you looking for?</Text>
-            <Text style={styles.initialSubtitle}>
-              Type or use voice search to find products
-            </Text>
+            <TransletText style={styles.initialTitle} text="What are you looking for?" />
+            <TransletText style={styles.initialSubtitle}
+              text="Type or use voice search to find products" />
             <View style={styles.trendingContainer}>
-              <Text style={styles.trendingTitle}>Trending Searches</Text>
+              <TransletText style={styles.trendingTitle} text="Trending Searches" />
               <View style={styles.trendingTags}>
                 {trendingSearches.map(renderTrendingSearch)}
               </View>
