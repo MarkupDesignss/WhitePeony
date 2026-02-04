@@ -484,9 +484,11 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         />
 
         <View style={styles.cardBody}>
-          <Text numberOfLines={2} style={styles.cardTitle}>
-            {productName}
-          </Text>
+          <TransletText
+            text={productName || 'Product'}
+            style={styles.cardTitle}
+            numberOfLines={2}
+          />
 
           <View style={styles.ratingContainer}>
             {[1, 2, 3, 4, 5].map(r => {
@@ -514,7 +516,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           </Text>
 
           {isOutOfStock ? (
-            <Text style={styles.outOfStock}>Out of Stock</Text>
+            <TransletText text="Out of Stock" style={styles.outOfStock} />
           ) : (
             <TouchableOpacity
               onPress={() => {
@@ -526,9 +528,11 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
               }}
               style={[styles.addButton, isInCart && styles.goToCartButton]}
             >
-              <Text style={styles.addButtonText}>
-                {isInCart ? 'Go to Cart' : 'Add to Bag'}
-              </Text>
+              <TransletText
+                text={isInCart ? 'Go to Cart' : 'Add to Bag'}
+                style={styles.addButtonText}
+              />
+
             </TouchableOpacity>
           )}
         </View>
@@ -541,7 +545,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
 
     return (
       <View style={styles.emptyContainer}>
-        <TransletText  text="No Products Found" style={styles.emptyText} />
+        <TransletText text="No Products Found" style={styles.emptyText} />
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => fetchProducts()}
@@ -578,7 +582,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             />
           </TouchableOpacity>
 
-          <TransletText text={categoryTitle || 'Products'} style={styles.headerTitle} numberOfLines={1} /> 
+          <TransletText text={categoryTitle || 'Products'} style={styles.headerTitle} numberOfLines={1} />
 
           <TouchableOpacity
             onPress={() => navigation.navigate('CheckoutScreen')}
@@ -607,7 +611,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             <TransletText text="Filters ▾" style={styles.filterButtonText} />
           </TouchableOpacity>
 
-        
+
         </View>
 
         {/* Products List */}
@@ -629,7 +633,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         {isLoading && (
           <View style={styles.fullScreenLoader}>
             <ActivityIndicator size="large" color="#AEB254" />
-            <Text style={styles.fullScreenLoaderText}>Loading...</Text>
+            <TransletText text="Loading..." style={styles.fullScreenLoaderText} />
           </View>
         )}
 

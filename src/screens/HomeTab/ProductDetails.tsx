@@ -42,6 +42,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import { convertAndFormatPrice } from '../../utils/currencyUtils';
+import TransletText from '../../components/TransletText';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 
 const wp = widthPercentageToDP;
 const hp = heightPercentageToDP;
@@ -116,6 +118,12 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomVisible, setZoomVisible] = useState(false);
   const [zoomIndex, setZoomIndex] = useState(0);
+  const { translatedText: noReviewText } = useAutoTranslate('No Review Found');
+  const { translatedText: addedToCartText } =
+  useAutoTranslate('Added to cart successfully!');
+const { translatedText: somethingWrongText } =
+  useAutoTranslate('Something went wrong!');
+
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
@@ -208,10 +216,10 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       // Lazy load extra images
       const extraImages = product.images
         ? product.images
-            .slice(0, 3)
-            .map((img: string) =>
-              img.startsWith('http') ? img : `${resolvedBase}${img}`,
-            )
+          .slice(0, 3)
+          .map((img: string) =>
+            img.startsWith('http') ? img : `${resolvedBase}${img}`,
+          )
         : [];
 
       const allImages = extraImages.length ? extraImages : mainImages;
@@ -483,7 +491,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       // setIsInCart will be updated automatically via checkSelectedVariantInCart
       Toast.show({
         type: 'success',
-        text1: 'Added to cart successfully!',
+        text1: addedToCartText || 'Added to cart successfully!',
       });
     } catch (error: any) {
       if (error.status === 401) {
@@ -491,11 +499,16 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       } else {
         Toast.show({
           type: 'error',
-          text1: error?.message || 'Something went wrong!',
+          text1: error?.message
+          ? error.message
+          : somethingWrongText || 'Something went wrong!',
         });
       }
     }
-  }, [productData, isInCart, selectedVariant, addToCart, navigation]);
+  }, [productData, isInCart, selectedVariant, addToCart, navigation, addedToCartText,
+    somethingWrongText
+  ]);
+
   const checkoutAction = useCallback(async () => {
     if (!productData || !selectedVariant) return;
 
@@ -509,7 +522,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       // setIsInCart will be updated automatically via checkSelectedVariantInCart
       Toast.show({
         type: 'success',
-        text1: 'Added to cart successfully!',
+        text1: addedToCartText || 'Added to cart successfully!',
       });
       navigation.navigate('CheckoutScreen');
     } catch (error: any) {
@@ -518,11 +531,14 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
       } else {
         Toast.show({
           type: 'error',
-          text1: error?.message || 'Something went wrong!',
+          text1: error?.message
+          ? error.message
+          : somethingWrongText || 'Something went wrong!',
         });
       }
     }
-  }, [productData, isInCart, selectedVariant, addToCart, navigation]);
+  }, [productData, isInCart, selectedVariant, addToCart, navigation , addedToCartText,
+    somethingWrongText]);
 
   const openZoom = useCallback((index: number) => {
     setZoomIndex(index);
@@ -537,7 +553,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     if (!productData) return null;
 
     if (productData.stock_quantity === 0) {
-      return <Text style={styles.outOfStock}>Out of Stock</Text>;
+      return <TransletText text="Out of Stock" style={styles.outOfStock} />;
     }
 
     return (
@@ -547,9 +563,11 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           onPress={handleCartAction}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.cartButtonText}>
-            {isInCart ? 'Go to Cart' : 'Add to Bag'}
-          </Text>
+          <TransletText
+            text={isInCart ? 'Go to Cart' : 'Add to Bag'}
+            style={styles.cartButtonText}
+          />
+
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -559,7 +577,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           }
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.checkoutButtonText}>Check-Out</Text>
+          <TransletText text="Check-Out" style={styles.checkoutButtonText} />
         </TouchableOpacity>
       </View>
     );
@@ -570,7 +588,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.button[100]} />
-        <Text style={styles.loadingText}>Loading product...</Text>
+        <TransletText text="Loading product..." style={styles.loadingText} />
       </SafeAreaView>
     );
   }
@@ -578,13 +596,13 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   if (!productData) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <Text style={styles.errorText}>Product not found</Text>
+        <TransletText text="Product not found" style={styles.errorText} />
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.backButtonText}>Go Back</Text>
+          <TransletText text="Go Back" style={styles.backButtonText} />
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -619,8 +637,8 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
               {selectedCurrency === 'USD'
                 ? '$'
                 : selectedCurrency === 'EUR'
-                ? '€'
-                : 'Kč'}
+                  ? '€'
+                  : 'Kč'}
             </Text>
             <Text style={styles.currencyCodeText}>{selectedCurrency}</Text>
             <Text style={styles.arrowDown}>▼</Text>
@@ -747,7 +765,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             </>
           ) : (
             <View style={styles.noImageContainer}>
-              <Text style={styles.noImageText}>No images available</Text>
+              <TransletText text="No images available" style={styles.noImageText} />
             </View>
           )}
         </View>
@@ -755,9 +773,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         {/* Product Info */}
         <View style={styles.productInfo}>
           <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={2}>
-              {productData.name || ''}
-            </Text>
+            <TransletText text={productData.name || ''} style={styles.title} numberOfLines={2} />
             <Text style={styles.rating}>
               ★{' '}
               <Text style={styles.ratingCount}>
@@ -776,7 +792,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           {/* Variant Selection */}
           {variants.length > 0 && (
             <View style={styles.variantSection}>
-              <Text style={styles.variantTitle}>Select an Unit</Text>
+              <TransletText text="Select an Unit" style={styles.variantTitle} />
               <View style={styles.variantContainer}>
                 {variants.map((variant, index) => {
                   const isSelected = selectedIndex === index;
@@ -801,19 +817,20 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                           end={{ x: 1, y: 0 }}
                           style={styles.discountBadge}
                         >
-                          <Text style={styles.discountText}>
-                            {variant.percentage}% OFF
-                          </Text>
+                          <TransletText
+                            text={`${variant?.percentage}% OFF`}
+                            style={styles.discountText}
+                          />
                         </LinearGradient>
                       )}
-                      <Text
+                      <TransletText
+                        text={variant.unit || variant.weight || variant.name}
                         style={[
                           styles.variantText,
                           isSelected && styles.variantTextSelected,
                         ]}
-                      >
-                        {variant.unit || variant.weight || variant.name}
-                      </Text>
+                      />
+
                     </TouchableOpacity>
                   );
                 })}
@@ -826,30 +843,39 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
 
           {/* Description */}
           <View style={styles.descriptionSection}>
-            <Text style={styles.sectionTitle}>Product Description</Text>
-            <Text
+            {/* Section title */}
+            <TransletText
+              text="Product Description"
+              style={styles.sectionTitle}
+            />
+
+            {/* Description content */}
+            <TransletText
+              text={productData.description || ''}
               style={styles.description}
               numberOfLines={descExpanded ? undefined : 3}
-            >
-              {productData.description || ''}
-            </Text>
+            />
+
+            {/* Read more / Read less */}
             {productData.description?.length > 150 && (
               <TouchableOpacity
                 onPress={() => setDescExpanded(prev => !prev)}
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.readMoreText}>
-                  {descExpanded ? 'Read less' : 'Read more'}
-                </Text>
+                <TransletText
+                  text={descExpanded ? 'Read less' : 'Read more'}
+                  style={styles.readMoreText}
+                />
               </TouchableOpacity>
             )}
           </View>
 
+
           {/* Recommended Products */}
           {relatedProducts.length > 0 && (
             <View style={styles.recommendedSection}>
-              <Text style={styles.sectionTitle}>Recommended For You</Text>
+              <TransletText text="Recommended For You" style={styles.sectionTitle} />
               <FlatList
                 data={relatedProducts}
                 keyExtractor={item => `recommended_${item.id}`}
@@ -873,7 +899,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
 
           {/* Reviews Section */}
           <View style={styles.reviewsSection}>
-            <Text style={styles.sectionTitle}>Customer Reviews</Text>
+            <TransletText text="Customer Reviews" style={styles.sectionTitle} />
             <View style={styles.reviewsContent}>
               <View style={styles.reviewsLeft}>
                 <Text style={styles.reviewsScore}>
@@ -900,8 +926,13 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   })}
                 </View>
                 <Text style={styles.reviewsCount}>
-                  {reviews.length} Reviews
+                  {reviews.length}{' '}
+                  <TransletText
+                    text="Reviews"
+                    style={styles.reviewsCount}
+                  />
                 </Text>
+
               </View>
 
               <View style={styles.reviewsRight}>
@@ -920,13 +951,20 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
               style={styles.showReviewsButton}
               onPress={() => {
                 reviews.length === 0
-                  ? Toast.show({ type: 'info', text1: 'No Review Found' })
+                  ? Toast.show({
+                    type: 'info',
+                    text1: noReviewText || 'No Review Found',
+                  })
                   : setShowModalVisible(true);
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.showReviewsButtonText}>Show Review</Text>
+              <TransletText
+                text="Show Review"
+                style={styles.showReviewsButtonText}
+              />
             </TouchableOpacity>
+
           </View>
         </View>
       </ScrollView>
@@ -968,7 +1006,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reviews</Text>
+              <TransletText text="Reviews" style={styles.modalTitle} />
               <TouchableOpacity
                 onPress={() => setShowModalVisible(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -987,9 +1025,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
               renderItem={({ item }) => (
                 <View style={styles.reviewItem}>
                   <View style={styles.reviewHeader}>
-                    <Text style={styles.reviewerName}>
-                      {item.customer?.name || 'Anonymous'}
-                    </Text>
+                    <TransletText text={item.customer?.name || 'Anonymous'} style={styles.reviewerName} />
                     <Text style={styles.reviewDate}>
                       {formatDate(item.updated_at)}
                     </Text>
@@ -997,7 +1033,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   <Text style={styles.reviewStars}>
                     {'★'.repeat(item.rating)}
                   </Text>
-                  <Text style={styles.reviewText}>{item.review}</Text>
+                  <TransletText text={item.review} style={styles.reviewText} />
                 </View>
               )}
               showsVerticalScrollIndicator={false}

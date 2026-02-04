@@ -19,6 +19,8 @@ import { HttpStatusCode } from 'axios';
 import { useCart } from '../../context/CartContext';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TransletText from '../../components/TransletText';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 
 type DisplayWishlistItem = {
   id: string;
@@ -51,7 +53,19 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
   const { cart, addToCart } = useCart();
   const [refreshing, setRefreshing] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>({});
+  const { translatedText: addedWishlistText } =
+    useAutoTranslate('Added to wishlist');
+  const { translatedText: savedAccountText } =
+    useAutoTranslate('Saved to your account');
+  const { translatedText: savedLocalText } =
+    useAutoTranslate('Saved locally');
 
+  const { translatedText: errorText } =
+    useAutoTranslate('Error');
+  const { translatedText: failedWishlistText } =
+    useAutoTranslate('Failed to add item to wishlist');
+
+    const { translatedText: removedText } = useAutoTranslate('Removed from wishlist');
   // Debug logging
   useEffect(() => {
     console.log('=== WISHLIST SCREEN DEBUG ===');
@@ -204,8 +218,8 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
             average_rating: Number(item?.average_rating || item?.rating || 0),
             isInCart: cart
               ? cart.some(
-                  (cartItem: any) => String(cartItem.id) === String(productId),
-                )
+                (cartItem: any) => String(cartItem.id) === String(productId),
+              )
               : false,
           };
         },
@@ -307,8 +321,8 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
             average_rating: Number(item?.average_rating || 0),
             isInCart: cart
               ? cart.some(
-                  (cartItem: any) => String(cartItem.id) === String(productId),
-                )
+                (cartItem: any) => String(cartItem.id) === String(productId),
+              )
               : false,
           };
         });
@@ -378,7 +392,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
 
           Toast.show({
             type: 'success',
-            text1: 'Removed from wishlist',
+            text1: removedText || 'Removed from wishlist',
           });
         } else {
           console.log('Wishlist delete error:', JSON.stringify(res?.data));
@@ -443,15 +457,13 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
         source={require('../../assets/Png/heart-1.png')}
         style={styles.emptyHeartIcon}
       />
-      <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
-      <Text style={styles.emptySubtitle}>
-        Save your favorite items here to keep track of them
-      </Text>
+      <TransletText text="Your wishlist is empty" style={styles.emptyTitle} />
+      <TransletText text="Save your favorite items here to keep track of them" style={styles.emptySubtitle} />
       <TouchableOpacity
         style={styles.browseButton}
         onPress={() => navigation.navigate('CategoryScreen')}
       >
-        <Text style={styles.browseButtonText}>Browse Products</Text>
+        <TransletText text="Browse Products" style={styles.browseButtonText} />
       </TouchableOpacity>
     </View>
   );
@@ -482,7 +494,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
             })
           }
         >
-          <Text style={styles.productName}>{item.name}</Text>
+          <TransletText text={item.name} style={styles.productName} />
         </TouchableOpacity>
 
         {/* Star Rating */}
@@ -548,7 +560,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
             style={{ width: 20, height: 20 }}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Wishlist</Text>
+        <TransletText text="Wishlist" style={styles.headerTitle} />
         {/* Removed the bag icon from header */}
         <View style={styles.headerButton} />
       </View>
@@ -559,9 +571,10 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
           source={require('../../assets/Png/star-fill.png')}
           style={{ width: 20, height: 20 }}
         />
-        <Text style={styles.collectionLabelText}>
-          My Collection ({items.length})
-        </Text>
+        <TransletText
+          text="My Collection"
+          style={styles.collectionLabelText}
+        />
       </View>
 
       {/* Wishlist Items */}
