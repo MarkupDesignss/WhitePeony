@@ -56,6 +56,15 @@ const LoginModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState('');
   const [step, setStep] = useState<'login' | 'otp'>('login');
   const [loading, setLoading] = useState(false);
+  const { translatedText: invalidInputText } =
+    useAutoTranslate('Please enter a valid email or 10-digit phone number');
+  const { translatedText: otpErrorText } =
+    useAutoTranslate('Invalid or expired OTP. Please try again.');
+  const { translatedText: phonePlaceholder } =
+    useAutoTranslate('Enter email or phone number');
+
+
+
 
   const { showLoader, hideLoader } = CommonLoader();
   const { setUserData, setIsLoggedIn, setUserType } =
@@ -138,7 +147,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
     setError('');
 
     if (!emailOrPhone.trim() || !validateEmailOrPhone()) {
-      setError('Please enter a valid email or 10-digit phone number');
+      setError(invalidInputText || 'Please enter a valid email or 10-digit phone number');
       return;
     }
 
@@ -226,16 +235,11 @@ const LoginModal: React.FC<AuthModalProps> = ({
 
         onClose();
       } else {
-        setError(
-          res?.data?.message || 'Invalid or expired OTP. Please try again.',
-        );
+        setError(otpErrorText || 'Invalid or expired OTP. Please try again.');
       }
     } catch (err: any) {
       hideLoader();
-      setError(
-        err?.response?.data?.message ||
-        'Invalid or expired OTP. Please try again.',
-      );
+      setError(otpErrorText || 'Invalid or expired OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -264,15 +268,24 @@ const LoginModal: React.FC<AuthModalProps> = ({
                 />
 
               ) : (
-                <Text style={styles.subtitle}>
-                  Enter the OTP sent to{' '}
-                  <Text style={styles.bold}>{emailOrPhone}</Text>
-                </Text>
+                <View>
+                  <TransletText
+                    text="Enter the OTP sent to"
+                    style={styles.subtitle}
+                  />
+                  <Text style={[styles.subtitle, styles.bold]}>
+                    {emailOrPhone}
+                  </Text>
+                </View>
               )}
 
               {step === 'login' && (
                 <>
-                  <Text style={styles.label}>Email/Phone Number *</Text>
+                  <TransletText
+                    text="Email/Phone Number *"
+                    style={styles.label}
+                  />
+
                   <View style={styles.inputWrapper}>
                     <TextInput
                       autoCapitalize="none"
@@ -280,7 +293,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                       style={styles.input}
                       value={emailOrPhone}
                       onChangeText={setEmailOrPhone}
-                      placeholder="+420 605 476 490"
+                      placeholder={phonePlaceholder || 'Enter email or phone number'}
                       placeholderTextColor={Colors.text[200]}
                       editable={!loading}
                     />
@@ -294,13 +307,20 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     {loading ? (
                       <ActivityIndicator color="#000" />
                     ) : (
-                      <Text style={styles.loginText}>Login</Text>
+                      <TransletText
+                        text="Login"
+                        style={styles.loginText}
+                      />
                     )}
                   </TouchableOpacity>
 
                   {!!error && <Text style={{ color: 'red' }}>{error}</Text>}
 
-                  <Text style={styles.orText}>Or</Text>
+                  <TransletText
+                    text="Or"
+                    style={styles.orText}
+                  />
+
                   <View style={styles.socialRow}>
                     <TouchableOpacity
                       style={styles.socialButton}
@@ -357,21 +377,28 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     }}
                     disabled={loading}
                   >
-                    <Text style={styles.changeEmailText}>
-                      Change Email/Phone
-                    </Text>
+                    <TransletText
+                      text="Change Email/Phone"
+                      style={styles.changeEmailText}
+                    />
+
                   </TouchableOpacity>
 
-                  <Text style={styles.resendText}>
-                    Didn’t receive the code?{' '}
-                    {timer > 0 ? (
-                      <Text style={styles.disabled}>Resend in {timer}s</Text>
-                    ) : (
-                      <Text style={styles.resendLink} onPress={requestOTP}>
-                        Resend
-                      </Text>
-                    )}
-                  </Text>
+                  <TransletText
+                    text="Didn’t receive the code?"
+                    style={styles.resendText}
+                  />
+
+                  {timer > 0 ? (
+                    <TransletText
+                      text={`Resend in ${timer}s`}
+                      style={styles.disabled}
+                    />
+                  ) : (
+                    <Text style={styles.resendLink} onPress={requestOTP}>
+                      Resend
+                    </Text>
+                  )}
 
                   <TouchableOpacity
                     style={[
@@ -385,7 +412,11 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     {loading ? (
                       <ActivityIndicator color="#000" />
                     ) : (
-                      <Text style={styles.loginText}>Verify</Text>
+                      <TransletText
+                        text="Verify"
+                        style={styles.loginText}
+                      />
+
                     )}
                   </TouchableOpacity>
                 </>

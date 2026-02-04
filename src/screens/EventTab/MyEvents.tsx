@@ -18,12 +18,22 @@ import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
+import TransletText from '../../components/TransletText';
+
 
 const MyEventsScreen = ({ navigation }) => {
     const [events, setEvents] = useState([]);
     const { showLoader, hideLoader } = CommonLoader();
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const { translatedText: cancelEventText } = useAutoTranslate('Cancel Event');
+const { translatedText: confirmCancelText } = useAutoTranslate(
+  'Are you sure you want to cancel this event?'
+);
+const { translatedText: noText } = useAutoTranslate('No');
+const { translatedText: yesCancelText } = useAutoTranslate('Yes, Cancel');
+
 
     useEffect(() => {
         OrderList();
@@ -64,16 +74,23 @@ const MyEventsScreen = ({ navigation }) => {
     };
 
     const handleCancelEvent = item => {
-        Alert.alert('Cancel Event', 'Are you sure you want to cancel this event?', [
-            { text: 'No', style: 'cancel' },
+        Alert.alert(
+          cancelEventText || 'Cancel Event',
+          confirmCancelText || 'Are you sure you want to cancel this event?',
+          [
             {
-                text: 'Yes, Cancel',
-                style: 'destructive',
-                onPress: () => CancelButton(item?.event_id),
-                // onPress: () => setEvents(events.filter((e) => e.id !== id)),
+              text: noText || 'No',
+              style: 'cancel',
             },
-        ]);
-    };
+            {
+              text: yesCancelText || 'Yes, Cancel',
+              style: 'destructive',
+              onPress: () => CancelButton(item?.event_id),
+            },
+          ],
+        );
+      };
+      
 
     const CancelButton = async id => {
         try {
@@ -107,25 +124,34 @@ const MyEventsScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => openBookingDetail(item)}>
             <View style={styles.card}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={styles.title}>{item.title}</Text>
-                    <Text style={styles.title}>{item.booked_seats}</Text>
+                    <TransletText text={item.title} style={styles.title} />
+                    <Text style={styles.title}>
+                        <TransletText text="Seats" />: {item.booked_seats}
+                    </Text>
                 </View>
-                <Text style={styles.detail}>📅 {formatDate(item.event_date)}</Text>
-                <Text style={styles.detail}>📍 {item.address}</Text>
+                <TransletText
+                    text={`📅 Date: ${formatDate(item.event_date)}`}
+                    style={styles.detail}
+                />
+
+                <TransletText
+                    text={`📍 Location: ${item.address}`}
+                    style={styles.detail}
+                />
 
                 <View style={styles.actions}>
                     <TouchableOpacity
                         style={styles.detailBtn}
                         onPress={() => openEventDetail(item)}
                     >
-                        <Text style={styles.detailText}>View Details</Text>
+                        <TransletText text="View Details" style={styles.detailText} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.cancelBtn}
                         onPress={() => handleCancelEvent(item)}
                     >
-                        <Text style={styles.cancelText}>Cancel</Text>
+                        <TransletText text="Cancel" style={styles.cancelText} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -145,13 +171,14 @@ const MyEventsScreen = ({ navigation }) => {
                         style={{ width: 20, height: 20 }}
                     />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>My Event</Text>
+                <TransletText text="My Event" style={styles.headerTitle} />
                 <View />
             </View>
 
             {events.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No events found.</Text>
+                    <TransletText text="No events found." style={styles.emptyText} />
+
                 </View>
             ) : (
                 <FlatList
@@ -174,45 +201,61 @@ const MyEventsScreen = ({ navigation }) => {
                     <Pressable style={styles.modalContainer}>
                         {selectedBooking && (
                             <>
-                                <Text style={styles.modalTitle}>{selectedBooking.title}</Text>
-                                <Text style={styles.modalDetail}>
-                                    📅 {formatDate(selectedBooking.event_date)}
-                                </Text>
-                                <Text style={styles.modalDetail}>
-                                    🎤 Speaker: {selectedBooking.speaker}
-                                </Text>
-                                <Text style={styles.modalDetail}>
-                                    📍 Venue: {selectedBooking.address}
-                                </Text>
-                                <Text style={styles.modalDetail}>
-                                    💺 Booked Seats: {selectedBooking.booked_seats} /{' '}
-                                    {selectedBooking.capacity}
-                                </Text>
-                                <Text style={styles.modalDetail}>
-                                    💰 Price per Seat: ₹{selectedBooking.price_per_seat}
-                                </Text>
-                                <Text style={styles.modalDetail}>
-                                    💵 Total: ₹{selectedBooking.total_price}
-                                </Text>
-                                {/* <Text
-                                    style={[
-                                        styles.modalDetail,
-                                        selectedBooking.payment_status === 'paid'
-                                            ? { color: 'green' }
-                                            : { color: 'orange' },
-                                    ]}
-                                >
-                                    💳 Payment Status:{' '}
-                                    {selectedBooking.payment_status.toUpperCase()}
-                                </Text> */}
+                                <>
+                                    {/* Title */}
+                                    <TransletText
+                                        text={selectedBooking.title}
+                                        style={styles.modalTitle}
+                                    />
 
-                                <Text style={styles.modalDescription}>
-                                    {selectedBooking.description}
-                                </Text>
+                                    {/* Date */}
+                                    <TransletText
+                                        text={`📅 Date: ${formatDate(selectedBooking.event_date)}`}
+                                        style={styles.modalDetail}
+                                    />
 
-                                <TouchableOpacity style={styles.closeBtn} onPress={closeModal}>
-                                    <Text style={styles.closeText}>Close</Text>
-                                </TouchableOpacity>
+                                    {/* Speaker */}
+                                    <TransletText
+                                        text={`🎤 Speaker: ${selectedBooking.speaker}`}
+                                        style={styles.modalDetail}
+                                    />
+
+                                    {/* Venue */}
+                                    <TransletText
+                                        text={`📍 Venue: ${selectedBooking.address}`}
+                                        style={styles.modalDetail}
+                                    />
+
+                                    {/* Seats */}
+                                    <TransletText
+                                        text={`💺 Booked Seats: ${selectedBooking.booked_seats} / ${selectedBooking.capacity}`}
+                                        style={styles.modalDetail}
+                                    />
+
+                                    {/* Price per seat */}
+                                    <TransletText
+                                        text={`💰 Price per Seat: ₹${selectedBooking.price_per_seat}`}
+                                        style={styles.modalDetail}
+                                    />
+
+                                    {/* Total */}
+                                    <TransletText
+                                        text={`💵 Total: ₹${selectedBooking.total_price}`}
+                                        style={styles.modalDetail}
+                                    />
+
+                                    {/* Description */}
+                                    <TransletText
+                                        text={selectedBooking.description || ''}
+                                        style={styles.modalDescription}
+                                    />
+
+                                    {/* Close button */}
+                                    <TouchableOpacity style={styles.closeBtn} onPress={closeModal}>
+                                        <TransletText text="Close" style={styles.closeText} />
+                                    </TouchableOpacity>
+                                </>
+
                             </>
                         )}
                     </Pressable>
