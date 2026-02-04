@@ -26,12 +26,38 @@ import { widthPercentageToDP } from '../../constant/dimentions';
 import { Colors, Images } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
 const { width } = Dimensions.get('window');
+import TransletText from '../../components/TransletText';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
+
 
 const EventScreen = ({ navigation }: any) => {
   const { showLoader, hideLoader } = CommonLoader();
   const [location, setLocation] = useState<any>(null);
   const [sampleEvents, setsampleEvents] = React.useState<any[]>([]);
   const [NearbyEvents, setNearbyEvents] = React.useState<any[]>([]);
+  const { translatedText: searchEventsPH } =
+    useAutoTranslate('Search events...');
+  const { translatedText: noUpcomingEventText } =
+    useAutoTranslate('No Upcoming Event Found');
+
+    const { translatedText: locPermTitle } =
+    useAutoTranslate('Location Permission Needed');
+  
+  const { translatedText: locPermDesc } =
+    useAutoTranslate('You need to allow location permission to use this feature.');
+  
+  const { translatedText: retryText } =
+    useAutoTranslate('Retry');
+  
+  const { translatedText: cancelText } =
+    useAutoTranslate('Cancel');
+  
+  const { translatedText: stillDeniedTitle } =
+    useAutoTranslate('Still Denied');
+  
+  const { translatedText: permNotGrantedText } =
+    useAutoTranslate('Permission not granted.');
+  
 
   // Search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,6 +72,10 @@ const EventScreen = ({ navigation }: any) => {
     EventList();
   }, []);
 
+  const safeText = (t: string | undefined, fallback: string) =>
+    t && t.trim().length > 0 ? t : fallback;
+
+  
   // 👇 Handles permission for both platforms
   const requestPermissionAndGetLocation = async () => {
     try {
@@ -67,27 +97,38 @@ const EventScreen = ({ navigation }: any) => {
           getCurrentLocation();
         } else {
           Alert.alert(
-            'Location Permission Needed',
-            'You need to allow location permission to use this feature.',
+            safeText(locPermTitle, 'Location Permission Needed'),
+            safeText(
+              locPermDesc,
+              'You need to allow location permission to use this feature.'
+            ),
             [
               {
-                text: 'Retry',
+                text: safeText(retryText, 'Retry'),
                 onPress: async () => {
                   const retryStatus = await request(permissionType);
+          
                   if (
                     retryStatus === RESULTS.GRANTED ||
                     retryStatus === RESULTS.LIMITED
                   ) {
                     getCurrentLocation();
                   } else {
-                    Alert.alert('Still Denied', 'Permission not granted.');
+                    Alert.alert(
+                      safeText(stillDeniedTitle, 'Still Denied'),
+                      safeText(permNotGrantedText, 'Permission not granted.')
+                    );
                   }
                 },
               },
-              { text: 'Cancel', style: 'cancel' },
+              {
+                text: safeText(cancelText, 'Cancel'),
+                style: 'cancel',
+              },
             ],
-            { cancelable: true },
+            { cancelable: true }
           );
+          
         }
       } else if (status === RESULTS.BLOCKED) {
         // Don't open settings — just show message
@@ -209,9 +250,7 @@ const EventScreen = ({ navigation }: any) => {
 
       <View style={styles.upBadgeRow}>
         <View style={styles.readBadge}>
-          <Text numberOfLines={2} style={styles.upTitleWhite}>
-            {item.title}
-          </Text>
+          <TransletText text={item.title} numberOfLines={2} style={styles.upTitleWhite} />
           <View
             style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}
           >
@@ -219,9 +258,8 @@ const EventScreen = ({ navigation }: any) => {
               source={Images.location}
               style={{ width: 15, height: 15, marginRight: 10 }}
             />
-            <Text numberOfLines={1} style={styles.upMetaWhite}>
-              {item.address}
-            </Text>
+            <TransletText text={item.address} numberOfLines={1} style={styles.upMetaWhite} />
+
           </View>
           <View
             style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}
@@ -231,8 +269,12 @@ const EventScreen = ({ navigation }: any) => {
               style={{ width: 15, height: 15, marginRight: 10 }}
             />
             <Text style={styles.readBadgeText}>
-              {formatDate(item.event_date)}
+              <TransletText
+                text={`Date: ${formatDate(item.event_date)}`}
+                style={styles.readBadgeText}
+              />
             </Text>
+
           </View>
           <View
             style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5 }}
@@ -241,7 +283,11 @@ const EventScreen = ({ navigation }: any) => {
               source={Images.officechair2}
               style={{ width: 15, height: 15, marginRight: 10 }}
             />
-            <Text style={styles.readBadgeText}>{item.remaining_seats} Seats Left</Text>
+            <TransletText
+              text={`${item.remaining_seats} Seats Left`}
+              style={styles.nearMeta}
+            />
+
           </View>
         </View>
       </View>
@@ -262,9 +308,7 @@ const EventScreen = ({ navigation }: any) => {
         style={styles.nearImage}
       />
       <View style={styles.nearBody}>
-        <Text numberOfLines={2} style={styles.nearTitle}>
-          {item.title}
-        </Text>
+        <TransletText text={item.title} numberOfLines={2} style={styles.nearTitle} />
 
         <View
           style={{
@@ -278,10 +322,7 @@ const EventScreen = ({ navigation }: any) => {
               source={Images.location}
               style={{ width: 14, height: 14, marginRight: 6 }}
             />
-            <Text numberOfLines={1} style={styles.nearMeta}>
-              {' '}
-              {item.address?.split(' ')[0]}
-            </Text>
+            <TransletText text={item.address?.split(' ')[0]} numberOfLines={1} style={styles.nearMeta} />
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -289,9 +330,10 @@ const EventScreen = ({ navigation }: any) => {
               source={Images.officechair2}
               style={{ width: 14, height: 14, marginRight: 6 }}
             />
-            <Text numberOfLines={1} style={styles.nearMeta}>
-              {item.remaining_seats} Seats Left
-            </Text>
+            <TransletText
+              text={`${item.remaining_seats} Seats Left`}
+              style={styles.nearMeta}
+            />
           </View>
         </View>
 
@@ -302,7 +344,10 @@ const EventScreen = ({ navigation }: any) => {
             source={Images.clock_3}
             style={{ width: 14, height: 14, marginRight: 6 }}
           />
-          <Text style={styles.nearDate}>{formatDate(item.event_date)}</Text>
+          <TransletText
+            text={`Date: ${formatDate(item.event_date)}`}
+            style={styles.nearDate}
+          />
         </View>
       </View>
     </TouchableOpacity>
@@ -394,13 +439,13 @@ const EventScreen = ({ navigation }: any) => {
               style={styles.backIcon}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Events</Text>
+          <TransletText text="Events" style={styles.headerTitle} />
           <View style={styles.headerRightPlaceholder} />
         </View>
 
         <View style={styles.searchRow}>
           <TextInput
-            placeholder="Search events..."
+            placeholder={searchEventsPH || 'Search events...'}
             placeholderTextColor={Colors.text[200]}
             style={styles.searchInput}
             value={searchQuery}
@@ -421,7 +466,7 @@ const EventScreen = ({ navigation }: any) => {
             />
           ) : searchQuery ? (
             <TouchableOpacity onPress={clearSearch} style={styles.microphone}>
-              <Text style={{ fontWeight: '700' }}>Clear</Text>
+              <TransletText text="Clear" style={{ fontWeight: '700' }} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.microphone}>
@@ -447,15 +492,12 @@ const EventScreen = ({ navigation }: any) => {
         ListHeaderComponent={() => (
           <View>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {searchQuery.trim() ? 'Search Results' : 'Upcoming Events'}
-              </Text>
+              <TransletText text={searchQuery.trim() ? 'Search Results' : 'Upcoming Events'} style={styles.sectionTitle} />
               <TouchableOpacity onPress={() => setUpcomingModalVisible(true)}>
-                <Text style={styles.seeMore}>
-                  {searchQuery.trim()
-                    ? `${searchResults.length} found`
-                    : 'See more'}
-                </Text>
+                <TransletText text={searchQuery.trim()
+                  ? `${searchResults.length} found`
+                  : 'See more'} style={styles.seeMore} />
+
               </TouchableOpacity>
             </View>
 
@@ -469,8 +511,9 @@ const EventScreen = ({ navigation }: any) => {
               ) : searchResults.length === 0 ? (
                 <View style={{ padding: 20 }}>
                   <Text style={{ color: '#666' }}>
-                    No results for "{searchQuery}"
+                    <TransletText text="No results for" /> "{searchQuery}"
                   </Text>
+
                 </View>
               ) : null
             ) : (
@@ -487,16 +530,17 @@ const EventScreen = ({ navigation }: any) => {
                 </View>
 
                 <View style={[styles.sectionHeader, {}]}>
-                  <Text style={styles.sectionTitle}>Events Near You</Text>
+                  <TransletText text="Events Near You" style={styles.sectionTitle} />
                   <TouchableOpacity
                     onPress={() => {
                       const upcomingNearby = filterUpcomingEvents(NearbyEvents);
-                      upcomingNearby.length == 0
-                        ? Alert.alert('', 'No Upcoming Event Found')
+
+                      upcomingNearby.length === 0
+                        ? Alert.alert('', noUpcomingEventText || 'No Upcoming Event Found')
                         : setNearbyModalVisible(true);
                     }}
                   >
-                    <Text style={styles.seeMore}>See more</Text>
+                    <TransletText text="See more" style={styles.seeMore} />
                   </TouchableOpacity>
                 </View>
               </>
@@ -506,7 +550,7 @@ const EventScreen = ({ navigation }: any) => {
         ListEmptyComponent={() =>
           !searchQuery.trim() ? (
             <View style={{ paddingTop: 80 }}>
-              <Text
+              <TransletText text="No nearby events found"
                 style={{
                   color: '#000',
                   fontWeight: '700',
@@ -514,23 +558,19 @@ const EventScreen = ({ navigation }: any) => {
                   textAlign: 'center',
                   flex: 1,
                 }}
-              >
-                No nearby events found
-              </Text>
+              />
             </View>
           ) : null
         }
       />
 
       {/* Upcoming events modal */}
-   
+
       <Modal visible={upcomingModalVisible} transparent animationType="slide">
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
             <View style={modalStyles.modalHeader}>
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>
-                Upcoming Events
-              </Text>
+              <TransletText text="Upcoming Events" style={{ fontSize: 18, fontWeight: '700' }} />
               <TouchableOpacity onPress={() => setUpcomingModalVisible(false)}>
                 <Text style={{ fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
@@ -553,9 +593,7 @@ const EventScreen = ({ navigation }: any) => {
               removeClippedSubviews={false}
               ListEmptyComponent={() => (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 }}>
-                  <Text style={{ color: '#666', fontSize: 16 }}>
-                    No upcoming events
-                  </Text>
+                  <TransletText text=" No upcoming events" style={{ color: '#666', fontSize: 16 }} />
                 </View>
               )}
             />
@@ -568,9 +606,7 @@ const EventScreen = ({ navigation }: any) => {
         <View style={modalStyles.overlay}>
           <View style={modalStyles.content}>
             <View style={modalStyles.modalHeader}>
-              <Text style={{ fontSize: 18, fontWeight: '700' }}>
-                Events Near You
-              </Text>
+              <TransletText text="Events Near You" style={{ fontSize: 18, fontWeight: '700' }} />
               <TouchableOpacity onPress={() => setNearbyModalVisible(false)}>
                 <Text style={{ fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>

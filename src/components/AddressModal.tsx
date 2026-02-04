@@ -19,6 +19,9 @@ import { HttpStatusCode } from 'axios';
 import Toast from 'react-native-toast-message';
 import AddressDetailModal from './AddressDetailModal';
 import { Images } from '../constant';
+import TransletText from '../components/TransletText';
+import { useAutoTranslate } from '../hooks/useAutoTranslate';
+
 
 type Address = {
   id: string | number;
@@ -50,7 +53,10 @@ const AddressModal: React.FC<AddressModalProps> = ({
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [internalVisible, setInternalVisible] = useState(visible);
+  const { translatedText: failedLoadText } =
+    useAutoTranslate('Failed to load addresses');
 
+  
   // Ref to track if we're already fetching data
   const isFetchingRef = useRef(false);
 
@@ -81,8 +87,9 @@ const AddressModal: React.FC<AddressModalProps> = ({
       } else {
         Toast.show({
           type: 'error',
-          text1: res?.data?.message || 'Failed to load addresses',
+          text1: failedLoadText || 'Failed to load addresses',
         });
+
         setAddressList([]);
       }
     } catch (err: any) {
@@ -182,8 +189,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={e => e.stopPropagation()}>
               <View style={styles.modalContainer}>
-                <Text style={styles.header}>Select Address</Text>
-
+                <TransletText text="Select Address" style={styles.header} />
                 <TouchableOpacity
                   style={styles.addButton}
                   onPress={() => handleAddressSelect(null)}
@@ -192,16 +198,17 @@ const AddressModal: React.FC<AddressModalProps> = ({
                     source={Images.plus1}
                     style={{ width: 15, height: 15 }}
                   />
-                  <Text style={styles.addText}> Add New Address</Text>
+                  <TransletText text="Add New Address" style={styles.addText} />
                 </TouchableOpacity>
 
                 <ScrollView style={{ maxHeight: 300, marginTop: 15 }}>
                   {isLoading ? (
                     <View style={styles.loadingContainer}>
                       <ActivityIndicator size="large" color="#AEB254" />
-                      <Text style={styles.loadingText}>
-                        Loading addresses...
-                      </Text>
+                      <TransletText
+                        text="Loading addresses..."
+                        style={styles.loadingText}
+                      />
                     </View>
                   ) : addressList && addressList.length > 0 ? (
                     addressList.map(addr => (
@@ -216,10 +223,14 @@ const AddressModal: React.FC<AddressModalProps> = ({
                               source={Images.home}
                               style={{ width: 18, height: 18 }}
                             />
-                            <Text style={styles.addressLabel}>
-                              {addr.address_type}
-                            </Text>
+
+                            {/* Address Type */}
+                            <TransletText
+                              text={addr.address_type || ''}
+                              style={styles.addressLabel}
+                            />
                           </View>
+
                           <TouchableOpacity
                             onPress={() => {
                               setSelectedAddress(addr);
@@ -232,38 +243,56 @@ const AddressModal: React.FC<AddressModalProps> = ({
                             />
                           </TouchableOpacity>
                         </View>
+
                         <View style={{ marginTop: 10 }}>
-                          <Text style={styles.addressName}>{addr.name}</Text>
-                          <Text style={styles.addressLine}>
-                            {addr.full_address}
-                          </Text>
-                          <Text style={styles.addressLine}>{addr.phone}</Text>
-                          <Text style={styles.addressLine}>
-                            {addr.postal_code}
-                          </Text>
+                          <TransletText
+                            text={addr.name || ''}
+                            style={styles.addressName}
+                          />
+
+                          <TransletText
+                            text={addr.full_address || ''}
+                            style={styles.addressLine}
+                          />
+
+                          <TransletText
+                            text={String(addr.phone || '')}
+                            style={styles.addressLine}
+                          />
+
+                          <TransletText
+                            text={String(addr.postal_code || '')}
+                            style={styles.addressLine}
+                          />
                         </View>
                       </TouchableOpacity>
                     ))
                   ) : (
                     <View style={styles.emptyContainer}>
-                      <Text style={styles.emptyText}>No addresses found</Text>
+                      <TransletText
+                        text="No addresses found"
+                        style={styles.emptyText}
+                      />
+
                       <TouchableOpacity
                         style={styles.emptyButton}
                         onPress={() => handleAddressSelect(null)}
                       >
-                        <Text style={styles.emptyButtonText}>
-                          Add New Address
-                        </Text>
+                        <TransletText
+                          text="Add New Address"
+                          style={styles.emptyButtonText}
+                        />
                       </TouchableOpacity>
                     </View>
                   )}
                 </ScrollView>
 
+
                 <TouchableOpacity
                   onPress={handleClose}
                   style={styles.closeButton}
                 >
-                  <Text style={styles.closeText}>Close</Text>
+                  <TransletText text="Close" style={styles.closeText} />
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>

@@ -77,6 +77,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { translatedText: notificationText } = useAutoTranslate('Notification');
   const { translatedText: myFavoritiesText } =
     useAutoTranslate('My Favorities');
+    const { translatedText: logoutSuccessText } =
+  useAutoTranslate('Log Out Successfully!');
+
 
   // Function to open external URLs with InAppBrowser
   const openInAppBrowser = async (url: string, title?: string) => {
@@ -160,7 +163,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           handleSignout(setIsLoggedIn);
           Toast.show({
             type: 'success',
-            text1: 'Log Out Successfully!',
+            text1: logoutSuccessText || 'Log Out Successfully!',
           });
         },
       },

@@ -12,13 +12,16 @@ import {
   Alert,
 } from 'react-native';
 import { Colors } from '../constant';
+import TransletText from '../components/TransletText';
+import { useAutoTranslate } from '../hooks/useAutoTranslate';
 
-const EmailInput = memo(({ index, value, onChange }) => (
+const EmailInput = memo(({ index, value, onChange,text }) => (
+  
   <TextInput
     value={value}
     onChangeText={text => onChange(text, index)}
     placeholderTextColor={Colors.text[200]}
-    placeholder={`Email for Seat ${index + 1}`}
+    placeholder={`${text || 'Email for Seat'} ${index + 1}`}
     keyboardType="email-address"
     autoCapitalize="none"
     style={{
@@ -35,6 +38,10 @@ const EmailInput = memo(({ index, value, onChange }) => (
 const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { translatedText: invalidEmailTitle } = useAutoTranslate('Invalid Email');
+const { translatedText: invalidEmailDesc } = useAutoTranslate('Please enter a valid email for seat');
+const { translatedText: emailForSeatText } = useAutoTranslate('Email for Seat');
+
 
   // reset when seatCount changes
   useEffect(() => {
@@ -57,9 +64,10 @@ const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
     for (let i = 0; i < emails.length; i++) {
       if (!isValidEmail(emails[i])) {
         Alert.alert(
-          'Invalid Email',
-          `Please enter a valid email for seat ${i + 1}`,
+          invalidEmailTitle || 'Invalid Email',
+          `${invalidEmailDesc || 'Please enter a valid email for seat'} ${i + 1}`
         );
+        
         return;
       }
     }
@@ -80,7 +88,7 @@ const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}>
           {/* Inner content - prevents closing when clicked inside */}
-          <TouchableWithoutFeedback onPress={() => {}}>
+          <TouchableWithoutFeedback onPress={() => { }}>
             <View
               style={{
                 flex: 1,
@@ -112,9 +120,11 @@ const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
                     marginBottom: 15,
                   }}
                 >
-                  <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                    Enter Emails for {seatCount} Seat{seatCount > 1 ? 's' : ''}
-                  </Text>
+                  <TransletText
+                    style={{ fontSize: 18, fontWeight: '600' }}
+                    text={`Enter Emails for ${seatCount} Seat${seatCount > 1 ? 's' : ''}`}
+                  />
+
                   <TouchableOpacity onPress={onClose} disabled={loading}>
                     <Text
                       style={{ fontSize: 28, color: '#999', fontWeight: '200' }}
@@ -135,6 +145,7 @@ const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
                       index={index}
                       value={email}
                       onChange={handleEmailChange}
+                      text={emailForSeatText}
                     />
                   ))}
                 </ScrollView>
@@ -153,11 +164,9 @@ const EmailModal = ({ visible, onClose, seatCount, onSubmit }) => {
                   {loading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text
+                    <TransletText text="Submit Emails"
                       style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}
-                    >
-                      Submit Emails
-                    </Text>
+                    />
                   )}
                 </TouchableOpacity>
               </View>

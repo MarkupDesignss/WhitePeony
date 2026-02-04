@@ -22,6 +22,9 @@ import { formatDate } from '../../helpers/helpers';
 import EmailModal from '../../components/EmailModal';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TransletText from '../../components/TransletText';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
+
 
 type EventDetail = {
   image?: string;
@@ -49,6 +52,28 @@ const EventDetails = ({ navigation, route }: any) => {
   const [selectedSeats, setSelectedSeats] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isEventPassed, setIsEventPassed] = useState(false);
+
+  const { translatedText: selectSeatsText } = useAutoTranslate(
+    'Please select number of seats'
+  );
+  const { translatedText: onlySeatsAvailableText } = useAutoTranslate(
+    'Only {count} seats available'
+  );
+  const { translatedText: registrationSuccessText } = useAutoTranslate(
+    'Registration successful!'
+  );
+  const { translatedText: registrationFailText } = useAutoTranslate(
+    'Failed to register'
+  );
+  const { translatedText: somethingWentWrongText } = useAutoTranslate(
+    'Something went wrong! Please try again.'
+  );
+  const { translatedText: eventPassedText } = useAutoTranslate(
+    'This event has already passed'
+  );
+  const { translatedText: enterExactEmailsText } = useAutoTranslate(
+    'Please enter exactly {count} email(s)'
+  );
 
   const onDescriptionTextLayout = React.useCallback(
     (e: any) => {
@@ -113,7 +138,6 @@ const EventDetails = ({ navigation, route }: any) => {
       const res = await UserService.eventupdate(id);
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { message, event } = res.data;
-
         // Check if event is passed using helper function
         const isPassed = isEventDatePassed(event.event_date);
         console.log('📊 Final check - Event passed:', isPassed);
@@ -125,7 +149,7 @@ const EventDetails = ({ navigation, route }: any) => {
         if (isPassed) {
           Toast.show({
             type: 'info',
-            text1: 'This event has already passed',
+            text1: eventPassedText || 'This event has already passed',
           });
           setTimeout(() => {
             navigation.goBack();
@@ -164,7 +188,7 @@ const EventDetails = ({ navigation, route }: any) => {
     if (selectedSeats === 0) {
       Toast.show({
         type: 'error',
-        text1: 'Please select number of seats',
+        text1: selectSeatsText || 'Please select number of seats',
       });
       return;
     }
@@ -176,7 +200,9 @@ const EventDetails = ({ navigation, route }: any) => {
     ) {
       Toast.show({
         type: 'error',
-        text1: `Only ${eventDetails.remaining_seats} seats available`,
+        text1: onlySeatsAvailableText
+          ? onlySeatsAvailableText.replace('{count}', eventDetails.remaining_seats.toString())
+          : `Only ${eventDetails.remaining_seats} seats available`,
       });
       return;
     }
@@ -190,9 +216,9 @@ const EventDetails = ({ navigation, route }: any) => {
     if (emails.length !== selectedSeats) {
       Toast.show({
         type: 'error',
-        text1: `Please enter exactly ${selectedSeats} email${
-          selectedSeats > 1 ? 's' : ''
-        }`,
+        text1: enterExactEmailsText
+          ? enterExactEmailsText.replace('{count}', selectedSeats.toString())
+          : `Please enter exactly ${selectedSeats} email${selectedSeats > 1 ? 's' : ''}`,
       });
       return;
     }
@@ -201,7 +227,10 @@ const EventDetails = ({ navigation, route }: any) => {
     try {
       const res = await UserService.eventsRegister({ emails }, eventid);
       if (res?.data?.success) {
-        Toast.show({ type: 'success', text1: 'Registration successful!' });
+        Toast.show({
+          type: 'error',
+          text1: registrationFailText || 'Failed to register',
+        });
         setModalVisible(false);
         setSelectedSeats(0);
         // Refresh event details to update remaining seats
@@ -217,7 +246,7 @@ const EventDetails = ({ navigation, route }: any) => {
       console.log('Registration error:', JSON.stringify(error));
       Toast.show({
         type: 'error',
-        text1: error?.response?.data?.message || 'Something went wrong!',
+        text1: somethingWentWrongText || 'Something went wrong!',
       });
     } finally {
       setIsLoading(false);
@@ -243,7 +272,7 @@ const EventDetails = ({ navigation, route }: any) => {
               style={{ width: 20, height: 20 }}
             />
           </TouchableOpacity>
-          <Text style={styles.screenTitle}>Event Details</Text>
+          <TransletText text="Event Details" style={styles.screenTitle} />
           <View style={{ width: 36 }} />
         </View>
 
@@ -265,18 +294,22 @@ const EventDetails = ({ navigation, route }: any) => {
                     source={require('../../assets/Png/clock.png')}
                     style={styles.metaIcon}
                   />
-                  <Text style={styles.metaText}>
-                    {formatDate(eventDetails?.event_date)}
-                  </Text>
+                  <TransletText
+                    text={`Date: ${formatDate(eventDetails?.event_date) || '—'}`}
+                    style={styles.metaText}
+                  />
+
                 </View>
                 <View style={styles.metaItem}>
                   <Image
                     source={require('../../assets/Png/office-chair2.png')}
                     style={styles.metaIcon}
                   />
-                  <Text style={styles.metaText}>
-                    {eventDetails?.remaining_seats || 0} Seats Left
-                  </Text>
+                  <TransletText
+                    text={`${eventDetails?.remaining_seats ?? 0} ${'Seats Left'}`}
+                    style={styles.metaText}
+                  />
+
                 </View>
               </View>
 
@@ -285,18 +318,17 @@ const EventDetails = ({ navigation, route }: any) => {
                   source={require('../../assets/Png/location.png')}
                   style={styles.addressIcon}
                 />
-                <Text style={styles.address}>{eventDetails?.address}</Text>
+                <TransletText text={eventDetails?.address} style={styles.address} />
               </View>
 
-              <Text style={styles.eventTitle}>{eventDetails?.title}</Text>
+              <TransletText text={eventDetails?.title} style={styles.eventTitle} />
 
-              <Text
+              <TransletText
+                text={eventDetails?.description || ''}
                 style={styles.excerpt}
                 numberOfLines={isDescriptionExpanded ? undefined : 5}
                 onTextLayout={onDescriptionTextLayout}
-              >
-                {eventDetails?.description}
-              </Text>
+              />
 
               {isDescriptionTruncatable && (
                 <TouchableOpacity
@@ -308,7 +340,7 @@ const EventDetails = ({ navigation, route }: any) => {
                 </TouchableOpacity>
               )}
 
-              <Text style={styles.agendaTitle}>Agenda</Text>
+              <TransletText text="Agenda" style={styles.agendaTitle} />
 
               {eventDetails?.agenda
                 ?.split(',')
@@ -319,7 +351,7 @@ const EventDetails = ({ navigation, route }: any) => {
                       source={require('../../assets/Png/check.png')}
                       style={styles.checkIcon}
                     />
-                    <Text style={styles.agendaText}>{item}</Text>
+                    <TransletText text={item} style={styles.agendaText} />
                   </View>
                 ))}
 
@@ -328,7 +360,7 @@ const EventDetails = ({ navigation, route }: any) => {
                   styles.registerBtn,
                   (!eventDetails?.remaining_seats ||
                     eventDetails.remaining_seats === 0) &&
-                    styles.disabledButton,
+                  styles.disabledButton,
                 ]}
                 onPress={openSeatSelection}
                 disabled={
@@ -336,21 +368,17 @@ const EventDetails = ({ navigation, route }: any) => {
                   eventDetails.remaining_seats === 0
                 }
               >
-                <Text style={styles.registerText}>
-                  {eventDetails?.remaining_seats === 0
-                    ? 'Sold Out'
-                    : 'Register Now'}
-                </Text>
+                <TransletText text={eventDetails?.remaining_seats === 0
+                  ? 'Sold Out'
+                  : 'Register Now'} style={styles.registerText} />
               </TouchableOpacity>
             </ScrollView>
           </>
         ) : (
           <View style={styles.noEventContainer}>
-            <Text style={styles.noEventText}>
-              {isEventPassed
-                ? 'This event has already passed'
-                : 'Event not found'}
-            </Text>
+            <TransletText text={isEventPassed
+              ? 'This event has already passed'
+              : 'Event not found'} style={styles.noEventText} />
           </View>
         )}
       </View>
@@ -371,13 +399,13 @@ const EventDetails = ({ navigation, route }: any) => {
                 <View style={styles.bottomSheetContent}>
                   <View style={styles.bottomSheetHandle} />
 
-                  <Text style={styles.bottomSheetTitle}>
-                    Select Number of Seats
-                  </Text>
+                  <TransletText text="Select Number of Seats" style={styles.bottomSheetTitle} />
 
-                  <Text style={styles.availableSeatsText}>
-                    Available seats: {eventDetails?.remaining_seats || 0}
-                  </Text>
+                  <TransletText
+                    text={`Available seats: ${eventDetails?.remaining_seats || 0}`}
+                    style={styles.availableSeatsText}
+                  />
+
 
                   <View style={styles.seatsContainer}>
                     {[1, 2, 3, 4, 5].map(num => (
@@ -395,7 +423,7 @@ const EventDetails = ({ navigation, route }: any) => {
                             styles.seatText,
                             selectedSeats === num && styles.selectedSeatText,
                             num > (eventDetails?.remaining_seats || 0) &&
-                              styles.disabledSeatText,
+                            styles.disabledSeatText,
                           ]}
                         >
                           {num}
@@ -412,13 +440,11 @@ const EventDetails = ({ navigation, route }: any) => {
                     onPress={handleConfirmRegistration}
                     disabled={selectedSeats === 0}
                   >
-                    <Text style={styles.confirmRegistrationText}>
-                      {selectedSeats > 0
-                        ? `Confirm Registration (${selectedSeats} seat${
-                            selectedSeats > 1 ? 's' : ''
-                          })`
-                        : 'Select seats to continue'}
-                    </Text>
+                    <TransletText text={selectedSeats > 0
+                      ? `Confirm Registration (${selectedSeats} seat${selectedSeats > 1 ? 's' : ''
+                      })`
+                      : 'Select seats to continue'} style={styles.confirmRegistrationText} />
+
                   </TouchableOpacity>
                 </View>
               </TouchableWithoutFeedback>

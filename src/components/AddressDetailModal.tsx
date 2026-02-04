@@ -18,8 +18,8 @@ import { UserService } from '../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import Toast from 'react-native-toast-message';
 import { Colors } from '../constant';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import TransletText from '../components/TransletText';
+import { useAutoTranslate } from '../hooks/useAutoTranslate';
 
 const AddressDetailModal = ({
   isVisible,
@@ -39,13 +39,25 @@ const AddressDetailModal = ({
     zip: '',
   });
 
-  // Track keyboard visibility
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  // Prevent duplicate submission
   const [isSubmitting, setIsSubmitting] = useState(false);
+    const { translatedText: fullNamePH } = useAutoTranslate('Full Name*');
+      const { translatedText: emailPH } = useAutoTranslate('Email ID*');
+      const { translatedText: phonePH } = useAutoTranslate('Contact Number*');
+      const { translatedText: addressPH } = useAutoTranslate('Full Address*');
+      const { translatedText: cityPH } = useAutoTranslate('City*');
+      const { translatedText: zipPH } = useAutoTranslate('ZIP Code*');
 
-  // validation errors
+      const { translatedText: fixValidationText } =
+  useAutoTranslate('Please fix validation errors');
+
+const { translatedText: addressSavedText } =
+  useAutoTranslate('Address saved successfully!');
+
+const { translatedText: somethingWrongText } =
+  useAutoTranslate('Something went wrong! Please try again.');
+      
+
   const [errors, setErrors] = useState({
     name: '',
     email: '',
@@ -185,7 +197,10 @@ const AddressDetailModal = ({
     Keyboard.dismiss();
 
     if (!validate()) {
-      Toast.show({ type: 'error', text1: 'Please fix validation errors' });
+      Toast.show({
+        type: 'error',
+        text1: fixValidationText,
+      });
       return;
     }
 
@@ -222,14 +237,14 @@ const AddressDetailModal = ({
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         Toast.show({
           type: 'success',
-          text1: res.data?.message || 'Address saved successfully!',
+          text1: res.data?.message || addressSavedText,
         });
         onAddressUpdated && onAddressUpdated();
         onClose();
       } else {
         Toast.show({
           type: 'error',
-          text1: res?.data?.message || 'Something went wrong!',
+          text1: somethingWrongText,
         });
       }
     } catch (err) {
@@ -277,9 +292,8 @@ const AddressDetailModal = ({
           >
             {/* Header with close button */}
             <View style={styles.header}>
-              <Text style={styles.modalTitle}>
-                {addresses ? 'Update Address' : 'Add New Address'}
-              </Text>
+              <TransletText text={addresses ? 'Update Address' : 'Add New Address'} style={styles.modalTitle} />
+
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={handleClose}
@@ -289,9 +303,10 @@ const AddressDetailModal = ({
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.bodytext}>
-              Complete address helps us serve you better.
-            </Text>
+            <TransletText
+              text="Complete address helps us serve you better."
+              style={styles.bodytext}
+            />
 
             <ScrollView
               showsVerticalScrollIndicator={false}
@@ -310,20 +325,18 @@ const AddressDetailModal = ({
                     style={[
                       styles.addressTypeButton,
                       selectedType === type.key &&
-                        styles.addressTypeButtonSelected,
+                      styles.addressTypeButtonSelected,
                     ]}
                     onPress={() => setSelectedType(type.key)}
                   >
                     <Text style={styles.addressTypeIcon}>{type.icon}</Text>
-                    <Text
+                    <TransletText
+                      text={type.label}
                       style={[
                         styles.addressTypeLabel,
-                        selectedType === type.key &&
-                          styles.addressTypeLabelSelected,
+                        selectedType === type.key && styles.addressTypeLabelSelected,
                       ]}
-                    >
-                      {type.label}
-                    </Text>
+                    />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -332,7 +345,7 @@ const AddressDetailModal = ({
               <View style={styles.formContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Full Name*"
+                  placeholder={fullNamePH}
                   placeholderTextColor={Colors.text[200]}
                   value={formData.name}
                   onChangeText={text => handleChange('name', text)}
@@ -340,12 +353,12 @@ const AddressDetailModal = ({
                   blurOnSubmit={false}
                 />
                 {errors.name ? (
-                  <Text style={styles.errorText}>{errors.name}</Text>
+                  <TransletText text={errors.name} style={styles.errorText} />
                 ) : null}
 
                 <TextInput
                   style={styles.input}
-                  placeholder="Email ID*"
+                  placeholder={emailPH}
                   placeholderTextColor={Colors.text[200]}
                   value={formData.email}
                   onChangeText={text => handleChange('email', text)}
@@ -355,12 +368,12 @@ const AddressDetailModal = ({
                   blurOnSubmit={false}
                 />
                 {errors.email ? (
-                  <Text style={styles.errorText}>{errors.email}</Text>
+                  <TransletText text={errors.name} style={styles.errorText} />
                 ) : null}
 
                 <TextInput
                   style={styles.input}
-                  placeholder="Contact Number*"
+                  placeholder={phonePH}
                   placeholderTextColor={Colors.text[200]}
                   value={formData.phone}
                   onChangeText={text => handleChange('phone', text)}
@@ -374,7 +387,7 @@ const AddressDetailModal = ({
 
                 <TextInput
                   style={[styles.input, styles.addressInput]}
-                  placeholder="Full Address*"
+                  placeholder={addressPH}
                   placeholderTextColor={Colors.text[200]}
                   value={formData.address}
                   onChangeText={text => handleChange('address', text)}
@@ -390,7 +403,7 @@ const AddressDetailModal = ({
 
                 <TextInput
                   style={styles.input}
-                  placeholder="City*"
+                  placeholder={cityPH}
                   placeholderTextColor={Colors.text[200]}
                   value={formData.city}
                   onChangeText={text => handleChange('city', text)}
@@ -403,7 +416,7 @@ const AddressDetailModal = ({
 
                 <TextInput
                   style={styles.input}
-                  placeholder="ZIP Code*"
+                  placeholder={zipPH}
                   placeholderTextColor={Colors.text[200]}
                   value={formData.zip}
                   onChangeText={text => handleChange('zip', text)}
@@ -424,13 +437,11 @@ const AddressDetailModal = ({
                   onPress={handleSubmit}
                   disabled={isSubmitting}
                 >
-                  <Text style={styles.confirmButtonText}>
-                    {isSubmitting
-                      ? 'Processing...'
-                      : addresses
+                  <TransletText text={isSubmitting
+                    ? 'Processing...'
+                    : addresses
                       ? 'Update Address'
-                      : 'Save Address'}
-                  </Text>
+                      : 'Save Address'} style={styles.confirmButtonText} />
                 </TouchableOpacity>
               </View>
             </ScrollView>
