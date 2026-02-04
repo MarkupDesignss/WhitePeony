@@ -633,15 +633,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
     zIndex: 1000,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
   },
   backButton: {
     width: 40,
@@ -666,7 +659,8 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
+    marginTop:10,
     position: 'relative',
   },
   avatar: {
@@ -678,7 +672,7 @@ const styles = StyleSheet.create({
   cameraButton: {
     position: 'absolute',
     bottom: 0,
-    right: '40%', // Adjusted for better positioning
+    right: '35%', // Adjusted for better positioning
     backgroundColor: '#f8fbe5',
     borderRadius: 20,
     padding: 8,

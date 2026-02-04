@@ -29,6 +29,7 @@ import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import { useAutoTranslate } from '../../hooks/useAutoTranslate';
+import TransletText from '../../components/TransletText';
 
 const { width } = Dimensions.get('window');
 
@@ -285,9 +286,8 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 )}
               </View>
               <View style={styles.profileInfo}>
-                <Text style={styles.name} numberOfLines={1}>
-                  {userData?.name || 'User Name'}
-                </Text>
+                <TransletText text={userData?.name || 'User Name'} style={styles.name} numberOfLines={1} />
+
                 <Text style={styles.since}>
                   {memberSinceText || 'Member since'}{' '}
                   {formatDate(userData?.created_at)}

@@ -52,8 +52,8 @@ type UiOrder = {
 };
 
 const OrdersScreen = ({ navigation }: { navigation: any }) => {
-  const { translatedText:searchplaceholder } = useAutoTranslate('Search orders...');
-  
+  const { translatedText: searchplaceholder } = useAutoTranslate('Search orders...');
+
   const selectedCurrency = useAppSelector(
     state => state.currency.selectedCurrency,
   );
@@ -452,21 +452,29 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 borderRadius: 20,
               }}
             />
-            <View style={{ marginLeft: 6 }}>
-              <Text style={styles.deliveryDate}>
-                {item?.status
+            <View style={{ marginLeft: 6, flex: 1 }}>
+              <TransletText
+                text={`${item?.status
                   ? item.status.charAt(0).toUpperCase() + item.status.slice(1)
-                  : 'Order'}{' '}
-                • {formData}
-              </Text>
-              <Text style={styles.deliveryStatus}>
-                {item?.tracking_number
-                  ? `${item.tracking_number}`
-                  : item?.payment_status
-                    ? item.payment_status
-                    : 'No tracking info'}
-              </Text>
+                  : 'Order'
+                  } • ${formData}`}
+                style={[styles.deliveryDate, { flexShrink: 1 }]}
+                numberOfLines={0}
+              />
+              <TransletText
+                text={
+                  item?.tracking_number
+                    ? `${item.tracking_number}`
+                    : item?.payment_status
+                      ? item.payment_status
+                      : 'No tracking info'
+                }
+                style={[styles.deliveryStatus, { flexShrink: 1 }]}
+                numberOfLines={0}
+              />
             </View>
+
+
             <Image
               source={require('../../assets/Png/next.png')}
               style={{ marginLeft: 'auto', width: 14, height: 14 }}
@@ -493,14 +501,16 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
 
               {/* Secondary summary */}
               {itemsList.length > 1 && (
-                <Text style={styles.moreItemsText}>
-                  +{itemsList.length - 1} items
-                </Text>
+                <TransletText
+                  text={`+${itemsList.length - 1} items`}
+                  style={styles.moreItemsText}
+                />
+
               )}
 
               <TransletText style={styles.productPrice}
-              text=  {item?.total_amount ? displayPrice(item.total_amount) : ''}
-          />
+                text={item?.total_amount ? displayPrice(item.total_amount) : ''}
+              />
             </View>
 
           </View>
@@ -520,9 +530,9 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 !productId && styles.disabledRateReview,
               ]}
             >
-           
+
               <TransletText style={styles.rateReviewLabel}
-               text= {userRating !== null ? 'Update Review' : 'Rate & Review'}
+                text={userRating !== null ? 'Update Review' : 'Rate & Review'}
               />
               <View style={{ flexDirection: 'row', marginTop: -10 }}>
                 {[1, 2, 3, 4, 5].map(r => {
@@ -564,36 +574,33 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
 
           {isExpanded && (
             <View style={styles.orderDetails}>
-              <Text style={styles.detailLabel}>
-                Order ID: <Text style={styles.detailValue}>{item?.id}</Text>
-              </Text>
-              <Text style={styles.detailLabel}>
-                Tracking:{' '}
-                <Text style={styles.detailValue}>
-                  {item?.tracking_number || '—'}
-                </Text>
-              </Text>
-              <Text style={styles.detailLabel}>
-                Payment:{' '}
-                <Text style={styles.detailValue}>
-                  {item?.payment_status || '—'}
-                </Text>
-              </Text>
-              <Text style={styles.detailLabel}>
-                Total:{' '}
-                <Text style={styles.detailValue}>
-                  {item?.total_amount ? displayPrice(item.total_amount) : '—'}
-                </Text>
-              </Text>
+              <TransletText
+                text={`Order ID: ${item?.id}`}
+                style={styles.detailLabel}
+              />
+              <TransletText
+                text={`Tracking: ${item?.tracking_number || '—'}`}
+                style={styles.detailLabel}
+              />
+              <TransletText
+                text={`Payment: ${item?.payment_status || '—'}`}
+                style={styles.detailLabel}
+              />
+              <TransletText
+                text={`Total: ${item?.total_amount ? displayPrice(item.total_amount) : '—'
+                  }`}
+                style={styles.detailLabel}
+              />
 
-              <Text style={[styles.detailLabel, { marginTop: 8 }]}>Items:</Text>
+              <TransletText text="Items:" style={[styles.detailLabel, { marginTop: 8 }]} />
+
               {itemsList && itemsList.length > 0 ? (
                 itemsList.map((it: any, idx: number) => {
                   const p = it?.product || it;
                   const currentProductId = p?.id?.toString();
                   const currentProductName = p?.name || 'Item';
 
-                  // Calculate rating for this specific product
+                  // Calculate rating
                   let itemRating = null;
                   let userItemRating = null;
                   let itemReviewCount = 0;
@@ -641,13 +648,15 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                         }}
                       />
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: '600' }}>
-                          {currentProductName}
-                        </Text>
-                        <Text style={{ color: '#666', fontSize: 13 }}>
-                          Qty: {parseQuantity(it?.quantity)}{' '}
-                          {p?.price ? `• ${displayPrice(p.price)}` : ''}
-                        </Text>
+                        <TransletText
+                          text={currentProductName}
+                          style={{ fontWeight: '600' }}
+                        />
+                        <TransletText
+                          text={`Qty: ${parseQuantity(it?.quantity)} ${p?.price ? `• ${displayPrice(p.price)}` : ''
+                            }`}
+                          style={{ color: '#666', fontSize: 13 }}
+                        />
 
                         {displayItemRating !== null && (
                           <View
@@ -667,40 +676,31 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                                     height: 12,
                                     marginRight: 1,
                                     tintColor:
-                                      displayItemRating >= r
-                                        ? '#F0C419'
-                                        : '#ccc',
+                                      displayItemRating >= r ? '#F0C419' : '#ccc',
                                   }}
                                 />
                               ))}
                             </View>
-                            <Text
+                            <TransletText
+                              text={`(${displayItemRating.toFixed(1)}, ${itemReviewCount} review${itemReviewCount !== 1 ? 's' : ''
+                                }${userItemRating !== null ? ' • Your rating' : ''})`}
                               style={{
                                 fontSize: 11,
                                 color: '#666',
                                 marginLeft: 4,
                               }}
-                            >
-                              ({displayItemRating.toFixed(1)}, {itemReviewCount}{' '}
-                              review
-                              {itemReviewCount !== 1 ? 's' : ''})
-                              {userItemRating !== null && ' • Your rating'}
-                            </Text>
+                            />
                           </View>
                         )}
 
                         {currentProductId && (
                           <TouchableOpacity
                             onPress={() =>
-                              handleOpenReviewModal(
-                                currentProductId,
-                                currentProductName,
-                              )
+                              handleOpenReviewModal(currentProductId, currentProductName)
                             }
                             style={[
                               styles.reviewButton,
-                              userItemRating !== null &&
-                              styles.updateReviewButton,
+                              userItemRating !== null && styles.updateReviewButton,
                             ]}
                             hitSlop={{
                               top: 10,
@@ -709,11 +709,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                               right: 10,
                             }}
                           >
-                            <Text style={styles.reviewButtonText}>
-                              {userItemRating !== null
-                                ? 'Update Review'
-                                : 'Rate this item'}
-                            </Text>
+                            <TransletText
+                              text={userItemRating !== null ? 'Update Review' : 'Rate this item'}
+                              style={styles.reviewButtonText}
+                            />
                           </TouchableOpacity>
                         )}
                       </View>
@@ -721,10 +720,11 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                   );
                 })
               ) : (
-                <Text style={{ color: '#666' }}>No items available</Text>
+                <TransletText text="No items available" style={{ color: '#666' }} />
               )}
             </View>
           )}
+
         </TouchableOpacity>
       );
     },
@@ -778,11 +778,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
             >
               <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>
-                    {existingRating !== null
-                      ? 'Update Your Review'
-                      : 'Write a Review'}
-                  </Text>
+                  <TransletText
+                    text={existingRating !== null ? 'Update Your Review' : 'Write a Review'}
+                    style={styles.modalTitle}
+                  />
                   <TouchableOpacity
                     onPress={() => {
                       setWriteModalVisible(false);
@@ -797,7 +796,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                     style={styles.closeButton}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Text style={styles.closeButtonText}>×</Text>
+                    <TransletText text="×" style={styles.closeButtonText} />
                   </TouchableOpacity>
                 </View>
 
@@ -808,20 +807,23 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 >
                   {selectedProductName && (
                     <View>
-                      <Text style={styles.productNameLabel}>
-                        Product: {selectedProductName}
-                      </Text>
+                      <TransletText
+                        text={`Product: ${selectedProductName}`}
+                        style={styles.productNameLabel}
+                      />
                       {existingRating !== null && (
-                        <Text style={styles.existingReviewNote}>
-                          You've already reviewed this product
-                        </Text>
+                        <TransletText
+                          text="You've already reviewed this product"
+                          style={styles.existingReviewNote}
+                        />
                       )}
                     </View>
                   )}
 
-                  <Text style={styles.modalSubtitle}>
-                    How would you rate this product?
-                  </Text>
+                  <TransletText
+                    text="How would you rate this product?"
+                    style={styles.modalSubtitle}
+                  />
                   <View style={styles.ratingContainer}>
                     {[1, 2, 3, 4, 5].map(r => (
                       <TouchableOpacity
@@ -833,9 +835,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                         <Text
                           style={[
                             styles.star,
-                            newRating >= r
-                              ? styles.starActive
-                              : styles.starInactive,
+                            newRating >= r ? styles.starActive : styles.starInactive,
                           ]}
                         >
                           ★
@@ -843,24 +843,27 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <Text style={styles.ratingText}>
-                    {newRating === 5
-                      ? 'Excellent'
-                      : newRating === 4
-                        ? 'Good'
-                        : newRating === 3
-                          ? 'Average'
-                          : newRating === 2
-                            ? 'Poor'
-                            : newRating === 1
-                              ? 'Terrible'
-                              : 'Select a rating'}
-                  </Text>
+                  <TransletText
+                    text={
+                      newRating === 5
+                        ? 'Excellent'
+                        : newRating === 4
+                          ? 'Good'
+                          : newRating === 3
+                            ? 'Average'
+                            : newRating === 2
+                              ? 'Poor'
+                              : newRating === 1
+                                ? 'Terrible'
+                                : 'Select a rating'
+                    }
+                    style={styles.ratingText}
+                  />
 
-                  <Text style={styles.modalSubtitle}>
-                    Your Review{' '}
-                    {existingRating !== null ? '(Edit)' : '(Optional)'}
-                  </Text>
+                  <TransletText
+                    text={`Your Review ${existingRating !== null ? '(Edit)' : '(Optional)'}`}
+                    style={styles.modalSubtitle}
+                  />
                   <TextInput
                     value={newComment}
                     onChangeText={setNewComment}
@@ -893,28 +896,25 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                     style={styles.cancelButton}
                     hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                   >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                    <TransletText text="Cancel" style={styles.cancelButtonText} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={PostReview}
-                    style={[
-                      styles.submitButton,
-                      !newRating && styles.submitButtonDisabled,
-                    ]}
+                    style={[styles.submitButton, !newRating && styles.submitButtonDisabled]}
                     disabled={!newRating}
                     hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
                   >
-                    <Text style={styles.submitButtonText}>
-                      {existingRating !== null
-                        ? 'Update Review'
-                        : 'Submit Review'}
-                    </Text>
+                    <TransletText
+                      text={existingRating !== null ? 'Update Review' : 'Submit Review'}
+                      style={styles.submitButtonText}
+                    />
                   </TouchableOpacity>
                 </View>
               </View>
             </KeyboardAvoidingView>
           </View>
         </TouchableWithoutFeedback>
+
       </Modal>
     ),
     [
@@ -1006,7 +1006,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                       ]}
                       text={tab.label}
                     />
-                     
+
                   </TouchableOpacity>
                 );
               })}
@@ -1022,7 +1022,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 }}
               >
                 <TransletText style={{ color: '#888', fontSize: 16 }} text="Loading orders..." />
-               
+
               </View>
             ) : (
               <FlatList
