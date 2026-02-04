@@ -1,4 +1,14 @@
 PODS:
+  - AppAuth (2.0.0):
+    - AppAuth/Core (= 2.0.0)
+    - AppAuth/ExternalUserAgent (= 2.0.0)
+  - AppAuth/Core (2.0.0)
+  - AppAuth/ExternalUserAgent (2.0.0):
+    - AppAuth/Core
+  - AppCheckCore (11.2.0):
+    - GoogleUtilities/Environment (~> 8.0)
+    - GoogleUtilities/UserDefaults (~> 8.0)
+    - PromisesObjC (~> 2.4)
   - boost (1.84.0)
   - BVLinearGradient (2.8.3):
     - React-Core
@@ -37,6 +47,11 @@ PODS:
   - GoogleDataTransport (10.1.0):
     - nanopb (~> 3.30910.0)
     - PromisesObjC (~> 2.4)
+  - GoogleSignIn (9.1.0):
+    - AppAuth (~> 2.0)
+    - AppCheckCore (~> 11.0)
+    - GTMAppAuth (~> 5.0)
+    - GTMSessionFetcher/Core (~> 3.3)
   - GoogleUtilities/AppDelegateSwizzler (8.1.0):
     - GoogleUtilities/Environment
     - GoogleUtilities/Logger
@@ -61,6 +76,10 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.0):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
+  - GTMAppAuth (5.0.0):
+    - AppAuth/Core (~> 2.0)
+    - GTMSessionFetcher/Core (< 4.0, >= 3.3)
+  - GTMSessionFetcher/Core (3.5.0)
   - hermes-engine (0.14.0):
     - hermes-engine/Pre-built (= 0.14.0)
   - hermes-engine/Pre-built (0.14.0)
@@ -2054,7 +2073,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - react-native-netinfo (11.5.1):
+  - react-native-netinfo (11.5.2):
     - boost
     - DoubleConversion
     - fast_float
@@ -2878,7 +2897,7 @@ PODS:
     - React-Core
     - SDWebImage (~> 5.11.1)
     - SDWebImageWebPCoder (~> 0.8.4)
-  - RNFBApp (23.8.5):
+  - RNFBApp (23.8.6):
     - boost
     - DoubleConversion
     - fast_float
@@ -2907,7 +2926,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - RNFBMessaging (23.8.5):
+  - RNFBMessaging (23.8.6):
     - boost
     - DoubleConversion
     - fast_float
@@ -2953,6 +2972,35 @@ PODS:
     - React-debug
     - React-Fabric
     - React-FabricComponents
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
+  - RNGoogleSignin (16.1.1):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - GoogleSignIn (~> 9.0)
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
     - React-featureflags
     - React-graphics
     - React-ImageManager
@@ -3122,7 +3170,7 @@ PODS:
     - RNWorklets
     - SocketRocket
     - Yoga
-  - RNScreens (4.21.0):
+  - RNScreens (4.22.0):
     - boost
     - DoubleConversion
     - fast_float
@@ -3149,10 +3197,10 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNScreens/common (= 4.21.0)
+    - RNScreens/common (= 4.22.0)
     - SocketRocket
     - Yoga
-  - RNScreens/common (4.21.0):
+  - RNScreens/common (4.22.0):
     - boost
     - DoubleConversion
     - fast_float
@@ -3374,6 +3422,7 @@ DEPENDENCIES:
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - "RNGoogleSignin (from `../node_modules/@react-native-google-signin/google-signin`)"
   - RNInAppBrowser (from `../node_modules/react-native-inappbrowser-reborn`)
   - RNLocalize (from `../node_modules/react-native-localize`)
   - "RNNotifee (from `../node_modules/@notifee/react-native`)"
@@ -3386,6 +3435,8 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - AppAuth
+    - AppCheckCore
     - Firebase
     - FirebaseCore
     - FirebaseCoreExtension
@@ -3393,7 +3444,10 @@ SPEC REPOS:
     - FirebaseInstallations
     - FirebaseMessaging
     - GoogleDataTransport
+    - GoogleSignIn
     - GoogleUtilities
+    - GTMAppAuth
+    - GTMSessionFetcher
     - libwebp
     - lottie-ios
     - nanopb
@@ -3590,6 +3644,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-firebase/messaging"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNGoogleSignin:
+    :path: "../node_modules/@react-native-google-signin/google-signin"
   RNInAppBrowser:
     :path: "../node_modules/react-native-inappbrowser-reborn"
   RNLocalize:
@@ -3608,6 +3664,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
+  AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
@@ -3622,7 +3680,10 @@ SPEC CHECKSUMS:
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
+  GoogleSignIn: fcee2257188d5eda57a5e2b6a715550ffff9206d
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
+  GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
+  GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
   hermes-engine: 410563446858d754c0a554a9d6cf8b5fb1196f75
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   lottie-ios: a881093fab623c467d3bce374367755c272bdd59
@@ -3668,7 +3729,7 @@ SPEC CHECKSUMS:
   react-native-document-picker: a0f219f1de355c2da4e4a7ce9de5f91e2d9df5a9
   react-native-geolocation-service: 32b2c2a3b91e70ce2a8d0c684801aaeb0a07e0ec
   react-native-image-picker: 6051cfd030121b880a58f1cc0e5e33e9887804e4
-  react-native-netinfo: 9f8e8c8591625fc7dc335e10e9b8cc1b0c1c482b
+  react-native-netinfo: 64f05e94821ee3f3adcd9b67b35c1480e5564915
   react-native-render-html: 5afc4751f1a98621b3009432ef84c47019dcb2bd
   react-native-safe-area-context: 0a3b034bb63a5b684dd2f5fffd3c90ef6ed41ee8
   react-native-video: 15a8286469ec8098852debb32ce6a32906695e1d
@@ -3710,15 +3771,16 @@ SPEC CHECKSUMS:
   RNCAsyncStorage: fd44f4b03e007e642e98df6726737bc66e9ba609
   RNCMaskedView: 4c5ee1c8667d56077246cc6d1977f77393923560
   RNFastImage: 462a183c4b0b6b26fdfd639e1ed6ba37536c3b87
-  RNFBApp: c9762a64109424ae325087a8978543daef4bab22
-  RNFBMessaging: 774c04a376bcd93f2c6d20918d14a245d7caf10e
+  RNFBApp: fd5c272db9c44968e30942a3c8f6c9c7398c7d42
+  RNFBMessaging: 762a5595c6b11bb595a08efd66ec5684afc6033f
   RNGestureHandler: c6327cf6e2bd384dc90351ccfff0da8142d62f54
+  RNGoogleSignin: c1de96d92d6dd4335fa8e0f0ed4312a9d34e4ecb
   RNInAppBrowser: 6d3eb68d471b9834335c664704719b8be1bfdb20
   RNLocalize: 9988fa71fb84c415902898b35cc6aa5af052731e
   RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNPermissions: c28bce4dc987ffce444ac818451f5fbbd05c96fc
   RNReanimated: fbcb7fd8da5b0b088401542c58fb5d266388f1cf
-  RNScreens: ed8557455a1c9de16749334ed6ddfd523081ade5
+  RNScreens: 2003f2c2280b7eb63b3f42087b85344cc09385a4
   RNWorklets: 01efdd402d236a13651ea5ea5437ca85a44e7afa
   SDWebImage: a7f831e1a65eb5e285e3fb046a23fcfbf08e696d
   SDWebImageWebPCoder: 908b83b6adda48effe7667cd2b7f78c897e5111d

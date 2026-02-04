@@ -31,7 +31,7 @@ import { heightPercentageToDP } from '../constant/dimentions';
 import { LocalStorage } from '../helpers/localstorage';
 import TransletText from '../components/TransletText';
 import { useAutoTranslate } from '../hooks/useAutoTranslate';
-
+import FCMService from '../service/FCMService';
 interface AuthModalProps {
   visible: boolean;
   onClose: () => void;
@@ -177,27 +177,43 @@ const LoginModal: React.FC<AuthModalProps> = ({
     try {
       setLoading(true);
       showLoader();
+
+      // 🔥 Get FCM token dynamically
+      let fcmToken = FCMService.getFCMToken();
+
+      // If token is not available, try to initialize FCM
+      if (!fcmToken) {
+        try {
+          await FCMService.init();
+          fcmToken = FCMService.getFCMToken();
+        } catch (fcmError) {
+          console.log('⚠️ Could not get FCM token:', fcmError);
+          // Continue without token - don't block login
+        }
+      }
+
       const res = await UserService.verifyOtp({
         email_or_phone: emailOrPhone.trim(),
         otp: enteredOtp,
+        fcm_token: fcmToken || '', // Pass token dynamically
       });
       hideLoader();
 
       if (res?.data?.success && res?.data?.user) {
         const user = res.data.user;
         const token = res.data.access_token;
-        const userType = user?.type; // Get user type from response
+        const userType = user?.type;
 
         // Store all user data
         await LocalStorage.save('@login', 'true');
         await LocalStorage.save('@user', user);
         await LocalStorage.save('@token', token);
-        await LocalStorage.save('@userType', userType); // Store user type
+        await LocalStorage.save('@userType', userType);
 
         // Update context
         setUserData(user);
         setIsLoggedIn('true');
-        setUserType(userType); // Set user type in context
+        setUserType(userType);
 
         syncCartAfterLogin?.();
 
@@ -224,7 +240,6 @@ const LoginModal: React.FC<AuthModalProps> = ({
       setLoading(false);
     }
   };
-
   /* ================= UI ================= */
   return (
     <Modal style={{}} visible={visible} transparent animationType="slide">

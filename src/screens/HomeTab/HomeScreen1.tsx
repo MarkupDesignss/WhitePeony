@@ -2030,7 +2030,12 @@ const HomeScreen1 = ({ navigation }: any) => {
                 />
 
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('CategoryScreen')}
+                  onPress={() =>
+                    navigation.navigate('BottomTabScreen', {
+                      screen: 'Category',
+                    })
+
+                  }
                   style={{
                     backgroundColor: '#2E2E2E',
                     paddingHorizontal: 16,

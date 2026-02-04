@@ -65,7 +65,7 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
   const { translatedText: failedWishlistText } =
     useAutoTranslate('Failed to add item to wishlist');
 
-    const { translatedText: removedText } = useAutoTranslate('Removed from wishlist');
+  const { translatedText: removedText } = useAutoTranslate('Removed from wishlist');
   // Debug logging
   useEffect(() => {
     console.log('=== WISHLIST SCREEN DEBUG ===');
@@ -461,11 +461,18 @@ const WishlistScreen = ({ navigation }: { navigation: any }) => {
       <TransletText text="Save your favorite items here to keep track of them" style={styles.emptySubtitle} />
       <TouchableOpacity
         style={styles.browseButton}
-        onPress={() => navigation.navigate('CategoryScreen')}
+        onPress={() =>
+          navigation.navigate('BottomTabScreen', {
+            screen: 'Category',
+          })
+
+        }
+
+
       >
         <TransletText text="Browse Products" style={styles.browseButtonText} />
       </TouchableOpacity>
-    </View>
+    </View >
   );
 
   const renderItem = ({ item }: { item: DisplayWishlistItem }) => (

@@ -32,7 +32,8 @@ import { UserDataContext } from '../../context';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import { convertAndFormatPrice } from '../../utils/currencyUtils';
-
+import TransletText from '../../components/TransletText';
+import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 const TABS = [
   { key: 'placed', label: 'Completed' },
   { key: 'pending', label: 'Pending' },
@@ -51,6 +52,8 @@ type UiOrder = {
 };
 
 const OrdersScreen = ({ navigation }: { navigation: any }) => {
+  const { translatedText:searchplaceholder } = useAutoTranslate('Search orders...');
+  
   const selectedCurrency = useAppSelector(
     state => state.currency.selectedCurrency,
   );
@@ -486,9 +489,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
             )}
             <View style={styles.productDetails}>
               {/* Primary product */}
-              <Text style={styles.productName} numberOfLines={1}>
-                {productName || 'Item'}
-              </Text>
+              <TransletText style={styles.productName} text={productName || 'Item'} />
 
               {/* Secondary summary */}
               {itemsList.length > 1 && (
@@ -497,9 +498,9 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 </Text>
               )}
 
-              <Text style={styles.productPrice}>
-                {item?.total_amount ? displayPrice(item.total_amount) : ''}
-              </Text>
+              <TransletText style={styles.productPrice}
+              text=  {item?.total_amount ? displayPrice(item.total_amount) : ''}
+          />
             </View>
 
           </View>
@@ -519,9 +520,10 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 !productId && styles.disabledRateReview,
               ]}
             >
-              <Text style={styles.rateReviewLabel}>
-                {userRating !== null ? 'Update Review' : 'Rate & Review'}
-              </Text>
+           
+              <TransletText style={styles.rateReviewLabel}
+               text= {userRating !== null ? 'Update Review' : 'Rate & Review'}
+              />
               <View style={{ flexDirection: 'row', marginTop: -10 }}>
                 {[1, 2, 3, 4, 5].map(r => {
                   const numericRating = Number(displayRating) || 0;
@@ -960,7 +962,8 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                 style={{ width: 20, height: 20 }}
               />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Orders</Text>
+            <TransletText style={styles.headerTitle} text="Orders" />
+
             <View style={{ width: 24 }} />
           </View>
 
@@ -968,7 +971,7 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
             <View style={styles.searchContainer}>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search Products..."
+                placeholder={searchplaceholder}
                 placeholderTextColor={Colors.text[200]}
                 value={searchText}
                 onChangeText={setSearchText}
@@ -996,14 +999,14 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                     ]}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Text
+                    <TransletText
                       style={[
                         styles.tabText,
                         isActive ? styles.tabTextActive : null,
                       ]}
-                    >
-                      {tab.label}
-                    </Text>
+                      text={tab.label}
+                    />
+                     
                   </TouchableOpacity>
                 );
               })}
@@ -1018,9 +1021,8 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
                   marginTop: 100,
                 }}
               >
-                <Text style={{ color: '#888', fontSize: 16 }}>
-                  Loading orders...
-                </Text>
+                <TransletText style={{ color: '#888', fontSize: 16 }} text="Loading orders..." />
+               
               </View>
             ) : (
               <FlatList

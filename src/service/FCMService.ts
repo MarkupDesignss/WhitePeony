@@ -9,6 +9,26 @@ import {
 import PushNotificationService from './PushNotificationService';
 
 class FCMService {
+  private static fcmToken: string | null = null;
+
+  // ✅ Make this method public/static so it can be accessed
+  static getFCMToken(): string | null {
+    return this.fcmToken;
+  }
+
+  // ✅ Optional: Add a method to check and refresh token
+  static async getFreshToken(): Promise<string | null> {
+    try {
+      const messagingInstance = getMessaging();
+      const token = await getToken(messagingInstance);
+      this.fcmToken = token;
+      return token;
+    } catch (error) {
+      console.log('❌ Error getting fresh FCM token:', error);
+      return this.fcmToken;
+    }
+  }
+
   static async init() {
     try {
       console.log('🚀 FCM init called');
@@ -20,6 +40,7 @@ class FCMService {
       // 🔹 Now it's safe to get token
       const token = await getToken(messagingInstance);
       console.log('🔥🔥🔥 FCM TOKEN:', token);
+      this.fcmToken = token; // Store the token
 
       // 🔹 Foreground messages
       onMessage(messagingInstance, async remoteMessage => {

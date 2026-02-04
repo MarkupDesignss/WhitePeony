@@ -24,12 +24,24 @@ import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TransletText from '../../components/TransletText';
-
+import { convertAndFormatPrice } from '../../utils/currencyUtils';
+import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import { useAppSelector } from '../../hooks/useAppSelector';
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 48) / 2;
 const LOADER_TIMEOUT = 10000;
 
 const CategoryDetailsList = ({ navigation, route }: any) => {
+  const { data: rates } = useGetRatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnReconnect: true,
+  });
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency,
+  );
+  const displayPrice = (priceEUR: any): string => {
+    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+  };
   const { addToCart, cart } = useCart();
   const [apiProducts, setApiProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -145,7 +157,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       }
 
       const cartIds = new Set(
-        cart.map((c: any) => String(c.id || c.product_id || ''))
+        cart.map((c: any) => String(c.id || c.product_id || '')),
       );
 
       const normalized = products
@@ -156,21 +168,27 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             return {
               ...product,
               id: productId,
-              name: String(product?.name || product?.product_name || 'Unnamed Product'),
+              name: String(
+                product?.name || product?.product_name || 'Unnamed Product',
+              ),
               front_image: product?.front_image || product?.image || '',
-              average_rating: Number(product?.average_rating || product?.rating || 0),
+              average_rating: Number(
+                product?.average_rating || product?.rating || 0,
+              ),
               variants:
                 Array.isArray(product?.variants) && product.variants.length > 0
                   ? product.variants
                   : [
-                    {
-                      price: Number(product?.price || 0),
-                      weight: String(product?.weight || ''),
-                      unit: String(product?.unit || ''),
-                      id: product?.variant_id || null,
-                    },
-                  ],
-              stock_quantity: Number(product?.stock_quantity || product?.quantity || 0),
+                      {
+                        price: Number(product?.price || 0),
+                        weight: String(product?.weight || ''),
+                        unit: String(product?.unit || ''),
+                        id: product?.variant_id || null,
+                      },
+                    ],
+              stock_quantity: Number(
+                product?.stock_quantity || product?.quantity || 0,
+              ),
               is_cart: cartIds.has(productId) ? 'true' : 'false',
             };
           } catch (err) {
@@ -227,8 +245,17 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         productsArray = response;
       }
 
-      // Normalize and set products
-      const normalizedProducts = normalizeProducts(productsArray);
+      // Filter out out-of-stock items BEFORE normalization
+      const inStockProducts = productsArray.filter(product => {
+        // Check stock quantity
+        const stockQty = Number(
+          product?.stock_quantity || product?.quantity || 0,
+        );
+        return stockQty > 0; // Only include items with stock > 0
+      });
+
+      // Normalize and set products (only in-stock items)
+      const normalizedProducts = normalizeProducts(inStockProducts);
       setApiProducts(normalizedProducts);
     } catch (error: any) {
       console.log('❌ fetchProducts error:', error);
@@ -292,7 +319,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
 
       // Filter out any null or undefined products
       const validProducts = productsToSort.filter(
-        product => product && typeof product === 'object'
+        product => product && typeof product === 'object',
       );
 
       const sortedProducts = validProducts.sort((a, b) => {
@@ -389,7 +416,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
               (product: any) =>
                 product &&
                 product.category_id &&
-                String(product.category_id) === String(categoryId)
+                String(product.category_id) === String(categoryId),
             );
           }
 
@@ -471,12 +498,12 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       <TouchableOpacity
         style={styles.card}
         onPress={() => {
-          if (productId) {
+          if (productId && !isOutOfStock) {
             navigation.navigate('ProductDetails', { productId });
           }
         }}
         activeOpacity={0.8}
-        disabled={!productId}
+        disabled={!productId || isOutOfStock}
       >
         <ProductImageCarousel
           images={imageUrl ? [{ uri: imageUrl }] : []}
@@ -512,7 +539,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           </View>
 
           <Text style={styles.cardPrice}>
-            {Math.round(price)} €{(weight || unit) && ` - ${weight || unit}`}
+            {displayPrice(price)} {(weight || unit) && ` - ${weight || unit}`}
           </Text>
 
           {isOutOfStock ? (
@@ -532,7 +559,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                 text={isInCart ? 'Go to Cart' : 'Add to Bag'}
                 style={styles.addButtonText}
               />
-
             </TouchableOpacity>
           )}
         </View>
@@ -582,7 +608,11 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             />
           </TouchableOpacity>
 
-          <TransletText text={categoryTitle || 'Products'} style={styles.headerTitle} numberOfLines={1} />
+          <TransletText
+            text={categoryTitle || 'Products'}
+            style={styles.headerTitle}
+            numberOfLines={1}
+          />
 
           <TouchableOpacity
             onPress={() => navigation.navigate('CheckoutScreen')}
@@ -610,8 +640,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           >
             <TransletText text="Filters ▾" style={styles.filterButtonText} />
           </TouchableOpacity>
-
-
         </View>
 
         {/* Products List */}
@@ -633,7 +661,10 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         {isLoading && (
           <View style={styles.fullScreenLoader}>
             <ActivityIndicator size="large" color="#AEB254" />
-            <TransletText text="Loading..." style={styles.fullScreenLoaderText} />
+            <TransletText
+              text="Loading..."
+              style={styles.fullScreenLoaderText}
+            />
           </View>
         )}
 
@@ -678,7 +709,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                           style={[
                             styles.ratingOption,
                             filterRating === String(r) &&
-                            styles.ratingOptionSelected,
+                              styles.ratingOptionSelected,
                           ]}
                           onPress={() => setFilterRating(String(r))}
                         >
@@ -686,7 +717,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                             style={[
                               styles.ratingOptionText,
                               filterRating === String(r) &&
-                              styles.ratingOptionTextSelected,
+                                styles.ratingOptionTextSelected,
                             ]}
                           >
                             {r}★
@@ -759,9 +790,9 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                         styles.modalButton,
                         styles.applyButton,
                         filterMinPrice &&
-                        filterMaxPrice &&
-                        Number(filterMinPrice) > Number(filterMaxPrice) &&
-                        styles.applyButtonDisabled,
+                          filterMaxPrice &&
+                          Number(filterMinPrice) > Number(filterMaxPrice) &&
+                          styles.applyButtonDisabled,
                       ]}
                       onPress={async () => {
                         if (
@@ -840,7 +871,9 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.sortOptionText, styles.resetSortOptionText]}>
+                <Text
+                  style={[styles.sortOptionText, styles.resetSortOptionText]}
+                >
                   Reset to Default
                 </Text>
               </TouchableOpacity>

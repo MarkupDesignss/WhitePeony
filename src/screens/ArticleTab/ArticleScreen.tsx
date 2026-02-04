@@ -270,7 +270,7 @@ const ArticleScreen = ({ navigation }: any) => {
             <TouchableOpacity style={styles.microphone}>
               <Image
                 source={require('../../assets/Png/search.png')}
-                style={[styles.iconSmall, { tintColor: '#fff' }]}
+                style={[styles.iconSmall, { tintColor: '#000' }]}
               />
             </TouchableOpacity>
           )}
