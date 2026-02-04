@@ -176,6 +176,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
   };
 
   /* ================= VERIFY OTP - UPDATED ================= */
+  /* ================= VERIFY OTP - DEBUGGED VERSION ================= */
   const verifyOtp = async () => {
     const enteredOtp = otp.join('');
     if (enteredOtp.length !== 6) {
@@ -187,37 +188,79 @@ const LoginModal: React.FC<AuthModalProps> = ({
       setLoading(true);
       showLoader();
 
-      // 🔥 Get FCM token dynamically
+      // Get FCM token
       let fcmToken = FCMService.getFCMToken();
-
-      // If token is not available, try to initialize FCM
       if (!fcmToken) {
         try {
           await FCMService.init();
           fcmToken = FCMService.getFCMToken();
         } catch (fcmError) {
           console.log('⚠️ Could not get FCM token:', fcmError);
-          // Continue without token - don't block login
         }
       }
 
       const res = await UserService.verifyOtp({
         email_or_phone: emailOrPhone.trim(),
         otp: enteredOtp,
-        fcm_token: fcmToken || '', // Pass token dynamically
+        fcm_token: fcmToken || '',
       });
+
+      // Debug: Log the response structure
+      console.log('Full API Response:', res);
+      console.log('Response data:', res?.data);
+
       hideLoader();
 
-      if (res?.data?.success && res?.data?.user) {
-        const user = res.data.user;
-        const token = res.data.access_token;
+      // Check response structure
+      if (!res) {
+        setError('No response from server');
+        return;
+      }
+
+      // Handle different response structures
+      let success = false;
+      let message = '';
+      let access_token = '';
+      let user = null;
+      let tiertype = '';
+
+      // Check if response has data property (axios wrapper)
+      if (res.data) {
+        // If it's the structure from your example
+        if (res.data.success !== undefined) {
+          success = res.data.success;
+          message = res.data.message || '';
+          access_token = res.data.access_token || '';
+          user = res.data.user || null;
+          tiertype = res.data.tiertype || '';
+        }
+        // If success is directly on res.data (alternative structure)
+        else if (res.success !== undefined) {
+          success = res.success;
+          message = res.message || '';
+          access_token = res.access_token || '';
+          user = res.user || null;
+          tiertype = res.tiertype || '';
+        }
+      }
+      // If response is directly the data
+      else if (res.success !== undefined) {
+        success = res.success;
+        message = res.message || '';
+        access_token = res.access_token || '';
+        user = res.user || null;
+        tiertype = res.tiertype || '';
+      }
+
+      if (success && user) {
         const userType = user?.type;
 
         // Store all user data
         await LocalStorage.save('@login', 'true');
         await LocalStorage.save('@user', user);
-        await LocalStorage.save('@token', token);
+        await LocalStorage.save('@token', access_token);
         await LocalStorage.save('@userType', userType);
+        await LocalStorage.save('@tierType', tiertype);
 
         // Update context
         setUserData(user);
@@ -226,20 +269,33 @@ const LoginModal: React.FC<AuthModalProps> = ({
 
         syncCartAfterLogin?.();
 
-        Toast.show({ type: 'success', text1: res.data.message });
+        Toast.show({ type: 'success', text1: message });
 
-        // Call onSuccess callback if provided
         if (onSuccess) {
           onSuccess(user);
         }
 
         onClose();
       } else {
-        setError(otpErrorText || 'Invalid or expired OTP. Please try again.');
+        setError(message || otpErrorText || 'Invalid or expired OTP. Please try again.');
       }
     } catch (err: any) {
       hideLoader();
-      setError(otpErrorText || 'Invalid or expired OTP. Please try again.');
+      console.log('Verify OTP Error:', err);
+      console.log('Error Response:', err?.response);
+
+      // Better error handling
+      if (err.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        setError(err.response.data?.message || 'Server error occurred');
+      } else if (err.request) {
+        // The request was made but no response was received
+        setError('No response from server. Please check your connection.');
+      } else {
+        // Something happened in setting up the request
+        setError('Request failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

@@ -592,6 +592,11 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       </View>
     );
   };
+  const isApplyDisabled =
+    (!filterRating && !filterMinPrice && !filterMaxPrice) ||
+    (filterMinPrice &&
+      filterMaxPrice &&
+      Number(filterMinPrice) > Number(filterMaxPrice));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -633,14 +638,14 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         </View>
 
         {/* Filter and Sort Buttons */}
-        <View style={styles.filterSortContainer}>
+        {/* <View style={styles.filterSortContainer}>
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setFilterVisible(true)}
           >
             <TransletText text="Filters ▾" style={styles.filterButtonText} />
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* Products List */}
         <FlatList
@@ -789,42 +794,24 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                       style={[
                         styles.modalButton,
                         styles.applyButton,
-                        filterMinPrice &&
-                          filterMaxPrice &&
-                          Number(filterMinPrice) > Number(filterMaxPrice) &&
-                          styles.applyButtonDisabled,
+                        isApplyDisabled && styles.applyButtonDisabled,
                       ]}
                       onPress={async () => {
-                        if (
-                          filterMinPrice &&
-                          filterMaxPrice &&
-                          Number(filterMinPrice) > Number(filterMaxPrice)
-                        ) {
-                          Toast.show({
-                            type: 'error',
-                            text1: 'Invalid price range',
-                          });
-                          return;
-                        }
+                        const params: any = {};
+
+                        if (filterRating) params.rating = filterRating;
+                        if (filterMinPrice) params.min_price = filterMinPrice;
+                        if (filterMaxPrice) params.max_price = filterMaxPrice;
 
                         setFilterVisible(false);
-                        await fetchProducts({
-                          rating: filterRating,
-                          min_price: filterMinPrice,
-                          max_price: filterMaxPrice,
-                        });
+                        await fetchProducts(params);
                       }}
-                      disabled={
-                        filterMinPrice &&
-                        filterMaxPrice &&
-                        Number(filterMinPrice) > Number(filterMaxPrice)
-                      }
+                      disabled={isApplyDisabled}
                     >
-                      <Text
+                      <TransletText
                         style={[styles.modalButtonText, styles.applyButtonText]}
-                      >
-                        Apply
-                      </Text>
+                        text="Apply"
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -871,11 +858,10 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                 }}
                 activeOpacity={0.7}
               >
-                <Text
+                <TransletText
                   style={[styles.sortOptionText, styles.resetSortOptionText]}
-                >
-                  Reset to Default
-                </Text>
+                  text="Reset to Default"
+                />
               </TouchableOpacity>
 
               {/* Sorting Options */}
