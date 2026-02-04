@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import { useAppDispatch, useAppSelector } from '../../hooks/useAppSelector';
 import { setCurrency, SupportedCurrency } from '../../redux/slices/currencySlice';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import TransletText from '../../components/TransletText';
 
 const currencies: { code: SupportedCurrency; label: string; symbol: string }[] = [
     { code: 'USD', label: 'US Dollar', symbol: '$' },
@@ -39,8 +40,8 @@ const CurrencyScreen = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <Text style={styles.title}>Select Your Currency</Text>
-            <Text style={styles.subtitle}>Prices in the app will be displayed in your selected currency</Text>
+            <TransletText text="Select Your Currency" style={styles.title} />
+            <TransletText text="Prices in the app will be displayed in your selected currency" style={styles.subtitle} />
             <FlatList
                 data={currencies}
                 keyExtractor={(item) => item.code}

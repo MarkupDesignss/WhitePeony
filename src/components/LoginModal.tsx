@@ -29,6 +29,8 @@ import { useCart } from '../context/CartContext';
 import { Colors } from '../constant';
 import { heightPercentageToDP } from '../constant/dimentions';
 import { LocalStorage } from '../helpers/localstorage';
+import TransletText from '../components/TransletText';
+import { useAutoTranslate } from '../hooks/useAutoTranslate';
 
 interface AuthModalProps {
   visible: boolean;
@@ -216,7 +218,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
       hideLoader();
       setError(
         err?.response?.data?.message ||
-          'Invalid or expired OTP. Please try again.',
+        'Invalid or expired OTP. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -234,12 +236,18 @@ const LoginModal: React.FC<AuthModalProps> = ({
         >
           <ScrollView keyboardShouldPersistTaps="handled">
             <View style={styles.modalContainer}>
-              <Text style={styles.title}>Log in to White Peony! 👋</Text>
+              <TransletText
+                text="Log in to White Peony!"
+                style={styles.title}
+              />
+
 
               {step === 'login' ? (
-                <Text style={styles.subtitle}>
-                  Hello again, you’ve been missed!
-                </Text>
+                <TransletText
+                  text="Hello again, you’ve been missed!"
+                  style={styles.subtitle}
+                />
+
               ) : (
                 <Text style={styles.subtitle}>
                   Enter the OTP sent to{' '}

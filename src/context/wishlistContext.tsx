@@ -10,6 +10,8 @@ import { LocalStorage } from '../helpers/localstorage';
 import { UserService } from '../service/ApiService';
 import Toast from 'react-native-toast-message';
 import { UserDataContext } from './userDataContext';
+import TransletText from '../components/TransletText';
+import { useAutoTranslate } from '../hooks/useAutoTranslate';
 
 export type WishlistItemId = string | number;
 
@@ -67,6 +69,28 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isLoggedIn, userType } = useContext(UserDataContext);
+
+  const { translatedText: addedWishlistText } =
+  useAutoTranslate('Added to wishlist');
+const { translatedText: savedAccountText } =
+  useAutoTranslate('Saved to your account');
+const { translatedText: savedLocalText } =
+  useAutoTranslate('Saved locally');
+
+const { translatedText: errorText } =
+  useAutoTranslate('Error');
+const { translatedText: failedWishlistText } =
+  useAutoTranslate('Failed to add item to wishlist');
+
+  const { translatedText: removedText } =
+  useAutoTranslate('Removed from wishlist');
+
+const { translatedText: removedAccountText } =
+  useAutoTranslate('Removed from your account');
+
+const { translatedText: removedLocalText } =
+  useAutoTranslate('Removed locally');
+
 
   // Extract IDs from wishlist items
   const wishlistIds = useMemo(
@@ -400,16 +424,18 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
 
       Toast.show({
         type: 'success',
-        text1: 'Added to wishlist',
-        text2: isLoggedIn ? 'Saved to your account' : 'Saved locally',
-      });
+        text1: addedWishlistText || 'Added to wishlist',
+        text2: isLoggedIn
+          ? savedAccountText || 'Saved to your account'
+          : savedLocalText || 'Saved locally',
+      });      
     } catch (error) {
       console.log('Error adding to wishlist:', error);
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: 'Failed to add item to wishlist',
-      });
+        text1: errorText || 'Error',
+        text2: failedWishlistText || 'Failed to add item to wishlist',
+      });      
     } finally {
       setIsLoading(false);
     }
@@ -439,8 +465,10 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
 
       Toast.show({
         type: 'success',
-        text1: 'Removed from wishlist',
-        text2: isLoggedIn ? 'Removed from your account' : 'Removed locally',
+        text1: removedText || 'Removed from wishlist',
+        text2: isLoggedIn
+          ? removedAccountText || 'Removed from your account'
+          : removedLocalText || 'Removed locally',
       });
     } catch (error) {
       console.log('Error removing from wishlist:', error);
