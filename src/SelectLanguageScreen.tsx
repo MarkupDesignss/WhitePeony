@@ -9,7 +9,7 @@ const languages: { code: LanguageCode; label: string; flag: string }[] = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'de', label: 'German', flag: '🇩🇪' },
   { code: 'cs', label: 'Czech', flag: '🇨🇿' },
-  { code: 'hi', label: 'हिंदी', flag: '🇮🇳' }, // Added Hindi
+  // { code: 'hi', label: 'हिंदी', flag: '🇮🇳' }, // Added Hindi
 ];
 
 export default function SelectLanguageScreen() {

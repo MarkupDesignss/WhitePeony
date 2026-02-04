@@ -20,7 +20,7 @@ const LANGUAGES: { code: LanguageCode; label: string }[] = [
   { code: 'en', label: 'English' },
   { code: 'de', label: 'German' },
   { code: 'cs', label: 'Czech' },
-  { code: 'hi', label: 'हिंदी' },
+  // { code: 'hi', label: 'हिंदी' },
 ];
 
 const OnBoardingScreen = ({ navigation }: { navigation: any }) => {
