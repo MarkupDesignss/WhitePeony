@@ -39,12 +39,12 @@ type AccountScreenProps = {
 const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { showLoader, hideLoader } = CommonLoader();
 
-  const { userData, setIsLoggedIn, isLoggedIn } =
+  const { userData, setIsLoggedIn, isLoggedIn, tierType } =
     useContext<UserData>(UserDataContext);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [modalAddress, setModalAddress] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-
+  // alert(tierType)
   // Use the useAutoTranslate hook for each text
   const { translatedText: accountTitle } = useAutoTranslate('Account');
   const { translatedText: loginText } = useAutoTranslate('Login');
@@ -68,7 +68,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { translatedText: deleteAccountText } =
     useAutoTranslate('Delete Account');
   const { translatedText: memberSinceText } = useAutoTranslate('Member since');
-  const { translatedText: superShinyText } = useAutoTranslate('Super Shiny');
+  const { translatedText: superShinyText } = useAutoTranslate(
+    JSON.stringify(tierType),
+  );
   const { translatedText: growthValueText } = useAutoTranslate('Growth Value');
   const { translatedText: privilegesText } = useAutoTranslate(
     'Privileges In Total',
@@ -77,9 +79,9 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { translatedText: notificationText } = useAutoTranslate('Notification');
   const { translatedText: myFavoritiesText } =
     useAutoTranslate('My Favorities');
-    const { translatedText: logoutSuccessText } =
-  useAutoTranslate('Log Out Successfully!');
-
+  const { translatedText: logoutSuccessText } = useAutoTranslate(
+    'Log Out Successfully!',
+  );
 
   // Function to open external URLs with InAppBrowser
   const openInAppBrowser = async (url: string, title?: string) => {
@@ -301,14 +303,8 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
 
                 <View style={styles.superShinyContent}>
                   <Text style={styles.superShinyTitle}>
-                    {superShinyText || 'Super Shiny'}
+                    {superShinyText ?? ''}
                   </Text>
-                  <Text style={styles.growthValue}>
-                    {growthValueText || 'Growth Value'} 10000€ / 2500012000€
-                  </Text>
-                  <View style={styles.progressBackground}>
-                    <View style={[styles.progressFill, { width: '30%' }]} />
-                  </View>
                 </View>
 
                 <View style={styles.privilegesFooter}>
