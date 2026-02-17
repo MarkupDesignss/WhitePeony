@@ -170,6 +170,97 @@ const HomeScreen1 = ({ navigation }: any) => {
     return data?.[currentType] || [];
   };
 
+  // Small Card Component
+  const ProductSmallCard = ({
+    product,
+    onPress,
+  }: {
+    product: any;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={{
+        flex: 1,
+        backgroundColor: '#F8F6F0',
+        borderRadius: 16,
+        padding: 10,
+        justifyContent: 'space-between',
+        minHeight: 100,
+      }}
+    >
+      {/* Product Name */}
+      <TransletText
+        text={product?.name || 'Product'}
+        style={{
+          fontSize: 11,
+          fontWeight: '400',
+          color: '#1A1A1A',
+          marginBottom: 4,
+          lineHeight: 14,
+        }}
+        numberOfLines={2}
+      />
+
+      {/* Price */}
+      {product?.variants?.[0]?.price && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          {product?.variants?.[0]?.actual_price && (
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '600',
+                color: '#1A1A1A',
+              }}
+            >
+              {displayPrice(product.variants[0].actual_price)}
+            </Text>
+          )}
+          <Text
+            style={{
+              fontSize: 9,
+              color: '#999999',
+              textDecorationLine: product?.variants?.[0]?.actual_price
+                ? 'line-through'
+                : 'none',
+            }}
+          >
+            {displayPrice(product.variants[0].price)}
+          </Text>
+        </View>
+      )}
+
+      {/* Image */}
+      {product?.front_image && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
+            width: 50,
+            height: 50,
+          }}
+        >
+          <Image
+            source={{ uri: Image_url + product.front_image }}
+            style={{
+              width: '100%',
+              height: '100%',
+              resizeMode: 'contain',
+            }}
+          />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+
   // Helper function to get promotional banners based on user type
   // Helper function to get promotional banners based on user type
   // Helper function to get promotional banners based on user type
@@ -352,17 +443,17 @@ const HomeScreen1 = ({ navigation }: any) => {
       isLoading,
       sampleItem: wishlistItems?.[0]
         ? {
-          id: wishlistItems[0]?.id,
-          name: wishlistItems[0]?.name,
-          product_type: wishlistItems[0]?.product_type,
-          front_image: wishlistItems[0]?.front_image,
-          variants: wishlistItems[0]?.variants,
-          // Check all possible properties
-          hasProductProperty: !!wishlistItems[0]?.product,
-          productId: wishlistItems[0]?.product?.id,
-          productName: wishlistItems[0]?.product?.name,
-          productFrontImage: wishlistItems[0]?.product?.front_image,
-        }
+            id: wishlistItems[0]?.id,
+            name: wishlistItems[0]?.name,
+            product_type: wishlistItems[0]?.product_type,
+            front_image: wishlistItems[0]?.front_image,
+            variants: wishlistItems[0]?.variants,
+            // Check all possible properties
+            hasProductProperty: !!wishlistItems[0]?.product,
+            productId: wishlistItems[0]?.product?.id,
+            productName: wishlistItems[0]?.product?.name,
+            productFrontImage: wishlistItems[0]?.product?.front_image,
+          }
         : null,
     });
   }, [wishlistItems, isLoggedIn, userType, isLoading]);
@@ -657,8 +748,9 @@ const HomeScreen1 = ({ navigation }: any) => {
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
-              }`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${
+              item?.product_id || ''
+            }`}
             style={styles.page}
           >
             <Image
@@ -707,41 +799,221 @@ const HomeScreen1 = ({ navigation }: any) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFF0' }}>
       <StatusBar barStyle={'dark-content'} />
 
+      {/* Header - Refined Dark Theme */}
       <View
         style={{
           flexDirection: 'row',
           justifyContent: 'space-between',
-          paddingVertical: heightPercentageToDP(3),
-          paddingHorizontal: widthPercentageToDP(3),
+          alignItems: 'center',
+          paddingVertical: heightPercentageToDP(2),
+          paddingHorizontal: widthPercentageToDP(5),
+          backgroundColor: '#FFFFF0',
+          borderBottomWidth: 1,
+          borderBottomColor: '#E0E0E0', // Subtle gray line instead of gold
         }}
       >
-        <View />
-        <Image
-          source={require('../../assets/peony_logo.png')}
-          style={{ width: 140, height: 25, resizeMode: 'contain', left: 10 }}
-        />
+        {/* Left Side - Minimal Decorative */}
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+          }}
+        >
+          <View
+            style={{
+              width: 20,
+              height: 2,
+              // backgroundColor: '#888888', // Dark gray
+              // borderRadius: 1,
+              // marginBottom: 4,
+            }}
+          />
+          <View
+            style={{
+              width: 12,
+              height: 2,
+              // backgroundColor: '#888888',
+              // borderRadius: 1,
+              // opacity: 0.5,
+            }}
+          />
+        </View>
+
+        {/* Center - Logo */}
+        <View
+          style={{
+            alignItems: 'center',
+          }}
+        >
+          <Image
+            source={require('../../assets/peony_logo.png')}
+            style={{
+              width: 160,
+              height: 30,
+              resizeMode: 'contain',
+            }}
+          />
+          <Text
+            style={{
+              fontSize: 9,
+              color: '#888888', // Dark gray
+              letterSpacing: 2,
+              textTransform: 'uppercase',
+              marginTop: 2,
+              fontWeight: '300',
+            }}
+          >
+            Premium Tea Collection
+          </Text>
+        </View>
+
+        {/* Right Side - User Icon */}
         <TouchableOpacity
           onPress={() =>
             isLoggedIn
               ? navigation.navigate('EditProfile')
               : setModalVisible(true)
           }
+          style={{
+            width: 40,
+            height: 40,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
         >
           <View
             style={{
-              borderColor: '#A7A7A7',
               borderWidth: 1,
+              borderColor: '#888888',
               borderRadius: 20,
-              padding: 5,
-              marginRight: 10,
+              padding: 8,
+              backgroundColor: 'rgba(0,0,0,0.02)',
             }}
           >
             <Image
               source={require('../../assets/userx.png')}
-              style={{ width: 15, height: 15, resizeMode: 'cover' }}
+              style={{
+                width: 16,
+                height: 16,
+                resizeMode: 'cover',
+                tintColor: '#666666',
+              }}
             />
           </View>
+          {isLoggedIn && (
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 2,
+                right: 2,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: '#4CAF50',
+                borderWidth: 1,
+                borderColor: '#FFFFF0',
+              }}
+            />
+          )}
         </TouchableOpacity>
+      </View>
+
+      {/* Search Bar - Refined */}
+      <View
+        style={{
+          paddingHorizontal: widthPercentageToDP(5),
+          paddingTop: heightPercentageToDP(2),
+          paddingBottom: heightPercentageToDP(1),
+          backgroundColor: '#FFFFF0',
+        }}
+      >
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Searchpage')}
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 2,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              borderRadius: 30,
+              height: 52,
+              paddingHorizontal: 16,
+              backgroundColor: '#FFFFFF',
+              borderWidth: 1, // Single border
+              borderColor: '#E0E0E0',
+            }}
+          >
+            {/* Search Icon */}
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: '#F5F5F5',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 10,
+              }}
+            >
+              <Image
+                source={require('../../assets/Searchx.png')}
+                style={{
+                  width: 18,
+                  height: 18,
+                  resizeMode: 'contain',
+                  tintColor: '#666666',
+                }}
+              />
+            </View>
+
+            {/* Search Text */}
+            <View style={{ flex: 1 }}>
+              <TransletText
+                text="Search for premium teas..."
+                style={{
+                  fontSize: 14,
+                  color: '#999999',
+                  fontWeight: '300',
+                  letterSpacing: 0.3,
+                }}
+              />
+            </View>
+
+            {/* Voice Icon - Fixed cutting issue */}
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: '#F5F5F5',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginLeft: 4,
+              }}
+            >
+              <Image
+                source={require('../../assets/micx.png')}
+                style={{
+                  width: 18,
+                  height: 18,
+                  resizeMode: 'contain',
+                  tintColor: '#666666',
+                }}
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* Removed decorative line */}
       </View>
 
       <ScrollView
@@ -750,68 +1022,11 @@ const HomeScreen1 = ({ navigation }: any) => {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            // onRefresh={onRefresh}
-            colors={['#2E2E2E']}
-            tintColor="#2E2E2E"
+            colors={['#666666']}
+            tintColor="#666666"
           />
         }
       >
-        {/* Search Bar */}
-        <TouchableOpacity onPress={() => navigation.navigate('Searchpage')}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              borderColor: '#A7A7A7',
-              borderWidth: 1,
-              borderRadius: 30,
-              height: 50,
-              backgroundColor: '#fff',
-              marginHorizontal: widthPercentageToDP(3),
-            }}
-          >
-            <Image
-              source={require('../../assets/Searchx.png')}
-              style={{
-                width: 20,
-                height: 20,
-                resizeMode: 'contain',
-                marginLeft: 10,
-                alignSelf: 'center',
-              }}
-            />
-            <TransletText
-              text='Search "Products"'
-              style={{
-                alignSelf: 'center',
-                color: '#A7A7A7',
-                fontSize: 16,
-                flex: 1,
-                marginLeft: 10,
-              }}
-            />
-
-            <View
-              style={{
-                borderWidth: 1,
-                borderColor: '#A7A7A7',
-                marginVertical: 8,
-                right: 10,
-              }}
-            />
-            <Image
-              source={require('../../assets/micx.png')}
-              style={{
-                width: 20,
-                height: 20,
-                resizeMode: 'contain',
-                marginRight: 10,
-                alignSelf: 'center',
-              }}
-            />
-          </View>
-        </TouchableOpacity>
-
         <View style={{ backgroundColor: '#fff', flex: 1 }}>
           {/* Categories Horizontal List */}
           <View
@@ -822,55 +1037,7 @@ const HomeScreen1 = ({ navigation }: any) => {
               paddingHorizontal: widthPercentageToDP(3),
               backgroundColor: '#FFFFF0',
             }}
-          >
-            <FlatList
-              data={category}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={item => String(item.id)}
-              renderItem={({ item }) => {
-                const isActive = item?.id === selectedCategoryId;
-                return (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSelectedCategoryId(item.id);
-                      GetCategoryIDWithoutLoader(item.id);
-                    }}
-                    style={{ alignItems: 'center', marginHorizontal: 10 }}
-                  >
-                    <Image
-                      source={{ uri: Image_url + item?.icon }}
-                      style={{
-                        width: 25,
-                        height: 25,
-                        resizeMode: 'cover',
-                        opacity: isActive ? 1 : 0.35,
-                        transform: [{ scale: isActive ? 1.05 : 1 }],
-                      }}
-                    />
-                    <TransletText
-                      text={item?.name}
-                      style={{
-                        fontWeight: '700',
-                        fontSize: 12,
-                        marginTop: heightPercentageToDP(1),
-                        color: isActive ? '#000' : '#A7A7A7',
-                      }}
-                    />
-                    <View
-                      style={{
-                        marginTop: 6,
-                        height: 3,
-                        width: 30,
-                        borderRadius: 4,
-                        backgroundColor: isActive ? '#2E2E2E' : 'transparent',
-                      }}
-                    />
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          </View>
+          ></View>
           <View
             style={{
               borderWidth: 0.7,
@@ -880,413 +1047,317 @@ const HomeScreen1 = ({ navigation }: any) => {
               marginTop: heightPercentageToDP(-2.2),
             }}
           />
-          {/* Categories Grid */}
-
+          {/* Categories Grid - Horizontal Scrolling */}
           {isLoadingCategory ? (
-            <View style={styles.container}>
-              <View style={[styles.row, { justifyContent: 'center' }]}>
-                <View
-                  style={{
-                    flex: 1,
-                    borderRadius: 12,
-                    backgroundColor: '#EFEFCA',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    minHeight: BIG_HEIGHT,
-                  }}
-                >
-                  <TransletText
-                    text="Loading products..."
-                    style={[styles.title, { marginTop: 10 }]}
-                  />
-
-                </View>
-              </View>
-            </View>
-          ) : Array.isArray(categoryProduct) && categoryProduct.length > 0 ? (
-            <View style={styles.container}>
-              {/* Calculate available products count */}
-              {(() => {
-                const availableProducts = categoryProduct.filter(
-                  item => item && item.id && item.name,
-                );
-
-                // If no products available after filtering
-                if (availableProducts.length === 0) {
-                  return (
-                    <View
-                      style={{
-                        borderRadius: 12,
-                        backgroundColor: '#EFEFCA',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        minHeight: BIG_HEIGHT,
-                        padding: 20,
-                      }}
-                    >
-                      <TransletText
-                        text="No Products Found"
-                        style={[
-                          styles.title,
-                          { fontSize: 16, marginBottom: 10 },
-                        ]}
-                      />
-
-                      <TransletText
-                        text="Try selecting a different category or check back later."
-                        style={[
-                          styles.title,
-                          { color: '#666', textAlign: 'center' },
-                        ]}
-                      />
-                    </View>
-                  );
-                }
-
-                // Function to get product at index safely
-                const getProductAt = (index: number) => {
-                  return availableProducts[index] || null;
-                };
-
-                // Count available products
-                const hasProduct1 = getProductAt(0) !== null;
-                const hasProduct2 = getProductAt(1) !== null;
-                const hasProduct3 = getProductAt(2) !== null;
-                const hasProduct4 = getProductAt(3) !== null;
-                const hasProduct5 = getProductAt(4) !== null;
-
-                // Calculate layout based on available products
-                const smallCardsCount = [
-                  hasProduct2,
-                  hasProduct3,
-                  hasProduct4,
-                  hasProduct5,
-                ].filter(Boolean).length;
-
-                let layoutHeight = BIG_HEIGHT;
-
-                // Adjust height based on number of small cards
-                if (smallCardsCount === 0 && hasProduct1) {
-                  // Only big card exists
-                  layoutHeight = BIG_HEIGHT;
-                } else if (smallCardsCount <= 2) {
-                  // Some small cards missing, reduce height
-                  layoutHeight = BIG_HEIGHT * 0.75;
-                }
-
-                return (
-                  <View style={[styles.row, { height: layoutHeight }]}>
-                    {/* Big Card (Only render if product exists) */}
-                    {hasProduct1 ? (
-                      <LinearGradient
-                        colors={['#EFEFCA', '#E2E689']}
-                        start={{ x: 0.5, y: 0 }}
-                        end={{ x: 0.5, y: 1 }}
-                        style={{ flex: 1, borderRadius: 12 }}
-                      >
-                        <TouchableOpacity
-                          onPress={() =>
-                            navigation.navigate('ProductDetails', {
-                              productId: availableProducts[0].id,
-                            })
-                          }
-                        >
-                          <View style={[styles.card, { height: '100%' }]}>
-                            <TransletText
-                              text="All"
-                              style={{ ...styles.title }}
-                            />
-
-                            <TransletText
-                              text={availableProducts[0]?.name || 'Product'}
-                              style={[styles.title, { color: '#000', marginTop: 8 }]}
-                              numberOfLines={2}
-                            />
-
-                            {availableProducts[0]?.variants?.[0]?.price && (
-                              <>
-                                <View
-                                  style={{
-                                    borderRadius: 4,
-                                    backgroundColor: '#5f621a',
-
-                                    alignSelf: 'center',
-                                    padding: 5,
-                                    justifyContent: 'center',
-                                    marginTop: 10,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontWeight: '700',
-                                      fontSize: 12,
-                                      alignSelf: 'center',
-                                      color: '#fff',
-                                      textDecorationLine: 'line-through',
-                                      textAlignVertical: 'center',
-                                    }}
-                                  >
-                                    {displayPrice(
-                                      availableProducts[0]?.variants?.[0]
-                                        ?.price,
-                                    )}
-                                  </Text>
-                                </View>
-                                <View
-                                  style={{
-                                    borderRadius: 4,
-                                    backgroundColor: '#E0CB54',
-
-                                    alignSelf: 'center',
-                                    marginTop: 10,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontWeight: '700',
-                                      fontSize: 12,
-                                      alignSelf: 'center',
-                                      padding: 5,
-                                      color: '#000',
-                                    }}
-                                  >
-                                    {displayPrice(
-                                      availableProducts[0]?.variants?.[0]
-                                        ?.actual_price || 0,
-                                    )}
-                                  </Text>
-                                </View>
-                              </>
-                            )}
-                            {availableProducts[0]?.front_image ? (
-                              <Image
-                                source={{
-                                  uri:
-                                    Image_url +
-                                    availableProducts[0]?.front_image,
-                                }}
-                                style={styles.imageBig}
-                              />
-                            ) : null}
-                          </View>
-                        </TouchableOpacity>
-                      </LinearGradient>
-                    ) : (
-                      // Empty big card placeholder
-                      <LinearGradient
-                        colors={['#EFEFCA', '#E2E689']}
-                        start={{ x: 0.5, y: 0 }}
-                        end={{ x: 0.5, y: 1 }}
-                        style={{
-                          flex: 1,
-                          borderRadius: 12,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <TransletText
-                          text="No Product Available"
-                          style={styles.title}
-                        />
-
-                      </LinearGradient>
-                    )}
-
-                    {/* Right side small cards */}
-                    <View style={styles.stack}>
-                      {/* First column */}
-                      <View
-                        style={{
-                          justifyContent: 'space-between',
-                          gap: 8,
-                          flex: 1,
-                        }}
-                      >
-                        {hasProduct2 ? (
-                          <LinearGradient
-                            key={`first-${availableProducts[1].id}`}
-                            colors={['#EFEFCA', '#E2E689']}
-                            start={{ x: 0.5, y: 0 }}
-                            end={{ x: 0.5, y: 1 }}
-                            style={{ flex: 1, borderRadius: 12 }}
-                          >
-                            <TouchableOpacity
-                              onPress={() =>
-                                navigation.navigate('ProductDetails', {
-                                  productId: availableProducts[1].id,
-                                })
-                              }
-                              style={{ flex: 1 }}
-                            >
-                              <View style={[styles.card, { height: '100%' }]}>
-                                <TransletText
-                                  text={availableProducts[1].name || 'Product'}
-                                  style={styles.title}
-                                />
-
-                                <Image
-                                  source={{
-                                    uri:
-                                      Image_url +
-                                      availableProducts[1].front_image,
-                                  }}
-                                  style={styles.imageSmall}
-                                />
-                              </View>
-                            </TouchableOpacity>
-                          </LinearGradient>
-                        ) : (
-                          <View style={{ flex: 1 }} /> // Empty space
-                        )}
-
-                        {hasProduct3 ? (
-                          <LinearGradient
-                            key={`second-${availableProducts[2].id}`}
-                            colors={['#EFEFCA', '#E2E689']}
-                            start={{ x: 0.5, y: 0 }}
-                            end={{ x: 0.5, y: 1 }}
-                            style={{ flex: 1, borderRadius: 12 }}
-                          >
-                            <TouchableOpacity
-                              onPress={() =>
-                                navigation.navigate('ProductDetails', {
-                                  productId: availableProducts[2].id,
-                                })
-                              }
-                              style={{ flex: 1 }}
-                            >
-                              <View style={[styles.card, { height: '100%' }]}>
-                                <TransletText
-                                  text={availableProducts[2].name || 'Product'}
-                                  style={[styles.title,]}
-                                />
-
-                                <Image
-                                  source={{
-                                    uri:
-                                      Image_url +
-                                      availableProducts[2].front_image,
-                                  }}
-                                  style={styles.imageSmall}
-                                />
-                              </View>
-                            </TouchableOpacity>
-                          </LinearGradient>
-                        ) : (
-                          <View style={{ flex: 1 }} /> // Empty space
-                        )}
-                      </View>
-
-                      {/* Second column */}
-                      <View
-                        style={{
-                          justifyContent: 'space-between',
-                          gap: 8,
-                          flex: 1,
-                        }}
-                      >
-                        {hasProduct4 ? (
-                          <LinearGradient
-                            key={`third-${availableProducts[3].id}`}
-                            colors={['#EFEFCA', '#E2E689']}
-                            start={{ x: 0.5, y: 0 }}
-                            end={{ x: 0.5, y: 1 }}
-                            style={{ flex: 1, borderRadius: 12 }}
-                          >
-                            <TouchableOpacity
-                              onPress={() =>
-                                navigation.navigate('ProductDetails', {
-                                  productId: availableProducts[3].id,
-                                })
-                              }
-                              style={{ flex: 1 }}
-                            >
-                              <View style={[styles.card, { height: '100%' }]}>
-                                <TransletText
-                                  text={availableProducts[3].name || 'Product'}
-                                  style={[styles.title, { numberOfLines: 2 }]}
-                                />
-
-                                <Image
-                                  source={{
-                                    uri:
-                                      Image_url +
-                                      availableProducts[3].front_image,
-                                  }}
-                                  style={styles.imageSmall}
-                                />
-                              </View>
-                            </TouchableOpacity>
-                          </LinearGradient>
-                        ) : (
-                          <View style={{ flex: 1 }} /> // Empty space
-                        )}
-
-                        {hasProduct5 ? (
-                          <LinearGradient
-                            key={`fourth-${availableProducts[4].id}`}
-                            colors={['#EFEFCA', '#E2E689']}
-                            start={{ x: 0.5, y: 0 }}
-                            end={{ x: 0.5, y: 1 }}
-                            style={{ flex: 1, borderRadius: 12 }}
-                          >
-                            <TouchableOpacity
-                              onPress={() =>
-                                navigation.navigate('ProductDetails', {
-                                  productId: availableProducts[4].id,
-                                })
-                              }
-                              style={{ flex: 1 }}
-                            >
-                              <View style={[styles.card, { height: '100%' }]}>
-                                <TransletText
-                                  text={availableProducts[4].name || 'Product'}
-                                  style={[styles.title, { numberOfLines: 2 }]}
-                                />
-
-                                <Image
-                                  source={{
-                                    uri:
-                                      Image_url +
-                                      availableProducts[4].front_image,
-                                  }}
-                                  style={styles.imageSmall}
-                                />
-                              </View>
-                            </TouchableOpacity>
-                          </LinearGradient>
-                        ) : (
-                          <View style={{ flex: 1 }} /> // Empty space
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                );
-              })()}
-            </View>
-          ) : (
-            // No products at all
-            <View style={styles.container}>
+            <View
+              style={{
+                paddingHorizontal: widthPercentageToDP(3),
+                paddingVertical: 20,
+                backgroundColor: '#FFFFFF',
+              }}
+            >
               <View
                 style={{
-                  borderRadius: 12,
-                  backgroundColor: '#EFEFCA',
-                  justifyContent: 'center',
+                  backgroundColor: '#F8F8F8',
+                  borderRadius: 16,
+                  padding: 40,
                   alignItems: 'center',
-                  minHeight: BIG_HEIGHT,
-                  padding: 20,
+                  justifyContent: 'center',
                 }}
               >
                 <TransletText
-                  text="No Products Found"
-                  style={[styles.title, { fontSize: 16, marginBottom: 10 }]}
+                  text="Loading products..."
+                  style={{
+                    fontSize: 14,
+                    color: '#999999',
+                    fontWeight: '300',
+                  }}
                 />
-                <TransletText
-                  text="Try selecting a different category or check back later."
-                  style={[styles.title, { color: '#666', textAlign: 'center' }]}
-                />
-
               </View>
+            </View>
+          ) : (
+            <View
+              style={{
+                backgroundColor: '#FFFFFF',
+                paddingTop: 8,
+                paddingBottom: 20,
+              }}
+            >
+              {/* Section Header */}
+              <View
+                style={{
+                  paddingHorizontal: widthPercentageToDP(3),
+                  marginBottom: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View>
+                  <TransletText
+                    text="Shop by Category"
+                    style={{
+                      fontSize: 18,
+                      fontWeight: '500',
+                      color: '#1A1A1A',
+                      letterSpacing: 0.3,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: 30,
+                      height: 2,
+                      backgroundColor: '#D4D4D4',
+                      marginTop: 4,
+                      borderRadius: 1,
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Category Chips - Light Backgrounds for Dark Icons */}
+              <View
+                style={{
+                  paddingVertical: heightPercentageToDP(2),
+                  backgroundColor: '#FFFFFF',
+                }}
+              >
+                <FlatList
+                  data={category}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={item => String(item.id)}
+                  contentContainerStyle={{
+                    paddingHorizontal: widthPercentageToDP(3),
+                    gap: 12,
+                  }}
+                  renderItem={({ item }) => {
+                    const isActive = item?.id === selectedCategoryId;
+                    return (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSelectedCategoryId(item.id);
+                          GetCategoryIDWithoutLoader(item.id);
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: isActive ? '#E8E8E8' : '#F8F8F8', // Light backgrounds
+                          paddingVertical: 10,
+                          paddingHorizontal: 18,
+                          borderRadius: 40,
+                          borderWidth: 1,
+                          borderColor: isActive ? '#D0D0D0' : '#F0F0F0',
+                        }}
+                      >
+                        {/* Icon - No tint, original colors */}
+                        <Image
+                          source={{ uri: Image_url + item?.icon }}
+                          style={{
+                            width: 20,
+                            height: 20,
+                            resizeMode: 'contain',
+                            marginRight: 8,
+                          }}
+                        />
+
+                        {/* Category Name */}
+                        <TransletText
+                          text={item?.name}
+                          style={{
+                            fontSize: 13,
+                            fontWeight: isActive ? '500' : '400',
+                            color: isActive ? '#2C2C2C' : '#666666',
+                          }}
+                        />
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              </View>
+              {/* Products - Horizontal Scroll */}
+              {Array.isArray(categoryProduct) && categoryProduct.length > 0 ? (
+                <FlatList
+                  data={categoryProduct}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={(item, index) =>
+                    item?.id ? String(item.id) : `product-${index}`
+                  }
+                  contentContainerStyle={{
+                    paddingHorizontal: widthPercentageToDP(3),
+                    gap: 12,
+                  }}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        navigation.navigate('ProductDetails', {
+                          productId: item.id,
+                        })
+                      }
+                      style={{
+                        width: 140, // Fixed width for horizontal items
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: '#F0F0F0',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Image Container */}
+                      <View
+                        style={{
+                          backgroundColor: '#F8F8F8',
+                          aspectRatio: 1,
+                          position: 'relative',
+                        }}
+                      >
+                        <Image
+                          source={{ uri: Image_url + item?.front_image }}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            resizeMode: 'cover',
+                          }}
+                        />
+
+                        {/* Wishlist Button */}
+                        <TouchableOpacity
+                          onPress={async e => {
+                            e.stopPropagation();
+                            if (isWishlisted(item.id)) {
+                              await removeFromWishlist(item.id);
+                            } else {
+                              await addToWishlist(item.id);
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            backgroundColor: 'rgba(255,255,255,0.9)',
+                            padding: 6,
+                            borderRadius: 20,
+                            width: 28,
+                            height: 28,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Image
+                            source={
+                              isWishlisted(item.id)
+                                ? require('../../assets/heart.png')
+                                : require('../../assets/Png/heart-1.png')
+                            }
+                            style={{
+                              width: 12,
+                              height: 12,
+                              resizeMode: 'cover',
+                              tintColor: isWishlisted(item.id)
+                                ? '#FF3E6C'
+                                : '#666666',
+                            }}
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Product Info */}
+                      <View
+                        style={{
+                          padding: 10,
+                        }}
+                      >
+                        <TransletText
+                          text={item?.name || 'Product'}
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '400',
+                            color: '#1A1A1A',
+                            marginBottom: 4,
+                            lineHeight: 16,
+                            height: 32,
+                          }}
+                          numberOfLines={2}
+                        />
+
+                        {/* Price */}
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '500',
+                            color: '#1A1A1A',
+                          }}
+                        >
+                          {displayPrice(
+                            item?.variants?.[0]?.price || item?.main_price || 0,
+                          )}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={
+                    <View
+                      style={{
+                        width: width - widthPercentageToDP(6),
+                        backgroundColor: '#F8F8F8',
+                        borderRadius: 16,
+                        padding: 40,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <TransletText
+                        text="No products in this category"
+                        style={{
+                          fontSize: 14,
+                          color: '#999999',
+                          fontWeight: '300',
+                          marginBottom: 8,
+                        }}
+                      />
+                      <TransletText
+                        text="Try selecting another category"
+                        style={{
+                          fontSize: 12,
+                          color: '#CCCCCC',
+                        }}
+                      />
+                    </View>
+                  }
+                />
+              ) : (
+                // Empty State
+                <View
+                  style={{
+                    marginHorizontal: widthPercentageToDP(3),
+                    backgroundColor: '#F8F8F8',
+                    borderRadius: 16,
+                    padding: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <TransletText
+                    text="No products in this category"
+                    style={{
+                      fontSize: 14,
+                      color: '#999999',
+                      fontWeight: '300',
+                      marginBottom: 8,
+                    }}
+                  />
+                  <TransletText
+                    text="Try selecting another category"
+                    style={{
+                      fontSize: 12,
+                      color: '#CCCCCC',
+                    }}
+                  />
+                </View>
+              )}
             </View>
           )}
           {/* Frequently Bought */}
@@ -1345,7 +1416,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                             text={item?.items[0]?.product?.name || ''}
                             style={styles.freqText}
                           />
-
                         </View>
                       </TouchableOpacity>
                     );
@@ -1355,467 +1425,942 @@ const HomeScreen1 = ({ navigation }: any) => {
             ) : null}
 
             {/* Featured This Week */}
-            <TransletText
-              text="Featured This Week"
-              style={styles.sectionTitle}
-            />
-
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={FeaturesProduct}
-              keyExtractor={(item, index) =>
-                item?.id ? String(item.id) : String(index)
-              }
-              contentContainerStyle={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
+            {/* Featured This Week - Redesigned */}
+            <View
+              style={{
+                marginTop: heightPercentageToDP(2),
+                marginBottom: heightPercentageToDP(1),
+                backgroundColor: '#FFFFFF',
+                paddingVertical: 16,
               }}
-              renderItem={({ item }) => {
-                return (
+            >
+              {/* Elegant Header */}
+              <View
+                style={{
+                  paddingHorizontal: widthPercentageToDP(3),
+                  marginBottom: 16,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <View>
+                    <TransletText
+                      text="Featured This Week"
+                      style={{
+                        fontSize: 18,
+                        fontWeight: '500',
+                        color: '#1A1A1A',
+                        letterSpacing: 0.3,
+                        marginBottom: 4,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: 50,
+                        height: 2,
+                        backgroundColor: '#D4D4D4',
+                        borderRadius: 2,
+                      }}
+                    />
+                  </View>
+
+                  {/* Optional subtle "View all" link */}
                   <TouchableOpacity
-                    style={styles.productCard}
-                    activeOpacity={0.7}
-                    onPress={() =>
-                      navigation.navigate('ProductDetails', {
-                        productId: item?.product?.id,
-                      })
-                    }
+                    onPress={() => navigation.navigate('Category')}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }}
                   >
-                    <View style={styles.productContainer}>
-                      <Image
-                        source={{ uri: Image_url + item?.product?.front_image }}
-                        style={styles.productImage}
-                        resizeMode="contain"
-                      />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: '#999999',
+                        marginRight: 4,
+                      }}
+                    >
+                      View all
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: '#999999',
+                      }}
+                    >
+                      →
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-                      {/* Sale/Discount Tag */}
-                      {item.tag && (
-                        <View style={styles.discountBadge}>
-                          <Text style={styles.discountText}>{item.tag}</Text>
-                        </View>
-                      )}
+              {/* Featured Products Carousel */}
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={FeaturesProduct}
+                keyExtractor={(item, index) =>
+                  item?.id ? String(item.id) : String(index)
+                }
+                contentContainerStyle={{
+                  paddingHorizontal: widthPercentageToDP(3),
+                  gap: 16,
+                }}
+                renderItem={({ item }) => {
+                  // Calculate discount percentage if applicable
+                  const discountPercentage =
+                    item.product?.discount ||
+                    (() => {
+                      if (item.product?.price_range) {
+                        const min = item.product.price_range.min;
+                        const max = item.product.price_range.max;
+                        if (min && max && max > min) {
+                          return Math.round(((max - min) / max) * 100);
+                        }
+                      }
+                      return null;
+                    })();
 
-                      {/* Product Info Container */}
-                      <View style={styles.productInfo}>
-                        <TransletText
-                          text={item.product?.name || 'Product Name'}
-                          style={[styles.productName]}
-                          numberOfLines={2}
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        navigation.navigate('ProductDetails', {
+                          productId: item?.product?.id,
+                        })
+                      }
+                      style={{
+                        width: 180,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 16,
+                        overflow: 'hidden',
+                        borderWidth: 1,
+                        borderColor: '#F2F2F2',
+                      }}
+                    >
+                      {/* Image Container */}
+                      <View
+                        style={{
+                          position: 'relative',
+                          backgroundColor: '#F9F9F9',
+                          aspectRatio: 1,
+                        }}
+                      >
+                        <Image
+                          source={{
+                            uri: Image_url + item?.product?.front_image,
+                          }}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            resizeMode: 'cover',
+                          }}
                         />
 
-                        {/* Price Container */}
-                        <View style={styles.priceContainer}>
-                          <Text style={styles.currentPrice}>
-                            {displayPrice(
-                              Math.round(item.product.price_range.min || 0),
-                            )}{' '}
-                            -{' '}
-                            {displayPrice(
-                              Math.round(item.product.price_range.max || 0),
-                            )}
-                          </Text>
-                          {item.product?.originalPrice && (
-                            <Text style={styles.originalPrice}>
-                              {displayPrice(item.product.originalPrice)}
-                            </Text>
-                          )}
-                          {item.product?.discount && (
-                            <Text style={styles.discountPercent}>
-                              {item.product.discount}% off
-                            </Text>
-                          )}
-                        </View>
-
-                        {/* Rating */}
-                        <View style={styles.ratingContainer}>
-                          <View style={styles.stars}>
-                            {[1, 2, 3, 4, 5].map(star => (
-                              <Text key={star} style={styles.star}>
-                                ★
-                              </Text>
-                            ))}
-                          </View>
-                          <Text style={styles.ratingCount}>
-                            ({item.product?.ratingCount || '4.2'})
-                          </Text>
-                        </View>
-
-                        {/* Quick Delivery Badge */}
-                        {item.product?.fastDelivery && (
-                          <View style={styles.deliveryBadge}>
-                            <Text style={styles.deliveryText}>
-                              Free Delivery
+                        {/* Minimal Tag - Only if exists */}
+                        {item.tag && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: 12,
+                              left: 12,
+                              backgroundColor: 'rgba(44, 44, 44, 0.85)',
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: 20,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: '#FFFFFF',
+                                fontSize: 9,
+                                fontWeight: '500',
+                                letterSpacing: 0.5,
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              {item.tag}
                             </Text>
                           </View>
                         )}
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          </View>
-          {/* Big Sale Section */}
-          {salesProduct.length > 0 && (
-            <View
-              style={{
-                width: '100%',
-                height: heightPercentageToDP(30),
-                marginTop: 20,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: '#fecf5d',
-              }}
-            >
-              <Image
-                source={require('../../assets/bg3x.png')}
-                style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
-              />
-              <View
-                style={{ position: 'absolute', top: 10, alignItems: 'center' }}
-              >
-                <Image
 
-                  source={require('../../assets/bigsales.png')}
-                  style={{ width: 75, height: 65, resizeMode: 'contain' }}
-                />
-                <TransletText
-                  text={`${formatDate(salesProduct[0]?.start_date).slice(0, 13)} - ${formatDate(salesProduct[0]?.end_date).slice(0, 13)}`}
-                  style={{ fontSize: 12, fontWeight: '700', marginTop: 15 }}
-                />
-
-                <FlatList
-                  data={salesProduct}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(item, index) => String(index)}
-                  renderItem={({ item }) => {
-                    return (
-                      <TouchableOpacity
-                        style={{
-                          borderWidth: 1,
-                          marginLeft: 10,
-                          marginTop: heightPercentageToDP(2),
-                          borderColor: 'lightgrey',
-                          borderRadius: 8,
-                        }}
-                        onPress={() =>
-                          navigation.navigate('ProductDetails', {
-                            productId: item?.product?.id,
-                          })
-                        }
-                      >
-                        <View
-                          style={{
-                            borderRadius: 8,
-                            alignItems: 'center',
-                            backgroundColor: '#FFEEBC',
-                            width: '100%',
-                            height: '100%',
-                          }}
-                        >
-                          <View
-                            style={{
-                              backgroundColor: '#FFFFFF',
-
-                              height: 17,
-                              borderRadius: 8,
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <TransletText
-                              text={`Upto ${item?.percentage}% Off`}
-                              style={{
-                                fontSize: 8,
-                                fontWeight: '700',
-                                alignSelf: 'center',
-                                padding: 2,
-                              }}
-                            />
-
-                          </View>
-                          <Image
-                            resizeMode="contain"
-                            source={{
-                              uri: Image_url + item?.product?.front_image,
-                            }}
-                            style={{
-                              width: 70,
-                              height: 80,
-                              resizeMode: 'cover',
-                              marginTop: 5,
-                              borderRadius: 8,
-                            }}
-                          />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            </View>
-          )}
-          {/* Lowest Prices Ever */}
-          <View
-            style={{
-              width: '100%',
-              marginVertical: heightPercentageToDP(0),
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Image
-              source={require('../../assets/Subtraction2.png')}
-              style={{
-                width: '100%',
-                height: heightPercentageToDP(40),
-                resizeMode: 'cover',
-              }}
-            />
-            <View
-              style={{
-                position: 'absolute',
-                top: 10,
-                paddingHorizontal: widthPercentageToDP(3),
-              }}
-            >
-              <TransletText
-                text="LOWEST PRICES EVER"
-                style={[styles.sectionTitle, { alignSelf: 'center' }]}
-              />
-              <FlatList
-                data={lowestitem}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(item, index) => String(index)}
-                // In your HomeScreen1.tsx, replace the Lowest Prices Ever FlatList renderItem with this:
-
-                renderItem={({ item }) => {
-                  const wished = isWishlisted(item.id);
-
-                  // Extract price information
-                  const getPriceInfo = (product: any) => {
-                    if (!product)
-                      return { discountedPrice: null, originalPrice: null };
-
-                    // Get the discounted price (actual_price)
-                    let discountedPrice = null;
-                    if (
-                      product?.variants?.[0]?.actual_price !== undefined &&
-                      product?.variants?.[0]?.actual_price !== null
-                    ) {
-                      discountedPrice = product.variants[0].actual_price;
-                    }
-
-                    // Get the original price (price)
-                    let originalPrice = null;
-                    if (
-                      product?.variants?.[0]?.price !== undefined &&
-                      product?.variants?.[0]?.price !== null
-                    ) {
-                      originalPrice = product.variants[0].price;
-                    }
-
-                    // If no discounted price but we have main_price, use that as original
-                    if (
-                      !discountedPrice &&
-                      !originalPrice &&
-                      product?.main_price
-                    ) {
-                      originalPrice = product.main_price;
-                    }
-
-                    // If we have discounted price but no original, use main_price as original
-                    if (
-                      discountedPrice &&
-                      !originalPrice &&
-                      product?.main_price
-                    ) {
-                      originalPrice = product.main_price;
-                    }
-
-                    return { discountedPrice, originalPrice };
-                  };
-
-                  const { discountedPrice, originalPrice } = getPriceInfo(item);
-                  const hasDiscount =
-                    discountedPrice &&
-                    originalPrice &&
-                    discountedPrice !== originalPrice;
-
-                  return (
-                    <TouchableOpacity
-                      onPress={() =>
-                        navigation.navigate('ProductDetails', {
-                          productId: item.id,
-                        })
-                      }
-                    >
+                      {/* Content */}
                       <View
-                        style={[styles.smallCard, { width: SMALL_CARD_WIDTH }]}
+                        style={{
+                          padding: 12,
+                        }}
                       >
-                        <Image
-                          source={{ uri: Image_url + item?.front_image }}
-                          style={styles.smallImage}
-                        />
+                        {/* Product Name */}
                         <TransletText
-                          text={item?.name || ''}
-                          style={[
-                            styles.smallTitle,
-                            { height: heightPercentageToDP(4) },
-                          ]}
+                          text={item.product?.name || 'Product Name'}
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '500',
+                            color: '#1A1A1A',
+                            marginBottom: 8,
+                            lineHeight: 18,
+                            height: 36,
+                          }}
                           numberOfLines={2}
                         />
 
-                        {/* PRICE DISPLAY - Updated with currency conversion */}
+                        {/* Price and Rating Row */}
                         <View
                           style={{
                             flexDirection: 'row',
                             alignItems: 'center',
-                            marginTop: 4,
-                            minHeight: 20,
+                            justifyContent: 'space-between',
+                            marginBottom: 8,
                           }}
                         >
-                          {hasDiscount ? (
-                            <>
-                              <Text
-                                style={[
-                                  styles.smallPrice,
-                                  { color: '#2E2E2E', fontWeight: '700' },
-                                ]}
-                              >
-                                {displayPrice(discountedPrice)}
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.smallOldPrice,
-                                  { marginLeft: 8 },
-                                ]}
-                              >
-                                {displayPrice(originalPrice)}
-                              </Text>
-                            </>
-                          ) : originalPrice ? (
-                            <Text
-                              style={[
-                                styles.smallPrice,
-                                { color: '#2E2E2E', fontWeight: '700' },
-                              ]}
-                            >
-                              {displayPrice(originalPrice)}
-                            </Text>
-                          ) : (
-                            <TransletText
-                              text="Price not available"
-                              style={{ fontSize: 12, color: '#666' }}
-                            />
-
-                          )}
-                        </View>
-
-                        <View
-                          style={{
-                            backgroundColor: '#EAE6B9',
-                            borderRadius: 4,
-                            marginVertical: 10,
-                            flexDirection: 'row',
-                            justifyContent: 'center',
-                            paddingVertical: 5,
-                            paddingHorizontal: 3,
-                          }}
-                        >
-                          <Text style={{ fontSize: 10, color: '#000' }}>
-                            <TransletText text="see more like this" style={{ fontSize: 10, color: '#000' }} />
-                            <Text style={{ color: '#008009', fontSize: 10 }}> ▶</Text>
-                          </Text>
-
-                        </View>
-
-                        <TouchableOpacity
-                          activeOpacity={0.8}
-                          onPress={async e => {
-                            e.stopPropagation();
-                            if (isWishlisted(item.id)) {
-                              await removeFromWishlist(item.id);
-                            } else {
-                              await addToWishlist(item.id);
-                            }
-                          }}
-                          style={{
-                            position: 'absolute',
-                            top: heightPercentageToDP(1.5),
-                            right: widthPercentageToDP(4),
-                            backgroundColor: Colors.button[100],
-                            padding: 6,
-                            borderRadius: 12,
-                            width: 28,
-                            height: 28,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <Image
-                            source={
-                              isWishlisted(item.id)
-                                ? require('../../assets/heart.png')
-                                : require('../../assets/Png/heart-1.png')
-                            }
+                          {/* Price */}
+                          <View
                             style={{
-                              width: 14,
-                              height: 14,
-                              resizeMode: 'cover',
+                              flexDirection: 'row',
+                              alignItems: 'baseline',
+                              gap: 6,
                             }}
-                          />
-                        </TouchableOpacity>
+                          >
+                            <Text
+                              style={{
+                                fontSize: 15,
+                                fontWeight: '600',
+                                color: '#1A1A1A',
+                              }}
+                            >
+                              {displayPrice(
+                                Math.round(item.product.price_range.min || 0),
+                              )}
+                            </Text>
+                            {item.product.price_range.max >
+                              item.product.price_range.min && (
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color: '#999999',
+                                }}
+                              >
+                                -{' '}
+                                {displayPrice(
+                                  Math.round(item.product.price_range.max),
+                                )}
+                              </Text>
+                            )}
+                          </View>
+
+                          {/* Rating */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: '#F5F5F5',
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 12,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: '#666666',
+                                marginRight: 2,
+                              }}
+                            >
+                              ★
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: '#666666',
+                                fontWeight: '500',
+                              }}
+                            >
+                              {item.product?.ratingCount || '4.2'}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Delivery Badge - Minimal */}
+                        {item.product?.fastDelivery && (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 3,
+                                height: 3,
+                                borderRadius: 1.5,
+                                backgroundColor: '#2E7D32',
+                              }}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                color: '#2E7D32',
+                                fontWeight: '400',
+                              }}
+                            >
+                              Free delivery
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </TouchableOpacity>
                   );
                 }}
               />
 
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Category')}
-              >
+              {/* Subtle Pagination Dots - Optional */}
+              {FeaturesProduct.length > 4 && (
                 <View
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: 8,
                     flexDirection: 'row',
+                    alignItems: 'center',
                     justifyContent: 'center',
-                    height: 40,
-                    width: widthPercentageToDP(90),
-                    alignSelf: 'center',
+                    marginTop: 16,
+                    gap: 6,
                   }}
                 >
-                  <Image
-                    source={require('../../assets/Png/Ellipse.png')}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      alignSelf: 'center',
-                      right: 10,
-                    }}
-                  />
-                  <TransletText
-                    text="See all products"
-                    style={[styles.moveToWishlistText, { alignSelf: 'center', color: '#000' }]}
-                  />
-                  <Image
-                    source={require('../../assets/Png/next.png')}
-                    style={{
-                      width: 12,
-                      height: 12,
-                      alignSelf: 'center',
-                      left: 10,
-                      tintColor: '#000000',
-                    }}
-                  />
+                  {[0, 1, 2].map(index => (
+                    <View
+                      key={index}
+                      style={{
+                        width: index === 0 ? 24 : 6,
+                        height: 4,
+                        borderRadius: 2,
+                        backgroundColor: index === 0 ? '#1A1A1A' : '#E0E0E0',
+                      }}
+                    />
+                  ))}
                 </View>
-              </TouchableOpacity>
+              )}
             </View>
           </View>
+          {/* Big Sale Section - Redesigned */}
+          {salesProduct.length > 0 && (
+            <View
+              style={{
+                width: '100%',
+                marginTop: 20,
+                marginBottom: 10,
+                paddingVertical: 15,
+                backgroundColor: '#F8F6F0', // Soft, neutral background
+              }}
+            >
+              {/* Section Header */}
+              <View
+                style={{
+                  paddingHorizontal: widthPercentageToDP(3),
+                  marginBottom: 15,
+                }}
+              >
+                <TransletText
+                  text="News"
+                  style={[
+                    styles.sectionTitle,
+                    {
+                      fontSize: 18,
+                      fontWeight: '600',
+                      color: '#2C2C2C',
+                      marginBottom: 4,
+                    },
+                  ]}
+                />
+                {salesProduct[0] && (
+                  <TransletText
+                    text={`${formatDate(salesProduct[0]?.start_date).slice(
+                      0,
+                      13,
+                    )} - ${formatDate(salesProduct[0]?.end_date).slice(0, 13)}`}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '400',
+                      color: '#666666',
+                      letterSpacing: 0.3,
+                    }}
+                  />
+                )}
+              </View>
 
+              {/* Carousel */}
+              <FlatList
+                data={salesProduct}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, index) => `sale-${index}`}
+                contentContainerStyle={{
+                  paddingHorizontal: widthPercentageToDP(3),
+                  gap: 12,
+                }}
+                renderItem={({ item }) => {
+                  // Calculate discount percentage if not provided
+                  const discountPercentage =
+                    item?.percentage ||
+                    (() => {
+                      if (item?.product?.price_range) {
+                        const min = item.product.price_range.min;
+                        const max = item.product.price_range.max;
+                        if (min && max && max > min) {
+                          return Math.round(((max - min) / max) * 100);
+                        }
+                      }
+                      return null;
+                    })();
+
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        navigation.navigate('ProductDetails', {
+                          productId: item?.product?.id || item?.id,
+                        })
+                      }
+                      style={{
+                        width: 200,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 16,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 8,
+                        elevation: 3,
+                        overflow: 'hidden',
+                        borderWidth: 1,
+                        borderColor: '#F0F0F0',
+                      }}
+                    >
+                      {/* Image Container */}
+                      <View
+                        style={{
+                          position: 'relative',
+                          backgroundColor: '#FAFAFA',
+                        }}
+                      >
+                        <Image
+                          source={{
+                            uri:
+                              Image_url +
+                              (item?.product?.front_image || item?.front_image),
+                          }}
+                          style={{
+                            width: '100%',
+                            height: 160,
+                            resizeMode: 'cover',
+                          }}
+                        />
+
+                        {/* Discount Badge - Optional, remove if you want even more minimal */}
+                        {discountPercentage && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: 12,
+                              left: 12,
+                              backgroundColor: 'rgba(40, 40, 40, 0.9)',
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 20,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: '#FFFFFF',
+                                fontSize: 11,
+                                fontWeight: '600',
+                                letterSpacing: 0.3,
+                              }}
+                            >
+                              {discountPercentage}% OFF
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Content */}
+                      <View
+                        style={{
+                          padding: 12,
+                        }}
+                      >
+                        <TransletText
+                          text={item?.product?.name || item?.name || 'Product'}
+                          style={{
+                            fontSize: 14,
+                            fontWeight: '500',
+                            color: '#2C2C2C',
+                            marginBottom: 8,
+                            lineHeight: 20,
+                          }}
+                          numberOfLines={2}
+                        />
+
+                        {/* Price */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                          }}
+                        >
+                          {item?.product?.price_range ? (
+                            <>
+                              <Text
+                                style={{
+                                  fontSize: 15,
+                                  fontWeight: '600',
+                                  color: '#2C2C2C',
+                                }}
+                              >
+                                {displayPrice(
+                                  Math.round(item.product.price_range.min),
+                                )}
+                              </Text>
+                              {item.product.price_range.max >
+                                item.product.price_range.min && (
+                                <>
+                                  <Text
+                                    style={{
+                                      fontSize: 13,
+                                      color: '#999999',
+                                    }}
+                                  >
+                                    -
+                                  </Text>
+                                  <Text
+                                    style={{
+                                      fontSize: 15,
+                                      fontWeight: '600',
+                                      color: '#2C2C2C',
+                                    }}
+                                  >
+                                    {displayPrice(
+                                      Math.round(item.product.price_range.max),
+                                    )}
+                                  </Text>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <Text
+                              style={{
+                                fontSize: 15,
+                                fontWeight: '600',
+                                color: '#2C2C2C',
+                              }}
+                            >
+                              {displayPrice(
+                                item?.variants?.[0]?.actual_price ||
+                                  item?.variants?.[0]?.price,
+                              )}
+                            </Text>
+                          )}
+                        </View>
+
+                        {/* Shop Now Link */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            marginTop: 10,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: '#666666',
+                              marginRight: 4,
+                            }}
+                          >
+                            Shop now
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: '#2C2C2C',
+                            }}
+                          >
+                            →
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </View>
+          )}
+          {/* Lowest Prices Ever */}
+          {/* Lowest Prices Ever - Redesigned */}
+          <View
+            style={{
+              width: '100%',
+              marginVertical: heightPercentageToDP(2),
+              backgroundColor: '#FFFFFF',
+              paddingVertical: 20,
+            }}
+          >
+            {/* Simple Decorative Header Line */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: widthPercentageToDP(3),
+                marginBottom: 16,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  height: 1,
+                  backgroundColor: '#E8E8E8',
+                }}
+              />
+              <View
+                style={{
+                  paddingHorizontal: 16,
+                }}
+              >
+                <TransletText
+                  text="Lowest PRICES EVER"
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '500',
+                    color: '#2C2C2C',
+                    letterSpacing: 0.8,
+                    textTransform: 'uppercase',
+                  }}
+                />
+              </View>
+              <View
+                style={{
+                  flex: 1,
+                  height: 1,
+                  backgroundColor: '#E8E8E8',
+                }}
+              />
+            </View>
+
+            {/* Subtitle */}
+            <TransletText
+              text="Unbeatable prices on premium products"
+              style={{
+                fontSize: 13,
+                color: '#666666',
+                textAlign: 'center',
+                marginBottom: 20,
+                fontStyle: 'italic',
+              }}
+            />
+
+            {/* Products Carousel */}
+            <FlatList
+              data={lowestitem}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item, index) => `lowest-${index}`}
+              contentContainerStyle={{
+                paddingHorizontal: widthPercentageToDP(3),
+                gap: 16,
+              }}
+              renderItem={({ item }) => {
+                const wished = isWishlisted(item.id);
+
+                // Extract price information
+                const getPriceInfo = (product: any) => {
+                  if (!product)
+                    return { discountedPrice: null, originalPrice: null };
+
+                  let discountedPrice = null;
+                  if (
+                    product?.variants?.[0]?.actual_price !== undefined &&
+                    product?.variants?.[0]?.actual_price !== null
+                  ) {
+                    discountedPrice = product.variants[0].actual_price;
+                  }
+
+                  let originalPrice = null;
+                  if (
+                    product?.variants?.[0]?.price !== undefined &&
+                    product?.variants?.[0]?.price !== null
+                  ) {
+                    originalPrice = product.variants[0].price;
+                  }
+
+                  if (
+                    !discountedPrice &&
+                    !originalPrice &&
+                    product?.main_price
+                  ) {
+                    originalPrice = product.main_price;
+                  }
+
+                  if (
+                    discountedPrice &&
+                    !originalPrice &&
+                    product?.main_price
+                  ) {
+                    originalPrice = product.main_price;
+                  }
+
+                  return { discountedPrice, originalPrice };
+                };
+
+                const { discountedPrice, originalPrice } = getPriceInfo(item);
+                const hasDiscount =
+                  discountedPrice &&
+                  originalPrice &&
+                  discountedPrice !== originalPrice;
+                const savingsPercentage = hasDiscount
+                  ? Math.round(
+                      ((originalPrice - discountedPrice) / originalPrice) * 100,
+                    )
+                  : null;
+
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() =>
+                      navigation.navigate('ProductDetails', {
+                        productId: item.id,
+                      })
+                    }
+                    style={{
+                      width: 160,
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#F0F0F0',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Image Container */}
+                    <View
+                      style={{
+                        position: 'relative',
+                        backgroundColor: '#FAFAFA',
+                      }}
+                    >
+                      <Image
+                        source={{ uri: Image_url + item?.front_image }}
+                        style={{
+                          width: '100%',
+                          height: 160,
+                          resizeMode: 'cover',
+                        }}
+                      />
+
+                      {/* Savings Badge - Only show if significant savings */}
+                      {savingsPercentage && savingsPercentage > 10 && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 12,
+                            right: 12,
+                            backgroundColor: 'rgba(44, 44, 44, 0.9)',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 20,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: '#FFFFFF',
+                              fontSize: 10,
+                              fontWeight: '600',
+                              letterSpacing: 0.3,
+                            }}
+                          >
+                            -{savingsPercentage}%
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Wishlist Button - Subtle */}
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={async e => {
+                          e.stopPropagation();
+                          if (isWishlisted(item.id)) {
+                            await removeFromWishlist(item.id);
+                          } else {
+                            await addToWishlist(item.id);
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: 12,
+                          left: 12,
+                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                          padding: 6,
+                          borderRadius: 20,
+                          width: 28,
+                          height: 28,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Image
+                          source={
+                            isWishlisted(item.id)
+                              ? require('../../assets/heart.png')
+                              : require('../../assets/Png/heart-1.png')
+                          }
+                          style={{
+                            width: 14,
+                            height: 14,
+                            resizeMode: 'cover',
+                            tintColor: isWishlisted(item.id)
+                              ? '#FF3E6C'
+                              : '#666666',
+                          }}
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Product Info */}
+                    <View
+                      style={{
+                        padding: 12,
+                      }}
+                    >
+                      <TransletText
+                        text={item?.name || ''}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '500',
+                          color: '#2C2C2C',
+                          marginBottom: 8,
+                          lineHeight: 18,
+                          height: 36,
+                        }}
+                        numberOfLines={2}
+                      />
+
+                      {/* Price Section */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'baseline',
+                          gap: 8,
+                        }}
+                      >
+                        {hasDiscount ? (
+                          <>
+                            <Text
+                              style={{
+                                fontSize: 16,
+                                fontWeight: '600',
+                                color: '#2C2C2C',
+                              }}
+                            >
+                              {displayPrice(discountedPrice)}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: '#999999',
+                                textDecorationLine: 'line-through',
+                              }}
+                            >
+                              {displayPrice(originalPrice)}
+                            </Text>
+                          </>
+                        ) : originalPrice ? (
+                          <Text
+                            style={{
+                              fontSize: 16,
+                              fontWeight: '600',
+                              color: '#2C2C2C',
+                            }}
+                          >
+                            {displayPrice(originalPrice)}
+                          </Text>
+                        ) : (
+                          <TransletText
+                            text="Price unavailable"
+                            style={{
+                              fontSize: 12,
+                              color: '#999999',
+                              fontStyle: 'italic',
+                            }}
+                          />
+                        )}
+                      </View>
+
+                      {/* View Details Link */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
+                          marginTop: 10,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: '#888888',
+                            marginRight: 4,
+                          }}
+                        >
+                          View details
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: '#2C2C2C',
+                          }}
+                        >
+                          →
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+
+            {/* See All Link - Minimal */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Category')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 20,
+                paddingVertical: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: '#666666',
+                  marginRight: 6,
+                  fontWeight: '400',
+                }}
+              >
+                Browse all products
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: '#2C2C2C',
+                }}
+              >
+                →
+              </Text>
+            </TouchableOpacity>
+          </View>
           // Wishlist Section - Replace your current wishlist section with this
           {wishlistItems && wishlistItems.length > 0 ? (
             <View
@@ -1828,7 +2373,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                 text={`Your Wishlist (${wishlistItems.length})`}
                 style={styles.sectionTitle}
               />
-
 
               <FlatList
                 data={wishlistItems}
@@ -1936,7 +2480,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           numberOfLines={2}
                         />
 
-
                         {/* Price */}
                         {correctPrice !== null ? (
                           <View
@@ -1959,7 +2502,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                               marginTop: 4,
                             }}
                           />
-
                         )}
 
                         {/* Wishlist Heart Button */}
@@ -2034,7 +2576,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                     navigation.navigate('BottomTabScreen', {
                       screen: 'Category',
                     })
-
                   }
                   style={{
                     backgroundColor: '#2E2E2E',
@@ -2047,7 +2588,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                     text="Browse Products →"
                     style={{ color: '#fff', fontWeight: '600' }}
                   />
-
                 </TouchableOpacity>
               </View>
             </View>
@@ -2058,75 +2598,137 @@ const HomeScreen1 = ({ navigation }: any) => {
             navigation={navigation}
           />
           {/* Recommended For You */}
+          {/* Recommended For You - Redesigned */}
           <View
             style={{
-              paddingHorizontal: widthPercentageToDP(3),
-              marginTop: heightPercentageToDP(2),
+              marginTop: heightPercentageToDP(3),
               marginBottom: heightPercentageToDP(4),
+              backgroundColor: '#FFFFFF',
+              paddingVertical: 20,
+              borderTopWidth: 1,
+              borderTopColor: '#F0F0F0',
             }}
           >
-            <TransletText text="Recommended For You" style={styles.sectionTitle} />
+            {/* Sophisticated Header */}
+            <View
+              style={{
+                paddingHorizontal: widthPercentageToDP(3),
+                marginBottom: 20,
+              }}
+            >
+              <TransletText
+                text="Recommended for you"
+                style={{
+                  fontSize: 18,
+                  fontWeight: '400',
+                  color: '#1A1A1A',
+                  letterSpacing: 0.3,
+                  marginBottom: 4,
+                }}
+              />
+              <TransletText
+                text="Based on your preferences"
+                style={{
+                  fontSize: 12,
+                  fontWeight: '300',
+                  color: '#999999',
+                  fontStyle: 'italic',
+                }}
+              />
+            </View>
+
+            {/* Recommended Carousel */}
             <FlatList
               ref={recRef}
               data={apiRecommend}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={item => item.id}
-              snapToInterval={WISHLIST_CARD_WIDTH + 12}
+              keyExtractor={(item, index) => `rec-${item.id || index}`}
+              snapToInterval={WISHLIST_CARD_WIDTH + 16}
               decelerationRate="fast"
-              contentContainerStyle={{ paddingVertical: 8 }}
+              contentContainerStyle={{
+                paddingHorizontal: widthPercentageToDP(3),
+                gap: 16,
+              }}
               onScroll={onRecommendedScroll}
-              renderItem={({ item }) => {
+              renderItem={({ item, index }) => {
                 const wished = isWishlisted(item.id);
                 const correctPrice = getCorrectPrice(item);
 
+                // Get original price if available
+                const originalPrice = item.variants?.[0]?.price;
+                const hasDiscount =
+                  originalPrice && correctPrice && originalPrice > correctPrice;
+                const discountPercentage = hasDiscount
+                  ? Math.round(
+                      ((originalPrice - correctPrice) / originalPrice) * 100,
+                    )
+                  : null;
+
                 return (
                   <TouchableOpacity
+                    activeOpacity={0.8}
                     onPress={() =>
                       navigation.navigate('ProductDetails', {
                         productId: item.id,
                       })
                     }
+                    style={{
+                      width: WISHLIST_CARD_WIDTH,
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: 16,
+                      overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: '#F2F2F2',
+                    }}
                   >
+                    {/* Image Container */}
                     <View
-                      style={[
-                        styles.wishlistCard,
-                        { width: WISHLIST_CARD_WIDTH },
-                      ]}
+                      style={{
+                        position: 'relative',
+                        backgroundColor: '#F9F9F9',
+                        aspectRatio: 1,
+                      }}
                     >
                       <Image
                         source={{ uri: Image_url + item?.front_image }}
-                        style={styles.wishlistImage}
-                      />
-                      <TransletText
-                        text={item?.name || ''}
-                        style={[
-                          styles.wishlistTitle,
-                          {
-                            fontWeight: '400',
-                            height: heightPercentageToDP(4),
-                          },
-                        ]}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          resizeMode: 'cover',
+                        }}
                       />
 
-                      <View
-                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                      >
-                        <Text style={styles.smallPrice}>
-                          {displayPrice(
-                            item.variants[0]?.actual_price ||
-                            item.variants[0]?.price,
-                          )}
-                        </Text>
-                        {item.variants[0]?.price && (
-                          <Text style={styles.smallOldPrice}>
-                            {displayPrice(item.variants[0]?.price)}
+                      {/* Subtle Discount Indicator - Only if significant */}
+                      {discountPercentage && discountPercentage > 5 && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 12,
+                            left: 12,
+                            backgroundColor: 'rgba(44, 44, 44, 0.85)',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 20,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: '#FFFFFF',
+                              fontSize: 9,
+                              fontWeight: '500',
+                              letterSpacing: 0.3,
+                            }}
+                          >
+                            -{discountPercentage}%
                           </Text>
-                        )}
-                      </View>
+                        </View>
+                      )}
 
+                      {/* Wishlist Button - Refined */}
                       <TouchableOpacity
-                        onPress={async () => {
+                        onPress={async e => {
+                          e.stopPropagation();
                           if (isWishlisted(item.id)) {
                             await removeFromWishlist(item.id);
                           } else {
@@ -2136,47 +2738,151 @@ const HomeScreen1 = ({ navigation }: any) => {
                         activeOpacity={0.7}
                         style={{
                           position: 'absolute',
-                          top: heightPercentageToDP(1.5),
-                          right: widthPercentageToDP(4),
-                          backgroundColor: Colors.button[100],
-                          padding: 6,
-                          borderRadius: 12,
-                          width: 20,
-                          height: 20,
+                          top: 12,
+                          right: 12,
+                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                          padding: 8,
+                          borderRadius: 20,
+                          width: 32,
+                          height: 32,
                           justifyContent: 'center',
+                          alignItems: 'center',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.05,
+                          shadowRadius: 4,
+                          elevation: 2,
                         }}
                       >
                         <Image
                           source={
-                            isWishlisted(item.id)
-                              ? require('../../assets/heart.png') // Filled heart (wishlisted)
-                              : require('../../assets/Png/heart-1.png') // Outline heart (not wishlisted)
+                            wished
+                              ? require('../../assets/heart.png')
+                              : require('../../assets/Png/heart-1.png')
                           }
                           style={{
-                            position: 'absolute',
-                            width: 12,
-                            height: 12,
-                            alignSelf: 'center',
+                            width: 14,
+                            height: 14,
                             resizeMode: 'cover',
+                            tintColor: wished ? '#FF3E6C' : '#666666',
                           }}
                         />
                       </TouchableOpacity>
+                    </View>
+
+                    {/* Content */}
+                    <View
+                      style={{
+                        padding: 12,
+                      }}
+                    >
+                      {/* Product Name */}
+                      <TransletText
+                        text={item?.name || ''}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '400',
+                          color: '#1A1A1A',
+                          marginBottom: 8,
+                          lineHeight: 18,
+                          height: 36,
+                        }}
+                        numberOfLines={2}
+                      />
+
+                      {/* Price Section */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'baseline',
+                          gap: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 15,
+                            fontWeight: '500',
+                            color: '#1A1A1A',
+                          }}
+                        >
+                          {displayPrice(
+                            correctPrice ||
+                              item.variants[0]?.actual_price ||
+                              item.variants[0]?.price,
+                          )}
+                        </Text>
+
+                        {hasDiscount && (
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: '#999999',
+                              textDecorationLine: 'line-through',
+                            }}
+                          >
+                            {displayPrice(originalPrice)}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Quick View Indicator */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginTop: 10,
+                          opacity: 0.5,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: '#666666',
+                            marginRight: 4,
+                          }}
+                        >
+                          Quick view
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: '#666666',
+                          }}
+                        >
+                          →
+                        </Text>
+                      </View>
                     </View>
                   </TouchableOpacity>
                 );
               }}
             />
 
-            {/* Dots */}
-            <View style={styles.dotsContainer}>
-              {Array.isArray(apiRecommend) &&
-                apiRecommend.map((_, i) => (
+            {/* Minimal Pagination Dots */}
+            {Array.isArray(apiRecommend) && apiRecommend.length > 0 && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 16,
+                  gap: 8,
+                }}
+              >
+                {apiRecommend.map((_, i) => (
                   <View
                     key={i}
-                    style={[styles.dot, activeRec === i && styles.activeDot]}
+                    style={{
+                      width: activeRec === i ? 24 : 6,
+                      height: 4,
+                      borderRadius: 2,
+                      backgroundColor: activeRec === i ? '#1A1A1A' : '#E0E0E0',
+                      transition: 'all 0.2s ease',
+                    }}
                   />
                 ))}
-            </View>
+              </View>
+            )}
           </View>
         </View>
 
