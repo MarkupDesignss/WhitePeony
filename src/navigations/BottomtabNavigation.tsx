@@ -17,7 +17,7 @@ import TransletText from '../components/TransletText';
 const Tab = createBottomTabNavigator();
 
 interface CustomTabBarIconProps {
-  source: any; 
+  source: any;
   focused: boolean;
   name: string; // Added name prop for potential future use
 }
@@ -56,11 +56,11 @@ const CustomTabBarIcon: React.FC<CustomTabBarIconProps> = ({
 
 const BottomTabScreen = () => {
 
-const { translatedText: homeText } = useAutoTranslate('Home');
-const { translatedText: categoryText } = useAutoTranslate('Category');
-const { translatedText: eventsText } = useAutoTranslate('Events');
-const { translatedText: articlesText } = useAutoTranslate('Articles');
-const { translatedText: accountsText } = useAutoTranslate('Accounts');
+  const { translatedText: homeText } = useAutoTranslate('Home');
+  const { translatedText: categoryText } = useAutoTranslate('Category');
+  const { translatedText: eventsText } = useAutoTranslate('Events');
+  const { translatedText: articlesText } = useAutoTranslate('Articles');
+  const { translatedText: accountsText } = useAutoTranslate('Accounts');
 
 
   return (
@@ -69,7 +69,7 @@ const { translatedText: accountsText } = useAutoTranslate('Accounts');
         tabBarStyle: styles.tabBar,
         tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: "#AEB254",
-        tabBarInactiveTintColor: "#999", 
+        tabBarInactiveTintColor: "#999",
         tabBarLabelStyle: {
           fontSize: 12,
           marginTop: 10,
@@ -78,28 +78,28 @@ const { translatedText: accountsText } = useAutoTranslate('Accounts');
         tabBarIcon: ({ focused, color }) => {
           let iconSource;
           let labelText;
-          
+
           if (route.name === 'Home') {
             iconSource = focused ? Images.homeC : Images.home;
             labelText = homeText || 'Home';
-          
+
           } else if (route.name === 'Category') {
             iconSource = focused ? Images.shoppingc : Images.category;
             labelText = categoryText || 'Category';
-          
+
           } else if (route.name === 'Events') {
             iconSource = focused ? Images.eventC : Images.event;
             labelText = eventsText || 'Events';
-          
+
           } else if (route.name === 'Articles') {
             iconSource = focused ? Images.blogC : Images.article;
             labelText = articlesText || 'Articles';
-          
+
           } else if (route.name === 'Accounts') {
             iconSource = focused ? Images.GroupC : Images.account;
             labelText = accountsText || 'Accounts';
           }
-          
+
           return (
             <View style={{ alignItems: "center" }}>
               {focused && (
@@ -113,7 +113,7 @@ const { translatedText: accountsText } = useAutoTranslate('Accounts');
                   }}
                 />
               )}
-          
+
               <CustomTabBarIcon
                 source={iconSource}
                 focused={focused}
@@ -121,7 +121,7 @@ const { translatedText: accountsText } = useAutoTranslate('Accounts');
               />
             </View>
           );
-          
+
 
 
         },
@@ -133,15 +133,16 @@ const { translatedText: accountsText } = useAutoTranslate('Accounts');
         options={{ headerShown: false }}
       />
       <Tab.Screen
-        name="Category"
-        component={CategoryStackNavigator}
-        options={{ headerShown: false }}
-      />
-      <Tab.Screen
         name="Events"
         component={EventScreen}
         options={{ headerShown: false }}
       />
+      <Tab.Screen
+        name="Category"
+        component={CategoryStackNavigator}
+        options={{ headerShown: false }}
+      />
+
       <Tab.Screen
         name="Articles"
         component={ArticleScreen}
