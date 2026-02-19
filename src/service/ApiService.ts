@@ -599,11 +599,12 @@ export const UserService = {
     return APIKit.delete(`delete-account`, apiHeaders);
   },
 
+  // This is already in your ApiService.ts
   profile: async () => {
     const token = await LocalStorage.read('@token');
     const apiHeaders = {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': 'multipart/form-data', // ⚠️ This should be 'application/json'
         Accept: 'application/json',
         Authorization: `Bearer ${token}`,
       },

@@ -1,43 +1,36 @@
-import React, {
-  FC,
-  createContext,
-  ReactNode,
-  useState,
-  useEffect,
-} from 'react';
+import React, { FC, createContext, ReactNode, useState, useEffect } from 'react';
 import { LocalStorage } from '../helpers/localstorage';
+import { UserService } from '../service/ApiService';
+import { HttpStatusCode } from 'axios';
 
 /* ================= TYPES ================= */
 
 export interface UserData {
-  isLoggedIn: string | null;
-  setIsLoggedIn: (value: boolean | any) => void;
-
+  isLoggedIn: boolean;
+  setIsLoggedIn: (value: boolean) => void;
   userData: any;
   setUserData: (data: any) => void;
-
-  // EXISTING (do not remove)
   userType: 'b2c' | 'b2b' | null;
   setUserType: (type: 'b2c' | 'b2b' | null) => void;
-
-  // NEW (tier.type -> "browns")
   tierType: string | null;
   setTierType: (type: string | null) => void;
+  isLoading: boolean;
+  refetchProfile: () => Promise<void>;
 }
 
 /* ================= CONTEXT ================= */
 
 const UserDataContext = createContext<UserData>({
-  isLoggedIn: null,
+  isLoggedIn: false,
   setIsLoggedIn: () => { },
   userData: null,
   setUserData: () => { },
-
   userType: null,
   setUserType: () => { },
-
   tierType: null,
   setTierType: () => { },
+  isLoading: true,
+  refetchProfile: async () => { },
 });
 
 type Props = {
@@ -47,92 +40,188 @@ type Props = {
 /* ================= PROVIDER ================= */
 
 const UserDataContextProvider: FC<Props> = ({ children }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userData, setUserData] = useState<any>(null);
-
-  // EXISTING
   const [userType, setUserType] = useState<'b2c' | 'b2b' | null>(null);
-
-  // NEW
   const [tierType, setTierType] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Check login status on mount
   useEffect(() => {
-    setContextDataFromStorage();
+    checkLoginStatus();
   }, []);
 
-  const setContextDataFromStorage = async () => {
+  const checkLoginStatus = async () => {
     try {
-      const login = await LocalStorage.read('@login');
-      const user = await LocalStorage.read('@user');
+      setIsLoading(true);
 
-      const storedUserType = await LocalStorage.read('@userType');
-      const storedTierType = await LocalStorage.read('@tierType');
+      // Check if token exists
+      const token = await LocalStorage.read('@token');
 
-
-      setIsLoggedIn(login || null);
-      setUserData(user || null);
-
-      /* ---------- userType (b2c / b2b) ---------- */
-      if (storedUserType === 'b2c' || storedUserType === 'b2b') {
-        setUserType(storedUserType);
-      } else if (user?.type === 'b2c' || user?.type === 'b2b') {
-        setUserType(user.type);
-        await LocalStorage.save('@userType', user.type);
+      if (token) {
+        console.log('🔑 Token found, fetching profile...');
+        await fetchUserProfile();
       } else {
+        console.log('🚫 No token found, user is logged out');
+        setIsLoggedIn(false);
+        setUserData(null);
         setUserType(null);
-      }
-
-      /* ---------- tierType (tier.type) ---------- */
-      if (storedTierType) {
-        setTierType(storedTierType);
-      } else if (user?.tier?.type) {
-        setTierType(user.tier.type);
-        await LocalStorage.save('@tierType', user.tier.type);
-      } else {
         setTierType(null);
+        setIsLoading(false);
       }
     } catch (error) {
-      console.error('Storage error:', error);
+      console.error('❌ Error checking login status:', error);
+      setIsLoggedIn(false);
+      setIsLoading(false);
+    }
+  };
+
+  const fetchUserProfile = async () => {
+    try {
+      console.log('📡 Calling UserService.profile()...');
+
+      const response = await UserService.profile();
+
+      console.log('📥 Profile API Response Status:', response?.status);
+      console.log('📥 Profile API Full Response:', JSON.stringify(response?.data, null, 2));
+
+      // Check if response is successful
+      if (response?.status === HttpStatusCode.Ok && response?.data) {
+
+        // Based on your API response structure:
+        // {
+        //   "success": true,
+        //   "user": {
+        //     "id": 38,
+        //     "email": "peter@yopmail.com",
+        //     "name": "Peter",
+        //     "phone": "9876543211",
+        //     "type": "b2c",
+        //     "profile_image": null,
+        //     "created_at": "2026-01-22T09:36:17.000000Z",
+        //     "address": { ... },
+        //     "tier": { "id": 1, "type": "browns" }
+        //   }
+        // }
+
+        // Extract user data from response (handle both structures)
+        const profileData = response.data.user || response.data;
+
+        console.log('✅ Profile data extracted:', {
+          id: profileData.id,
+          name: profileData.name,
+          email: profileData.email,
+          phone: profileData.phone,
+          type: profileData.type,
+          profile_image: profileData.profile_image,
+          tier: profileData.tier?.type,
+          address: profileData.address ? 'exists' : 'none',
+          created_at: profileData.created_at
+        });
+
+        // Set all user data
+        setUserData(profileData);
+        setIsLoggedIn(true);
+
+        // Set user type from the 'type' field (b2c/b2b)
+        if (profileData.type === 'b2c' || profileData.type === 'b2b') {
+          setUserType(profileData.type);
+          console.log('✅ User type set to:', profileData.type);
+        }
+
+        // Set tier type from tier.type (browns, etc.)
+        if (profileData.tier?.type) {
+          setTierType(profileData.tier.type);
+          console.log('✅ Tier type set to:', profileData.tier.type);
+        }
+
+      } else {
+        console.log('❌ Profile fetch failed - invalid response');
+        console.log('Response data:', response?.data);
+        setIsLoggedIn(false);
+        setUserData(null);
+        setUserType(null);
+        setTierType(null);
+
+        // Clear invalid token
+        await LocalStorage.remove('@token');
+      }
+    } catch (error: any) {
+      console.error('❌ Error in fetchUserProfile:', error);
+
+      // Log detailed error information
+      if (error.response) {
+        console.error('❌ Error response:', {
+          status: error.response.status,
+          data: error.response.data
+        });
+
+        // Check if error is due to invalid token (401)
+        if (error.response.status === 401) {
+          console.log('🔑 Token invalid or expired, clearing...');
+          await LocalStorage.remove('@token');
+        }
+      } else if (error.request) {
+        console.error('❌ No response received:', error.request);
+      } else {
+        console.error('❌ Error message:', error.message);
+      }
+
+      setIsLoggedIn(false);
+      setUserData(null);
+      setUserType(null);
+      setTierType(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const setIsLoggedInSafe = (value: boolean) => {
+    console.log('🔐 Setting isLoggedIn:', value);
+    setIsLoggedIn(value);
+
+    if (!value) {
+      // Clear all data on logout
+      setUserData(null);
       setUserType(null);
       setTierType(null);
     }
   };
 
-  /* ================= SAFE SETTERS ================= */
-
-  const setUserTypeSafe = (type: 'b2c' | 'b2b' | null) => {
-    setUserType(type);
-    if (type) {
-      LocalStorage.save('@userType', type);
-    } else {
-      LocalStorage.remove('@userType');
+  const setUserDataSafe = (data: any) => {
+    setUserData(data);
+    if (data) {
+      if (data.type === 'b2c' || data.type === 'b2b') {
+        setUserType(data.type);
+      }
+      if (data.tier?.type) {
+        setTierType(data.tier.type);
+      }
     }
   };
 
-  const setTierTypeSafe = (type: string | null) => {
-    setTierType(type);
-    if (type) {
-      LocalStorage.save('@tierType', type);
-    } else {
-      LocalStorage.remove('@tierType');
-    }
+  const refetchProfile = async () => {
+    await fetchUserProfile();
   };
 
-  /* ================= PROVIDER ================= */
+  // Show loading while checking status
+  if (isLoading) {
+    return null; // Or a loading spinner component
+  }
 
   return (
     <UserDataContext.Provider
       value={{
         isLoggedIn,
-        setIsLoggedIn,
+        setIsLoggedIn: setIsLoggedInSafe,
         userData,
-        setUserData,
-
+        setUserData: setUserDataSafe,
         userType,
-        setUserType: setUserTypeSafe,
-
+        setUserType,
         tierType,
-        setTierType: setTierTypeSafe,
+        setTierType,
+        isLoading,
+        refetchProfile,
       }}
     >
       {children}

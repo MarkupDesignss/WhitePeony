@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Linking,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -39,48 +40,69 @@ type AccountScreenProps = {
 
 const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { showLoader, hideLoader } = CommonLoader();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  const { userData, setIsLoggedIn, isLoggedIn, tierType } =
-    useContext<UserData>(UserDataContext);
+  const {
+    userData,
+    setIsLoggedIn,
+    isLoggedIn,
+    userType,
+    tierType,
+    isLoading: contextLoading,
+    refetchProfile,
+  } = useContext<UserData>(UserDataContext);
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [modalAddress, setModalAddress] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  // alert(tierType)
+
+  // Debug logging
+  useEffect(() => {
+    console.log('📱 AccountScreen - Context Values:', {
+      userData: userData ? {
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        type: userData.type,
+        tier: userData.tier?.type,
+        profile_image: userData.profile_image,
+        created_at: userData.created_at
+      } : null,
+      isLoggedIn,
+      userType,
+      tierType,
+      contextLoading
+    });
+    setIsInitialLoad(false);
+  }, [userData, isLoggedIn, userType, tierType, contextLoading]);
+
   // Use the useAutoTranslate hook for each text
   const { translatedText: accountTitle } = useAutoTranslate('Account');
   const { translatedText: loginText } = useAutoTranslate('Login');
   const { translatedText: logoutText } = useAutoTranslate('Logout');
-  const { translatedText: viewProfileText } =
-    useAutoTranslate('View Full Profile');
+  const { translatedText: viewProfileText } = useAutoTranslate('View Full Profile');
   const { translatedText: myOrdersText } = useAutoTranslate('My Orders');
   const { translatedText: myEventsText } = useAutoTranslate('My Events');
   const { translatedText: myFavoritesText } = useAutoTranslate('My Favorites');
   const { translatedText: myAddressText } = useAutoTranslate('My Address');
-  const { translatedText: notificationsText } =
-    useAutoTranslate('Notifications');
+  const { translatedText: notificationsText } = useAutoTranslate('Notifications');
   const { translatedText: policiesText } = useAutoTranslate('Policies');
   const { translatedText: termsText } = useAutoTranslate('Terms & Conditions');
-  const { translatedText: languageChangeText } =
-    useAutoTranslate('Language Change');
+  const { translatedText: languageChangeText } = useAutoTranslate('Language Change');
   const { translatedText: cookiesText } = useAutoTranslate('Cookies');
   const { translatedText: privacyText } = useAutoTranslate('Privacy Policy');
-  const { translatedText: changeCurrencyText } =
-    useAutoTranslate('Change Currency');
-  const { translatedText: deleteAccountText } =
-    useAutoTranslate('Delete Account');
+  const { translatedText: changeCurrencyText } = useAutoTranslate('Change Currency');
+  const { translatedText: deleteAccountText } = useAutoTranslate('Delete Account');
   const { translatedText: memberSinceText } = useAutoTranslate('Member since');
-  const { translatedText: superShinyText } = useAutoTranslate(tierType);
+  const { translatedText: superShinyText } = useAutoTranslate(tierType || '');
   const { translatedText: growthValueText } = useAutoTranslate('Growth Value');
-  const { translatedText: privilegesText } = useAutoTranslate(
-    'Privileges In Total',
-  );
+  const { translatedText: privilegesText } = useAutoTranslate('Privileges In Total');
   const { translatedText: unlockedText } = useAutoTranslate('Unlocked');
   const { translatedText: notificationText } = useAutoTranslate('Notification');
-  const { translatedText: myFavoritiesText } =
-    useAutoTranslate('My Favorities');
-  const { translatedText: logoutSuccessText } = useAutoTranslate(
-    'Log Out Successfully!',
-  );
+  const { translatedText: myFavoritiesText } = useAutoTranslate('My Favorities');
+  const { translatedText: logoutSuccessText } = useAutoTranslate('Log Out Successfully!');
 
   // Function to open external URLs with InAppBrowser
   const openInAppBrowser = async (url: string, title?: string) => {
@@ -160,12 +182,14 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
       },
       {
         text: 'OK',
-        onPress: () => {
-          handleSignout(setIsLoggedIn);
+        onPress: async () => {
+          setIsLoading(true);
+          await handleSignout(setIsLoggedIn);
           Toast.show({
             type: 'success',
             text1: logoutSuccessText || 'Log Out Successfully!',
           });
+          setIsLoading(false);
         },
       },
     ]);
@@ -193,8 +217,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
       const res = await UserService.deleteAccount();
       hideLoader();
       if (res?.status === HttpStatusCode.Ok && res?.data) {
-        const { message, data } = res.data;
-        console.log('DeleteAcc response data:', res.data);
+        const { message } = res.data;
         Toast.show({ type: 'success', text1: message });
         setTimeout(() => {
           setIsLoggedIn(false);
@@ -213,22 +236,78 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
       console.log('Error in DeleteAcc:', JSON.stringify(err));
       Toast.show({
         type: 'error',
-        text1:
-          err?.response?.data?.message ||
-          'Something went wrong! Please try again.',
+        text1: err?.response?.data?.message || 'Something went wrong! Please try again.',
       });
     }
   };
+
+  const getDisplayName = () => {
+    if (userData?.name) {
+      return userData.name;
+    }
+    if (userData?.first_name && userData?.last_name) {
+      return `${userData.first_name} ${userData.last_name}`;
+    }
+    if (userData?.first_name) {
+      return userData.first_name;
+    }
+    return 'User Name';
+  };
+
+  const getUserEmail = () => {
+    return userData?.email || null;
+  };
+
+  const getUserPhone = () => {
+    return userData?.phone || null;
+  };
+
+  const getMemberSince = () => {
+    if (userData?.created_at) {
+      return formatDate(userData.created_at);
+    }
+    return 'N/A';
+  };
+
+  const getTierName = () => {
+    if (tierType) {
+      return tierType;
+    }
+    if (userData?.tier?.type) {
+      return userData.tier.type;
+    }
+    return null;
+  };
+
+  const getProfileImage = () => {
+    if (userData?.profile_image) {
+      return { uri: Image_url + userData.profile_image };
+    }
+    return null;
+  };
+
+  const isB2BUser = userType === 'b2b';
+  const tierName = getTierName();
+
+  // Show loading only on initial load
+  if (isInitialLoad || contextLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.button[100]} />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{accountTitle || 'Account'}</Text>
         {isLoggedIn ? (
-          <TouchableOpacity onPress={() => signout()} style={styles.logoutIcon}>
+          <TouchableOpacity onPress={signout} style={styles.logoutIcon}>
             <Image
               source={require('../../assets/Png/logout1.png')}
-              style={{ width: 20, height: 20 }}
+              style={{ width: 20, height: 20, tintColor: Colors.button[100] }}
             />
           </TouchableOpacity>
         ) : (
@@ -248,61 +327,91 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
         onFacebookLogin={() => Alert.alert('Facebook Login')}
         phoneNumber="email or phone number"
       />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {isLoggedIn ? (
+        {isLoggedIn && userData ? (
           <LinearGradient
-            colors={['#FCFFBF', '#F7FB9D']}
+            colors={isB2BUser ? ['#FCFFBF', '#F7FB9D'] : ['#FFFFFF', '#F5F5F5']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.profileCard}
+            style={[
+              styles.profileCard,
+              !isB2BUser && styles.b2cProfileCard
+            ]}
           >
-            {/* Diagonal Shine Overlay */}
-            <LinearGradient
-              colors={[
-                'rgba(255,255,255,0.45)',
-                'rgba(255,255,255,0.15)',
-                'rgba(255,255,255,0)',
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.diagonalShine}
-            />
+            {/* Diagonal Shine Overlay - Only for B2B */}
+            {isB2BUser && (
+              <LinearGradient
+                colors={[
+                  'rgba(255,255,255,0.45)',
+                  'rgba(255,255,255,0.15)',
+                  'rgba(255,255,255,0)',
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.diagonalShine}
+              />
+            )}
 
             <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
-                {userData?.profile_image ? (
+                {getProfileImage() ? (
                   <Image
-                    source={{ uri: Image_url + userData?.profile_image }}
+                    source={getProfileImage()}
                     style={styles.avatar}
                   />
                 ) : (
-                  <Image
-                    source={{ uri: 'https://i.postimg.cc/mZXFdw63/person.png' }}
-                    style={styles.avatar}
-                  />
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarText}>
+                      {getDisplayName().charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
                 )}
               </View>
               <View style={styles.profileInfo}>
-                <Text style={styles.name}>{userData?.name || 'User Name'}</Text>
+                <Text style={styles.name}>{getDisplayName()}</Text>
+
+                {getUserEmail() && (
+                  <Text style={styles.email} numberOfLines={1}>
+                    {getUserEmail()}
+                  </Text>
+                )}
+
+                {getUserPhone() && (
+                  <Text style={styles.phone} numberOfLines={1}>
+                    {getUserPhone()}
+                  </Text>
+                )}
 
                 <Text style={styles.since}>
-                  {memberSinceText || 'Member since'}{' '}
-                  {formatDate(userData?.created_at)}
+                  {memberSinceText || 'Member since'} {getMemberSince()}
                 </Text>
+
+                {tierName && (
+                  <View style={styles.tierBadge}>
+                    <Text style={styles.tierText}>
+                      {tierName.charAt(0).toUpperCase() + tierName.slice(1)} Tier
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
-            {userData?.type !== 'b2c' && (
+            {/* B2B Specific Content - Only show for B2B users */}
+            {isB2BUser && (
               <>
                 <View style={styles.separator} />
 
                 <View style={styles.superShinyContent}>
                   <Text style={styles.superShinyTitle}>
-                    {superShinyText ?? ''}
+                    {userType ? userType.toUpperCase() : 'B2B MEMBER'}
                   </Text>
+                  {tierName && (
+                    <Text style={styles.tierSubText}>{tierName} Tier</Text>
+                  )}
                 </View>
 
                 <View style={styles.privilegesFooter}>
@@ -316,7 +425,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           </LinearGradient>
         ) : null}
 
-        {isLoggedIn ? (
+        {isLoggedIn && (
           <TouchableOpacity
             onPress={() => navigation.navigate('EditProfile')}
             style={styles.menuButton}
@@ -332,10 +441,10 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-        ) : null}
+        )}
 
         <View style={styles.menuCard}>
-          {isLoggedIn ? (
+          {isLoggedIn && (
             <>
               <TouchableOpacity
                 onPress={() => navigation.navigate('OrdersScreen')}
@@ -369,7 +478,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
             </>
-          ) : null}
+          )}
 
           <TouchableOpacity
             onPress={() => navigation.navigate('WishlistScreen')}
@@ -387,7 +496,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          {isLoggedIn ? (
+          {isLoggedIn && (
             <TouchableOpacity
               onPress={() => setModalAddress(true)}
               style={[styles.menuItem, styles.lastMenuItem]}
@@ -398,13 +507,12 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                   style={styles.menuIcon}
                 />
                 <Text style={styles.menuItemText}>
-                  {' '}
                   {myAddressText || 'My Address'}
                 </Text>
               </View>
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
-          ) : null}
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>
@@ -522,10 +630,10 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           </TouchableOpacity>
         </View>
 
-        {isLoggedIn ? (
+        {isLoggedIn && (
           <TouchableOpacity
             style={styles.deleteButton}
-            onPress={() => DeleteAccount()}
+            onPress={DeleteAccount}
           >
             <Image
               source={require('../../assets/Png/delete.png')}
@@ -535,14 +643,14 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
               {deleteAccountText || 'Delete Account'}
             </Text>
           </TouchableOpacity>
-        ) : null}
+        )}
       </ScrollView>
+
       <AddressModal
         visible={modalAddress}
         onClose={() => setModalAddress(false)}
         onSelect={address => {
           console.log('Selected address:', address);
-          // Handle selected address if needed
           setModalAddress(false);
         }}
       />
@@ -556,6 +664,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: Colors.button[100],
   },
   header: {
     alignItems: 'center',
@@ -592,6 +711,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
   },
+  b2cProfileCard: {
+    borderColor: '#E5E5E5',
+  },
   diagonalShine: {
     position: 'absolute',
     top: -40,
@@ -614,6 +736,16 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: '#fff',
   },
+  avatarPlaceholder: {
+    backgroundColor: Colors.button[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#000',
+  },
   profileInfo: {
     flex: 1,
   },
@@ -621,11 +753,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  email: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  phone: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
   },
   since: {
     fontSize: 12,
     color: '#6B6B6B',
+  },
+  tierBadge: {
+    backgroundColor: Colors.button[100],
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  tierText: {
+    fontSize: 10,
+    color: '#000',
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
   separator: {
     height: 1,
@@ -641,7 +797,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
     color: '#000',
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  tierSubText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    textTransform: 'capitalize',
+    marginTop: 2,
   },
   growthValue: {
     fontSize: 12,
@@ -748,7 +911,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
-
   policiesCard: {
     width: width * 0.9,
     alignSelf: 'center',
@@ -775,13 +937,13 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     marginRight: 8,
+    tintColor: '#FF3B30',
   },
   deleteButtonText: {
-    color: '#000000',
+    color: '#FF3B30',
     fontSize: 14,
     fontWeight: '500',
   },
-
   notificationButton: {
     width: width * 0.9,
     alignSelf: 'center',
@@ -799,9 +961,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   switch: {
-    transform:
-      Platform.OS === 'ios'
-        ? [{ scaleX: 0.8 }, { scaleY: 0.8 }]
-        : [{ scaleX: 1 }, { scaleY: 1 }],
+    transform: Platform.OS === 'ios'
+      ? [{ scaleX: 0.8 }, { scaleY: 0.8 }]
+      : [{ scaleX: 1 }, { scaleY: 1 }],
   },
 });
