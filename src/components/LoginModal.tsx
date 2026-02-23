@@ -56,15 +56,15 @@ const LoginModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState('');
   const [step, setStep] = useState<'login' | 'otp'>('login');
   const [loading, setLoading] = useState(false);
-  const { translatedText: invalidInputText } =
-    useAutoTranslate('Please enter a valid email or 10-digit phone number');
-  const { translatedText: otpErrorText } =
-    useAutoTranslate('Invalid or expired OTP. Please try again.');
-  const { translatedText: phonePlaceholder } =
-    useAutoTranslate('Enter email or phone number');
-
-
-
+  const { translatedText: invalidInputText } = useAutoTranslate(
+    'Please enter a valid email or 10-digit phone number',
+  );
+  const { translatedText: otpErrorText } = useAutoTranslate(
+    'Invalid or expired OTP. Please try again.',
+  );
+  const { translatedText: phonePlaceholder } = useAutoTranslate(
+    'Enter email or phone number',
+  );
 
   const { showLoader, hideLoader } = CommonLoader();
   const { setUserData, setIsLoggedIn, setUserType } =
@@ -147,7 +147,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
     setError('');
 
     if (!emailOrPhone.trim() || !validateEmailOrPhone()) {
-      setError(invalidInputText || 'Please enter a valid email or 10-digit phone number');
+      setError(
+        invalidInputText ||
+        'Please enter a valid email or 10-digit phone number',
+      );
       return;
     }
 
@@ -218,13 +221,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
       const responseData = res.data;
 
       if (responseData.success && responseData.user) {
-        const {
-          success,
-          message,
-          access_token,
-          user,
-          tiertype
-        } = responseData;
+        const { success, message, access_token, user, tiertype } = responseData;
 
         const userType = user?.type;
 
@@ -250,7 +247,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
 
           Toast.show({
             type: 'success',
-            text1: message || 'Login successful!'
+            text1: message || 'Login successful!',
           });
 
           if (onSuccess) {
@@ -261,7 +258,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
         } catch (storageError: any) {
           console.error('❌ Storage error:', {
             message: storageError.message,
-            error: storageError
+            error: storageError,
           });
           setError('Failed to save user data. Please try again.');
         }
@@ -269,7 +266,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
         setError(
           responseData.message ||
           otpErrorText ||
-          'Invalid or expired OTP. Please try again.'
+          'Invalid or expired OTP. Please try again.',
         );
       }
     } catch (err: any) {
@@ -287,129 +284,180 @@ const LoginModal: React.FC<AuthModalProps> = ({
       setLoading(false);
     }
   };
-  /* ================= UI ================= */
+  const logo = require('../../src/assets/Png/splashlogo.png');
+
   return (
-    <Modal style={{}} visible={visible} transparent animationType="slide">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+    >
       <View style={styles.overlay}>
-        <Pressable style={styles.flexFill} onPress={onClose} />
+        <Pressable style={styles.backdrop} onPress={onClose} />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
         >
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
             <View style={styles.modalContainer}>
-              <TransletText
-                text="Log in to White Peony!"
-                style={styles.title}
-              />
-
+              {/* Header with Logo */}
+              <View style={styles.header}>
+                <View style={styles.handleBar} />
+                <Image source={logo} style={styles.logo} resizeMode="contain" />
+                {/* <TransletText
+                  text="White Peony"
+                  style={styles.brandName}
+                />
+                <TransletText
+                  text="Premium Tea Collection"
+                  style={styles.brandTagline}
+                /> */}
+              </View>
 
               {step === 'login' ? (
-                <TransletText
-                  text="Hello again, you’ve been missed!"
-                  style={styles.subtitle}
-                />
-
-              ) : (
-                <View>
-                  <TransletText
-                    text="Enter the OTP sent to"
-                    style={styles.subtitle}
-                  />
-                  <Text style={[styles.subtitle, styles.bold]}>
-                    {emailOrPhone}
-                  </Text>
-                </View>
-              )}
-
-              {step === 'login' && (
                 <>
-                  <TransletText
-                    text="Email/Phone Number *"
-                    style={styles.label}
-                  />
-
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                      style={styles.input}
-                      value={emailOrPhone}
-                      onChangeText={setEmailOrPhone}
-                      placeholder={phonePlaceholder || 'Enter email or phone number'}
-                      placeholderTextColor={Colors.text[200]}
-                      editable={!loading}
+                  <View style={styles.welcomeSection}>
+                    <TransletText text="Welcome Back!" style={styles.title} />
+                    <TransletText
+                      text="Sign in to continue your tea journey"
+                      style={styles.subtitle}
                     />
                   </View>
 
-                  <TouchableOpacity
-                    style={[styles.loginButton, loading && { opacity: 0.7 }]}
-                    onPress={requestOTP}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#000" />
-                    ) : (
+                  <View style={styles.form}>
+                    <View style={styles.inputGroup}>
                       <TransletText
-                        text="Login"
-                        style={styles.loginText}
+                        text="Email or Phone"
+                        style={styles.label}
                       />
+                      <View
+                        style={[
+                          styles.inputWrapper,
+                          error && styles.inputError,
+                        ]}
+                      >
+                        <TextInput
+                          autoCapitalize="none"
+                          keyboardType="email-address"
+                          style={styles.input}
+                          value={emailOrPhone}
+                          onChangeText={setEmailOrPhone}
+                          placeholder="Enter email or phone"
+                          placeholderTextColor="#999"
+                          editable={!loading}
+                        />
+                      </View>
+                    </View>
+
+                    {!!error && (
+                      <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>{error}</Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
 
-                  {!!error && <Text style={{ color: 'red' }}>{error}</Text>}
-
-                  <TransletText
-                    text="Or"
-                    style={styles.orText}
-                  />
-
-                  <View style={styles.socialRow}>
                     <TouchableOpacity
-                      style={styles.socialButton}
-                      onPress={onGoogleLogin}
+                      style={[
+                        styles.loginButton,
+                        loading && styles.buttonDisabled,
+                      ]}
+                      onPress={requestOTP}
                       disabled={loading}
+                      activeOpacity={0.8}
                     >
-                      <Image
-                        source={require('../assets/Png/google.png')}
-                        style={{ width: 24, height: 24 }}
-                      />
+                      {loading ? (
+                        <ActivityIndicator color="#000" />
+                      ) : (
+                        <TransletText
+                          text="Continue"
+                          style={styles.loginText}
+                        />
+                      )}
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.socialButton}
-                      onPress={onFacebookLogin}
-                      disabled={loading}
-                    >
-                      <Image
-                        source={require('../assets/Png/facebook.png')}
-                        style={{ width: 24, height: 24 }}
+
+                    <View style={styles.divider}>
+                      <View style={styles.dividerLine} />
+                      <TransletText text="Or" style={styles.orText} />
+                      <View style={styles.dividerLine} />
+                    </View>
+
+                    <View style={styles.socialRow}>
+                      <TouchableOpacity
+                        style={styles.socialButton}
+                        onPress={onGoogleLogin}
+                        disabled={loading}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('../assets/Png/google.png')}
+                          style={styles.socialIcon}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.socialButton}
+                        onPress={onFacebookLogin}
+                        disabled={loading}
+                        activeOpacity={0.7}
+                      >
+                        <Image
+                          source={require('../assets/Png/facebook.png')}
+                          style={styles.socialIcon}
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Terms and Privacy Policy */}
+                    <View style={styles.termsContainer}>
+                      <TransletText
+                        text="By continuing, you agree to our"
+                        style={styles.termsText}
                       />
-                    </TouchableOpacity>
+                      <View style={styles.termsLinks}>
+                        <Text style={styles.termsLink}>Terms of Service</Text>
+                        <Text style={styles.termsSeparator}> and </Text>
+                        <Text style={styles.termsLink}>Privacy Policy</Text>
+                      </View>
+                    </View>
                   </View>
                 </>
-              )}
-
-              {step === 'otp' && (
+              ) : (
                 <>
+                  <View style={styles.otpHeader}>
+                    <TransletText text="Enter Code" style={styles.title} />
+                    <View style={styles.otpMessage}>
+                      <TransletText
+                        text="We've sent a 6-digit code to"
+                        style={styles.subtitle}
+                      />
+                      <Text style={styles.otpDestination}>{emailOrPhone}</Text>
+                    </View>
+                  </View>
+
                   <View style={styles.otpRow}>
                     {otp.map((digit, index) => (
                       <TextInput
                         key={index}
                         ref={ref => (inputRefs.current[index] = ref)}
-                        style={styles.otpInput}
+                        style={[styles.otpInput, error && styles.otpInputError]}
                         keyboardType="number-pad"
                         maxLength={1}
                         value={digit}
                         onChangeText={text => handleChangeOtp(text, index)}
                         editable={!loading}
+                        selectTextOnFocus
                       />
                     ))}
                   </View>
 
                   {!!error && (
-                    <Text style={{ color: 'red', marginBottom: 10 }}>
-                      {error}
-                    </Text>
+                    <View style={styles.errorContainer}>
+                      <Text style={styles.errorText}>{error}</Text>
+                    </View>
                   )}
 
                   <TouchableOpacity
@@ -419,49 +467,62 @@ const LoginModal: React.FC<AuthModalProps> = ({
                       setStep('login');
                     }}
                     disabled={loading}
+                    activeOpacity={0.7}
                   >
                     <TransletText
-                      text="Change Email/Phone"
+                      text="Change email/phone"
                       style={styles.changeEmailText}
                     />
-
                   </TouchableOpacity>
 
-                  <TransletText
-                    text="Didn’t receive the code?"
-                    style={styles.resendText}
-                  />
-
-                  {timer > 0 ? (
+                  <View style={styles.resendContainer}>
                     <TransletText
-                      text={`Resend in ${timer}s`}
-                      style={styles.disabled}
+                      text="Didn't receive code?"
+                      style={styles.resendText}
                     />
-                  ) : (
-                    <Text style={styles.resendLink} onPress={requestOTP}>
-                      Resend
-                    </Text>
-                  )}
+                    {timer > 0 ? (
+                      <TransletText
+                        text={`Resend in ${timer}s`}
+                        style={styles.disabled}
+                      />
+                    ) : (
+                      <TouchableOpacity
+                        onPress={requestOTP}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.resendLink}>Resend</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
 
                   <TouchableOpacity
                     style={[
                       styles.loginButton,
-                      loading && { opacity: 0.7 },
-                      { marginBottom: 30 },
+                      loading && styles.buttonDisabled,
                     ]}
                     onPress={verifyOtp}
                     disabled={loading}
+                    activeOpacity={0.8}
                   >
                     {loading ? (
                       <ActivityIndicator color="#000" />
                     ) : (
-                      <TransletText
-                        text="Verify"
-                        style={styles.loginText}
-                      />
-
+                      <TransletText text="Verify" style={styles.loginText} />
                     )}
                   </TouchableOpacity>
+
+                  {/* Terms and Privacy Policy for OTP screen */}
+                  <View style={styles.termsContainer}>
+                    <TransletText
+                      text="By verifying, you agree to our"
+                      style={styles.termsText}
+                    />
+                    <View style={styles.termsLinks}>
+                      <Text style={styles.termsLink}>Terms of Service</Text>
+                      <Text style={styles.termsSeparator}> and </Text>
+                      <Text style={styles.termsLink}>Privacy Policy</Text>
+                    </View>
+                  </View>
                 </>
               )}
             </View>
@@ -476,90 +537,292 @@ export default LoginModal;
 
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  flexFill: { flex: 1 },
-  title: { fontSize: 18, fontWeight: '700' },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  keyboardView: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 20,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ccc',
+    borderRadius: 2,
+    marginBottom: 16,
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    marginBottom: 8,
+  },
+  brandName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+  },
+  brandTagline: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  welcomeSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
   subtitle: {
     fontSize: 14,
     color: '#666',
-    fontWeight: '500',
-    marginVertical: 10,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  bold: { fontWeight: '600', color: '#000' },
+  bold: {
+    fontWeight: '600',
+    color: '#000',
+  },
+  form: {
+    width: '100%',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
   label: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#666',
     marginBottom: 6,
-    marginTop: heightPercentageToDP(1),
   },
   inputWrapper: {
     borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 10,
-    marginBottom: 15,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    backgroundColor: '#fff',
   },
-  input: { fontSize: 16, color: '#000', paddingVertical: 10 },
+  input: {
+    fontSize: 15,
+    color: '#000',
+    paddingVertical: 14,
+  },
+  inputError: {
+    borderColor: '#ff4444',
+    borderWidth: 1,
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
   loginButton: {
     backgroundColor: '#DDE35A',
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginBottom: 15,
+    paddingVertical: 16,
+    borderRadius: 14,
+    marginBottom: 20,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   loginText: {
     color: '#000',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
-  orText: { textAlign: 'center', color: '#666', marginBottom: 10 },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ccc',
+  },
+  orText: {
+    marginHorizontal: 14,
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '500',
+  },
   socialRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    gap: 16,
     marginBottom: 20,
   },
   socialButton: {
     backgroundColor: '#f2f2f2',
-    padding: 12,
-    borderRadius: 50,
-    marginHorizontal: 10,
+    padding: 14,
+    borderRadius: 45,
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  socialIcon: {
+    width: 26,
+    height: 26,
+    resizeMode: 'contain',
+  },
+  termsContainer: {
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  termsText: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '400',
+    textAlign: 'center',
+  },
+  termsLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  termsLink: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  termsSeparator: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '400',
+  },
+  otpHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  otpMessage: {
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  otpDestination: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   otpRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 20,
-  },
-  otpInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    width: 45,
-    height: 50,
-    textAlign: 'center',
-    fontSize: 18,
-    color: '#000',
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
+    gap: 10,
+    marginBottom: 20,
     paddingHorizontal: 10,
   },
-  modalContainer: {
+  otpInput: {
+    width: 48,
+    height: 58,
+    borderWidth: 1.5,
+    borderColor: '#ccc',
+    borderRadius: 14,
     backgroundColor: '#fff',
-    borderRadius: 27,
-    padding: 16,
-    maxHeight: '90%',
-    width: '100%',
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#000',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  otpInputError: {
+    borderColor: '#ff4444',
+  },
+  changeEmailButton: {
+    marginBottom: 16,
     alignSelf: 'center',
   },
-  resendText: { textAlign: 'center', color: '#666', marginBottom: 15 },
-  disabled: { color: '#aaa' },
-  resendLink: { color: '#007AFF', fontWeight: '600' },
-  changeEmailButton: { marginBottom: 10, alignSelf: 'center' },
   changeEmailText: {
     color: '#007AFF',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13,
     textDecorationLine: 'underline',
+  },
+  resendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 24,
+  },
+  resendText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  disabled: {
+    fontSize: 13,
+    color: '#aaa',
+    fontWeight: '500',
+  },
+  resendLink: {
+    fontSize: 13,
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });
