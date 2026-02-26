@@ -1,4 +1,5 @@
-import React, { FC, useContext, useEffect, useState } from 'react';
+// HomeStackNavigator.tsx
+import React, { FC, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabScreen from './BottomtabNavigation';
 import HomeScreen from '../screens/HomeTab/HomeScreen';
@@ -16,7 +17,7 @@ import EditProfile from '../screens/ProfileTab/EditProfile';
 import NotificationScreen from '../screens/Notification';
 import WishlistScreen from '../screens/HomeTab/Wishlist';
 import OrdersScreen from '../screens/AccountTab/OrdersScreen';
-import CheckoutScreen from '../screens/HomeTab/CheckoutScreen';
+// import CheckoutScreen from '../screens/HomeTab/CheckoutScreen'; // REMOVED
 import IntroScreen from '../screens/IntroScreen/IntroScreen';
 import PaymentSuccess from '../screens/HomeTab/PaymentSuccess';
 import { checkFirstLaunch, setFirstLaunch } from '../helpers/helpers';
@@ -29,7 +30,7 @@ import CurrencyScreen from '../screens/currency/CurrencyScreen';
 import PermissionService from '../service/PermissionService';
 import FCMService from '../service/FCMService';
 import PushNotificationService from '../service/PushNotificationService';
-import { getToken } from '@react-native-firebase/messaging';
+
 const HomeStackNavigator: FC = () => {
   const Stack = createNativeStackNavigator();
 
@@ -75,7 +76,6 @@ const HomeStackNavigator: FC = () => {
             await PushNotificationService.createDefaultChannel();
             await FCMService.init();
           }
-
         }
       } catch (error) {
         console.log('Notification permission error:', error);
@@ -88,7 +88,6 @@ const HomeStackNavigator: FC = () => {
       mounted = false;
     };
   }, [showSplash, isFirstLaunch]);
-
 
   // UI decision AFTER hooks
   if (showSplash || isFirstLaunch === null) {
@@ -119,15 +118,19 @@ const HomeStackNavigator: FC = () => {
       <Stack.Screen name="NotificationScreen" component={NotificationScreen} />
       <Stack.Screen name="WishlistScreen" component={WishlistScreen} />
       <Stack.Screen name="OrdersScreen" component={OrdersScreen} />
-      <Stack.Screen name="CheckoutScreen" component={CheckoutScreen} />
+      {/* CheckoutScreen REMOVED from here */}
       <Stack.Screen name="IntroScreen" component={IntroScreen} />
       <Stack.Screen name="PaymentSuccess" component={PaymentSuccess} />
       <Stack.Screen name="MyEventsScreen" component={MyEventsScreen} />
       <Stack.Screen name="Searchpage" component={Searchpage} />
       <Stack.Screen name="Slugs" component={Slugs} />
       <Stack.Screen name="CurrencyScreen" component={CurrencyScreen} />
-      <Stack.Screen name="SelectLanguageScreen" component={SelectLanguageScreen} />
+      <Stack.Screen
+        name="SelectLanguageScreen"
+        component={SelectLanguageScreen}
+      />
     </Stack.Navigator>
   );
 };
+
 export default HomeStackNavigator;

@@ -701,6 +701,8 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                 <Text style={styles.outOfStockOverlayText}>Out of Stock</Text>
               </View>
             )}
+
+            {/* REMOVE THE BUTTON FROM HERE - DELETE THIS ENTIRE SECTION */}
           </View>
 
           {/* Product Details */}
@@ -747,13 +749,14 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
               </Text>
             )}
 
-            {/* Add to Cart Button */}
+            {/* Add to Cart Button - KEEP THIS ONE */}
             {!isOutOfStock && (
               <TouchableOpacity
                 onPress={e => {
                   e.stopPropagation();
                   if (isInCart) {
-                    navigation.navigate('CheckoutScreen');
+                    // Navigate to Cart tab
+                    navigation.getParent()?.navigate('Cart');
                   } else {
                     handleAddToCart(item);
                   }
@@ -826,7 +829,10 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => navigation.navigate('CheckoutScreen')}
+          onPress={() => {
+            // Navigate to Cart tab using parent navigator
+            navigation.getParent()?.navigate('Cart');
+          }}
           style={styles.headerButton}
         >
           <Image

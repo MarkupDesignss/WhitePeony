@@ -462,7 +462,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 onPress={() => navigation.navigate('MyEventsScreen')}
                 style={styles.menuItem}
               >
@@ -476,7 +476,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
                   </Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </>
           )}
 

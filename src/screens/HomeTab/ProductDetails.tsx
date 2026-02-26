@@ -773,7 +773,7 @@ const { translatedText: somethingWrongText } =
         {/* Product Info */}
         <View style={styles.productInfo}>
           <View style={styles.titleRow}>
-            <TransletText text={productData.name || ''} style={styles.title} numberOfLines={2} />
+            <Text style={styles.title} numberOfLines={2}>{productData.name || ''}</Text>
             <Text style={styles.rating}>
               ★{' '}
               <Text style={styles.ratingCount}>

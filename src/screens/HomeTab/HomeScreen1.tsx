@@ -27,7 +27,7 @@ import { HttpStatusCode } from 'axios';
 import { formatDate } from '../../helpers/helpers';
 import { WishlistContext } from '../../context';
 import Toast from 'react-native-toast-message';
-import LinearGradient from 'react-native-linear-gradient';
+
 import { UserData, UserDataContext } from '../../context/userDataContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LoginModal from '../../components/LoginModal';
@@ -1270,7 +1270,19 @@ const HomeScreen1 = ({ navigation }: any) => {
                           padding: 10,
                         }}
                       >
-                        <TransletText
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '400',
+                            color: '#1A1A1A',
+                            marginBottom: 4,
+                            lineHeight: 16,
+                            height: 32,
+                          }}
+                        >
+                          {item?.name || 'Products'}
+                        </Text>
+                        {/* <TransletText
                           text={item?.name || 'Product'}
                           style={{
                             fontSize: 12,
@@ -1281,7 +1293,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             height: 32,
                           }}
                           numberOfLines={2}
-                        />
+                        /> */}
 
                         {/* Price */}
                         <Text
@@ -1596,8 +1608,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                         }}
                       >
                         {/* Product Name */}
-                        <TransletText
-                          text={item.product?.name || 'Product Name'}
+                        <Text
                           style={{
                             fontSize: 13,
                             fontWeight: '500',
@@ -1606,8 +1617,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                             lineHeight: 18,
                             height: 36,
                           }}
-                          numberOfLines={2}
-                        />
+                        >
+                          {item.product?.name || 'Product Name'}
+                        </Text>
 
                         {/* Price and Rating Row */}
                         <View
@@ -1891,8 +1903,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                           padding: 12,
                         }}
                       >
-                        <TransletText
-                          text={item?.product?.name || item?.name || 'Product'}
+                        <Text
                           style={{
                             fontSize: 14,
                             fontWeight: '500',
@@ -1901,7 +1912,10 @@ const HomeScreen1 = ({ navigation }: any) => {
                             lineHeight: 20,
                           }}
                           numberOfLines={2}
-                        />
+                        >
+                          {' '}
+                          {item?.product?.name || item?.name || 'Product'}
+                        </Text>
 
                         {/* Price */}
                         <View
@@ -2233,8 +2247,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                         padding: 12,
                       }}
                     >
-                      <TransletText
-                        text={item?.name || ''}
+                      <Text
                         style={{
                           fontSize: 13,
                           fontWeight: '500',
@@ -2244,7 +2257,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                           height: 36,
                         }}
                         numberOfLines={2}
-                      />
+                      >
+                        {item?.name || 'Unnamed Product'}
+                      </Text>
 
                       {/* Price Section */}
                       <View
@@ -2777,8 +2792,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                       }}
                     >
                       {/* Product Name */}
-                      <TransletText
-                        text={item?.name || ''}
+                      <Text
                         style={{
                           fontSize: 13,
                           fontWeight: '400',
@@ -2788,7 +2802,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                           height: 36,
                         }}
                         numberOfLines={2}
-                      />
+                      >
+                        {item?.name || 'Unnamed Product'}
+                      </Text>
 
                       {/* Price Section */}
                       <View

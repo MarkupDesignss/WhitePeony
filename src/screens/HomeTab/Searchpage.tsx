@@ -28,6 +28,9 @@ import {
   heightPercentageToDP,
   widthPercentageToDP,
 } from '../../constant/dimentions';
+import { useAppSelector } from '../../hooks/useAppSelector';
+import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
+import { convertAndFormatPrice } from '../../utils/currencyUtils';
 import Voice from '@react-native-voice/voice';
 import Toast from 'react-native-toast-message';
 import { WishlistContext } from '../../context';
@@ -36,8 +39,9 @@ import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 const { width } = Dimensions.get('window');
 
 const Searchpage = ({ navigation }: any) => {
-  const { translatedText: searchPlace } =
-    useAutoTranslate("Search for products, brands and more");
+  const { translatedText: searchPlace } = useAutoTranslate(
+    'Search for products, brands and more',
+  );
   const [query, setQuery] = useState('');
 
   const [isSearching, setIsSearching] = useState(false);
@@ -46,6 +50,24 @@ const Searchpage = ({ navigation }: any) => {
   const [wishlistLoadingMap, setWishlistLoadingMap] = useState<
     Record<string, boolean>
   >({});
+
+  // Currency conversion hooks
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency,
+  );
+  const { data: rates } = useGetRatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+    refetchOnReconnect: true,
+  });
+
+  // Price display helper
+  const displayPrice = (priceEUR: any): string => {
+    if (!priceEUR && priceEUR !== 0)
+      return convertAndFormatPrice(0, selectedCurrency, rates);
+    const priceNum =
+      typeof priceEUR === 'string' ? parseFloat(priceEUR) : priceEUR;
+    return convertAndFormatPrice(priceNum, selectedCurrency, rates);
+  };
 
   // Use WishlistContext
   const { wishlistIds, isWishlisted, toggleWishlist } =
@@ -131,7 +153,7 @@ const Searchpage = ({ navigation }: any) => {
   const stopListening = async () => {
     try {
       await Voice.stop();
-    } catch { }
+    } catch {}
 
     setListening(false);
     pulseAnim.stopAnimation();
@@ -151,7 +173,7 @@ const Searchpage = ({ navigation }: any) => {
       try {
         setIsSearching(true);
         const res = await UserService.search(word);
-        console.log("effe", res)
+        console.log('effe', res);
         if (res?.data?.status) {
           const products = Array.isArray(res.data.data) ? res.data.data : [];
           const mapped = products.map((p: any) => {
@@ -258,11 +280,19 @@ const Searchpage = ({ navigation }: any) => {
     });
   };
 
+  /* ---------------- SAFE PRICE CONVERSION HELPER ---------------- */
+  const safePrice = (price: any): number => {
+    if (!price && price !== 0) return 0;
+    const num = typeof price === 'string' ? parseFloat(price) : price;
+    return isNaN(num) ? 0 : num;
+  };
+
   /* ---------------- RENDER PRODUCT ITEM ---------------- */
   const renderItem = ({ item, index }: any) => {
     const productId = String(item.ID);
     const isWishlistedItem = isWishlisted(productId);
     const isLoading = wishlistLoadingMap[productId] || false;
+    const currentPrice = safePrice(item.price);
 
     return (
       <TouchableOpacity
@@ -324,24 +354,19 @@ const Searchpage = ({ navigation }: any) => {
 
           <View style={styles.priceContainer}>
             <Text style={styles.cardPrice}>
-              €{item.price}
+              {displayPrice(currentPrice)}
               {item.unit && <Text style={styles.unitText}> / {item.unit}</Text>}
             </Text>
             {item.discount > 0 && (
               <Text style={styles.originalPrice}>
-                €
-                {(
-                  (parseFloat(item.price) * 100) /
-                  (100 - item.discount)
-                ).toFixed(2)}
+                {displayPrice((currentPrice * 100) / (100 - item.discount))}
               </Text>
             )}
           </View>
 
           {item.discount > 0 && (
             <Text style={styles.discountTag}>
-              Save €
-              {((parseFloat(item.price) * item.discount) / 100).toFixed(2)}
+              Save {displayPrice((currentPrice * item.discount) / 100)}
             </Text>
           )}
 
@@ -509,11 +534,19 @@ const Searchpage = ({ navigation }: any) => {
               source={require('../../assets/search_illustration.png')}
               style={styles.initialImage}
             />
-            <TransletText style={styles.initialTitle} text="What are you looking for?" />
-            <TransletText style={styles.initialSubtitle}
-              text="Type or use voice search to find products" />
+            <TransletText
+              style={styles.initialTitle}
+              text="What are you looking for?"
+            />
+            <TransletText
+              style={styles.initialSubtitle}
+              text="Type or use voice search to find products"
+            />
             <View style={styles.trendingContainer}>
-              <TransletText style={styles.trendingTitle} text="Trending Searches" />
+              <TransletText
+                style={styles.trendingTitle}
+                text="Trending Searches"
+              />
               <View style={styles.trendingTags}>
                 {trendingSearches.map(renderTrendingSearch)}
               </View>
