@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,8 @@ import {
     ImageBackground,
     StyleSheet,
     TouchableOpacity,
+    FlatList,
+    Dimensions,
 } from 'react-native';
 import {
     heightPercentageToDP,
@@ -16,8 +18,11 @@ import {
 import { Colors } from '../../constant';
 import TransletText from '../../components/TransletText';
 
+const { width } = Dimensions.get('window');
+
 const IntroScreen = ({ navigation }) => {
     const [currentStep, setCurrentStep] = useState(0);
+    const flatListRef = useRef(null);
 
     // Slides data (image + text)
     const slides = [
@@ -73,12 +78,39 @@ const IntroScreen = ({ navigation }) => {
 
     const handleNext = () => {
         if (currentStep < slides.length - 1) {
-            setCurrentStep(currentStep + 1);
+            const nextStep = currentStep + 1;
+            setCurrentStep(nextStep);
+            flatListRef.current?.scrollToIndex({ 
+                index: nextStep, 
+                animated: true 
+            });
         } else {
             console.log('Intro Finished 🚀');
             // 👉 Navigate to home or login here
             navigation.replace('BottomTabScreen');
         }
+    };
+
+    const handleScroll = (event) => {
+        const scrollPosition = event.nativeEvent.contentOffset.x;
+        const index = Math.round(scrollPosition / width);
+        setCurrentStep(index);
+    };
+
+    const renderItem = ({ item }) => {
+        return (
+            <View style={{ width }}>
+                {/* Background Image */}
+                <ImageBackground
+                    source={item.image}
+                    resizeMode="cover"
+                    style={{
+                        width: widthPercentageToDP(100),
+                        height: heightPercentageToDP(100),
+                    }}
+                />
+            </View>
+        );
     };
 
     const currentSlide = slides[currentStep];
@@ -90,14 +122,19 @@ const IntroScreen = ({ navigation }) => {
                 top: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
             }}
         >
-            {/* Background Image */}
-            <ImageBackground
-                source={currentSlide.image}
-                resizeMode="cover"
-                style={{
-                    width: widthPercentageToDP(100),
-                    height: heightPercentageToDP(100),
-                }}
+            {/* Swipeable FlatList for Images */}
+            <FlatList
+                ref={flatListRef}
+                data={slides}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                bounces={false}
+                style={{ flex: 1 }}
             />
 
             {/* Content Section */}

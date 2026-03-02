@@ -2482,7 +2482,19 @@ const HomeScreen1 = ({ navigation }: any) => {
                         )}
 
                         {/* Product Name */}
-                        <TransletText
+                        <Text
+                          style={[
+                            styles.wishlistTitle,
+                            {
+                              fontWeight: '400',
+                              height: heightPercentageToDP(4),
+                              marginTop: 8,
+                            },
+                          ]}
+                        >
+                          {productName}
+                        </Text>
+                        {/* <TransletText
                           text={productName}
                           style={[
                             styles.wishlistTitle,
@@ -2493,7 +2505,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             },
                           ]}
                           numberOfLines={2}
-                        />
+                        /> */}
 
                         {/* Price */}
                         {correctPrice !== null ? (

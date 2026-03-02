@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,11 +6,12 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Share,
   Platform,
-  ImageURISource,
   StatusBar,
   Dimensions,
+  FlatList,
+  Alert,
+  Linking,
 } from 'react-native';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { Image_url, UserService } from '../../service/ApiService';
@@ -18,9 +19,9 @@ import { HttpStatusCode } from 'axios';
 import Toast from 'react-native-toast-message';
 import { formatDate } from '../../helpers/helpers';
 import { Colors, Images } from '../../constant';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TransletText from '../../components/TransletText';
+import Share from 'react-native-share';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,90 +48,397 @@ const getTimeAgo = (dateString?: string) => {
 
 // Platform-specific header height
 const HEADER_HEIGHT = Platform.OS === 'ios' ? 44 : 56;
-const IMAGE_HEIGHT = Platform.OS === 'ios' ? height * 0.35 : height * 0.32;
+const IMAGE_HEIGHT = Platform.OS === 'ios' ? height * 0.4 : height * 0.38;
 
-const ArticleDetails = ({ navigation, route }: any) => {
-  const airtcleid = route?.params?.article || '';
+const ArticleDetailsScreen = ({ navigation, route }: any) => {
+  // Get the article slug from params
+  const slug = route?.params?.slug || route?.params?.article || '';
+
   const insets = useSafeAreaInsets();
+  const flatListRef = useRef<FlatList>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const { showLoader, hideLoader } = CommonLoader();
 
-  type ArticleDetail = {
-    image?: string;
+  // Define types based on API response
+  type Author = {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  type GalleryImage = {
+    id: number;
+    article_id: string;
+    image_path: string;
+    sort_order: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  type ArticleContent = {
+    id?: number;
+    author_id?: string;
     title?: string;
-    updated_at?: string;
-    created_at?: string;
-    views?: number;
+    slug?: string;
     content?: string;
+    image?: string;
+    views?: string;
+    created_at?: string;
+    updated_at?: string;
+    is_trending?: boolean;
+    share_url?: string;
+    author?: Author;
+    images?: GalleryImage[];
   };
 
-  const [airtcleDetails, setairtcleDetails] =
-    React.useState<ArticleDetail | null>(null);
-
-  const onCaptureAndShare = async () => {
-    try {
-      const img = require('../../../src/assets/Png/tea.jpg') as ImageURISource;
-      // @ts-ignore
-      const resolved = (Image as any).resolveAssetSource
-        ? (Image as any).resolveAssetSource(img)
-        : img;
-      const uri = resolved?.uri || img;
-
-      await Share.share(
-        {
-          url: uri,
-          title: 'Article Image',
-          message:
-            Platform.OS === 'android' ? 'Sharing article image' : undefined,
-        },
-        { dialogTitle: 'Share article image' },
-      );
-    } catch (err) {
-      console.warn('share error', err);
-    }
-  };
+  const [contentData, setContentData] = useState<ArticleContent | null>(null);
 
   useEffect(() => {
-    ArticleDetail(airtcleid);
-  }, []);
+    console.log('Route params:', route?.params);
+    console.log('Article slug:', slug);
 
-  const ArticleDetail = async (id: string) => {
+    if (slug) {
+      loadArticleContent(slug);
+    } else {
+      console.log('No article slug provided');
+      setError('No article slug provided');
+      Toast.show({
+        type: 'error',
+        text1: 'No article slug provided',
+      });
+    }
+  }, [slug]);
+
+  const loadArticleContent = async (articleSlug: string) => {
     try {
+      setIsLoading(true);
+      setError(null);
       showLoader();
-      const res = await UserService.articleDetail(id);
-      hideLoader();
+      console.log('Fetching article with slug:', articleSlug);
 
-      if (res?.status === HttpStatusCode.Ok && res?.data) {
-        const { message, data } = res.data;
-        console.log('EventList response data:', res.data);
-        setairtcleDetails(data || null);
+      const response = await UserService.articleDetail(articleSlug);
+      console.log('Full API Response:', JSON.stringify(response, null, 2));
+
+      hideLoader();
+      setIsLoading(false);
+
+      // Check if response exists and is successful
+      if (response?.status === HttpStatusCode.Ok) {
+        // The response structure from your API
+        if (response.data?.data) {
+          console.log('Article data found in response.data.data');
+          const articleData = response.data.data;
+          console.log('Article title:', articleData.title);
+          console.log('Article content length:', articleData.content?.length);
+          console.log('Has images:', articleData.images?.length || 0);
+          console.log('Has author:', articleData.author ? 'Yes' : 'No');
+          console.log('Share URL:', articleData.share_url);
+
+          setContentData(articleData);
+        }
+        // If data is directly in response.data (alternative structure)
+        else if (response.data && typeof response.data === 'object') {
+          console.log('Article data found in response.data directly');
+          console.log('Article title:', response.data.title);
+          console.log('Share URL:', response.data.share_url);
+
+          setContentData(response.data);
+        } else {
+          console.log('No valid data structure found in response');
+          setError('Invalid response structure');
+          Toast.show({
+            type: 'error',
+            text1: 'Invalid response structure',
+          });
+        }
       } else {
+        console.log('Response status not OK:', response?.status);
+        setError(`API Error: ${response?.status}`);
         Toast.show({
           type: 'error',
-          text1: res?.data?.message || 'Something went wrong!',
+          text1: response?.data?.message || 'Something went wrong!',
         });
       }
-    } catch (err: any) {
+    } catch (error: any) {
       hideLoader();
-      console.log('Error in EventList:', JSON.stringify(err));
+      setIsLoading(false);
+      console.log('Error in loadArticleContent:', error);
+      console.log('Error message:', error.message);
+      console.log('Error response:', error.response?.data);
+
+      setError(error?.message || 'Failed to load article');
+
       Toast.show({
         type: 'error',
         text1:
-          err?.response?.data?.message ||
-          'Something went wrong! Please try again.',
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to load article',
       });
     }
   };
 
-  // Custom Header Component - Now as a separate header bar
-  const CustomHeader = () => (
+  // Construct image source
+  const getImageSource = (imagePath?: string) => {
+    if (!imagePath) return Images.placeholder;
+
+    // Check if it's already a full URL
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return { uri: imagePath };
+    }
+
+    // If it's a relative path, combine with base URL
+    const cleanPath = imagePath.replace(/^\//, '');
+    const fullUrl = `${Image_url}${cleanPath}`;
+    console.log('Constructed image URL:', fullUrl);
+    return { uri: fullUrl };
+  };
+
+  // Get all images
+  const fetchAllImages = () => {
+    const imagesList = [];
+
+    // Add main image if exists
+    if (contentData?.image) {
+      imagesList.push({
+        id: 'main',
+        source: getImageSource(contentData.image),
+        isMain: true,
+        sortOrder: -1, // Main image first
+      });
+    }
+
+    // Add gallery images if they exist
+    if (contentData?.images && contentData.images.length > 0) {
+      contentData.images.forEach(img => {
+        imagesList.push({
+          id: img.id,
+          source: getImageSource(img.image_path),
+          sortOrder: parseInt(img.sort_order || '0'),
+        });
+      });
+    }
+
+    // Sort images by sort_order
+    const sortedImages = imagesList.sort((a, b) => {
+      return (a.sortOrder || 0) - (b.sortOrder || 0);
+    });
+
+    console.log('Total images to display:', sortedImages.length);
+    return sortedImages;
+  };
+
+  const allImages = fetchAllImages();
+
+  // Generate share URL helper
+  const generateShareUrl = () => {
+    // Use the API provided share_url first
+    if (contentData?.share_url) {
+      return contentData.share_url;
+    }
+
+    // Fallback to constructing URL if share_url is not available
+    return `https://www.markupdesigns.net/whitepeony/article/${
+      contentData?.slug || contentData?.id
+    }`;
+  };
+
+  // Share article
+  const shareArticle = async () => {
+    try {
+      // Use share_url directly from the API response
+      const shareUrl = generateShareUrl();
+
+      if (!shareUrl) {
+        Toast.show({
+          type: 'error',
+          text1: 'Share URL not available',
+        });
+        return;
+      }
+
+      await Share.open({
+        url: shareUrl,
+        failOnCancel: false,
+      });
+    } catch (error: any) {
+      if (error.message !== 'User did not share') {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to share article',
+        });
+      }
+    }
+  };
+
+  // Share to social platform
+  const shareToSocialPlatform = async (social: keyof typeof Share.Social) => {
+    try {
+      showLoader();
+
+      const shareUrl = generateShareUrl();
+      const title = contentData?.title || 'Article';
+
+      const shareOptions = {
+        title: 'Share Article',
+        message: title,
+        url: shareUrl,
+        social: Share.Social[social],
+        failOnCancel: false,
+      };
+
+      await Share.shareSingle(shareOptions);
+      hideLoader();
+    } catch (error: any) {
+      hideLoader();
+      if (error.message !== 'User did not share') {
+        console.warn(`Share to ${social} error:`, error);
+
+        if (error.message?.includes('not installed')) {
+          Alert.alert(
+            'App Not Installed',
+            `Would you like to share via web instead?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Share via Web',
+                onPress: () => openWebShareLink(social, generateShareUrl()),
+              },
+            ],
+          );
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: `Failed to share to ${social}`,
+          });
+        }
+      }
+    }
+  };
+
+  // Open web share link
+  const openWebShareLink = (social: string, url: string) => {
+    let webUrl = '';
+    const encodedUrl = encodeURIComponent(url);
+    const text = encodeURIComponent(contentData?.title || 'Check this out');
+
+    switch (social) {
+      case 'FACEBOOK':
+        webUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+        break;
+      case 'TWITTER':
+        webUrl = `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${text}`;
+        break;
+      case 'WHATSAPP':
+        webUrl = `https://api.whatsapp.com/send?text=${text}%20${encodedUrl}`;
+        break;
+      case 'TELEGRAM':
+        webUrl = `https://t.me/share/url?url=${encodedUrl}&text=${text}`;
+        break;
+      case 'LINKEDIN':
+        webUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
+        break;
+      default:
+        return;
+    }
+
+    Linking.openURL(webUrl).catch(err => {
+      console.warn('Could not open web share:', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Could not open sharing page',
+      });
+    });
+  };
+
+  // Show share options
+  const displayShareOptions = () => {
+    Alert.alert(
+      'Share Article',
+      'Choose how you want to share',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Share via...', onPress: shareArticle },
+        { text: 'WhatsApp', onPress: () => shareToSocialPlatform('WHATSAPP') },
+        { text: 'Facebook', onPress: () => shareToSocialPlatform('FACEBOOK') },
+        { text: 'Twitter', onPress: () => shareToSocialPlatform('TWITTER') },
+        { text: 'Telegram', onPress: () => shareToSocialPlatform('TELEGRAM') },
+        { text: 'Email', onPress: () => shareToSocialPlatform('EMAIL') },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  const renderGalleryItem = ({ item, index }: { item: any; index: number }) => (
+    <View style={[styles.carouselItem, { width }]}>
+      <Image
+        source={item.source}
+        style={[styles.headerImage, { height: IMAGE_HEIGHT }]}
+        resizeMode="cover"
+        onError={error =>
+          console.log('Image loading error:', error.nativeEvent.error)
+        }
+      />
+    </View>
+  );
+
+  const handleImageScroll = (event: any) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollPosition / width);
+    setCurrentImageIndex(index);
+  };
+
+  const renderPaginationDots = () => {
+    if (allImages.length <= 1) return null;
+
+    return (
+      <View style={styles.paginationContainer}>
+        {allImages.map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.paginationDot,
+              index === currentImageIndex && styles.paginationDotActive,
+            ]}
+          />
+        ))}
+      </View>
+    );
+  };
+
+  const renderImageCount = () => {
+    if (allImages.length <= 1) return null;
+
+    return (
+      <View style={styles.imageCounter}>
+        <Text style={styles.imageCounterText}>
+          {currentImageIndex + 1} / {allImages.length}
+        </Text>
+      </View>
+    );
+  };
+
+  // Custom Header Component
+  const renderCustomHeader = () => (
     <View
       style={[
         styles.headerContainer,
         {
           height: HEADER_HEIGHT + insets.top,
           paddingTop: insets.top,
-          backgroundColor: '#fff',
+          backgroundColor: 'transparent',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
         },
       ]}
     >
@@ -142,90 +450,200 @@ const ArticleDetails = ({ navigation, route }: any) => {
         >
           <Image
             source={require('../../assets/Png/back.png')}
-            style={styles.backIcon}
+            style={[styles.backIcon, { tintColor: '#fff' }]}
           />
         </TouchableOpacity>
 
         <View style={styles.titleContainer}>
-          <TransletText
-            text={airtcleDetails?.title || 'Article Details'}
-            style={styles.headerTitle}
-          />
-
+          {/* Empty view for spacing */}
         </View>
 
-        {/* Optional: Add share button */}
         <TouchableOpacity
-          style={styles.placeholderButton}
-          onPress={onCaptureAndShare}
+          style={styles.shareButton}
+          onPress={displayShareOptions}
         >
-          {/* Empty placeholder to balance the layout */}
-          <View style={{ width: 24, height: 24 }} />
+          <Image
+            source={require('../../assets/Png/share.png')}
+            style={[styles.shareIcon, { tintColor: '#fff' }]}
+          />
         </TouchableOpacity>
       </View>
     </View>
   );
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
+        {renderCustomHeader()}
+        <View style={styles.loadingContainer}>
+          <Text>Loading article...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
+        {renderCustomHeader()}
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => loadArticleContent(slug)}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // No data state
+  if (!contentData) {
+    return (
+      <View style={styles.container}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
+        {renderCustomHeader()}
+        <View style={styles.loadingContainer}>
+          <Text>No article data available</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => loadArticleContent(slug)}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <CustomHeader />
-  
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+
+      {renderCustomHeader()}
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Image section - starts below the header */}
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: Image_url + airtcleDetails?.image }}
-            style={[styles.headerImage, { height: IMAGE_HEIGHT }]}
-            resizeMode="cover"
-          />
+        {/* Carousel Section */}
+        <View style={styles.carouselContainer}>
+          {allImages.length > 0 ? (
+            <>
+              <FlatList
+                ref={flatListRef}
+                data={allImages}
+                renderItem={renderGalleryItem}
+                keyExtractor={item => item.id.toString()}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleImageScroll}
+                scrollEventThrottle={16}
+                decelerationRate="fast"
+                bounces={false}
+              />
+              {renderPaginationDots()}
+              {renderImageCount()}
+            </>
+          ) : (
+            <View
+              style={[
+                styles.headerImage,
+                {
+                  height: IMAGE_HEIGHT,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                },
+              ]}
+            >
+              <Image
+                source={Images.placeholder}
+                style={styles.headerImage}
+                resizeMode="cover"
+              />
+            </View>
+          )}
         </View>
-  
+
         <View style={styles.contentContainer}>
           <View style={styles.titleWrapper}>
             <TransletText
-              text={airtcleDetails?.title || 'Article Title'}
+              text={contentData?.title || 'Article Title'}
               style={styles.articleTitle}
               numberOfLines={3}
             />
           </View>
-  
+
           <View style={styles.metaInfoRow}>
             <View style={styles.metaItem}>
               <View style={styles.statusDot} />
               <TransletText
-                text={getTimeAgo(airtcleDetails?.created_at) || 'Just now'}
+                text={getTimeAgo(contentData?.created_at) || 'Just now'}
                 style={styles.metaText}
               />
             </View>
-  
+
             <View style={styles.metaItem}>
               <Image source={Images.date} style={styles.metaIcon} />
               <TransletText
-                text={formatDate(airtcleDetails?.created_at)?.slice(0, -9) || ''}
+                text={
+                  contentData?.created_at
+                    ? formatDate(contentData.created_at)?.slice(0, -9)
+                    : ''
+                }
                 style={styles.metaText}
               />
             </View>
-  
+
             <View style={styles.metaItem}>
               <Image source={Images.views} style={styles.metaIcon} />
               <TransletText
-                text={`${airtcleDetails?.views || 0} views`}
+                text={`${contentData?.views || 0} views`}
                 style={styles.metaText}
               />
             </View>
           </View>
-  
+
+          {/* Author information */}
+          {contentData?.author && (
+            <View style={styles.authorContainer}>
+              <Text style={styles.authorText}>
+                By: {contentData.author.name}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.contentBody}>
             <TransletText
-              text={airtcleDetails?.title || 'Article Title'}
+              text={contentData?.title || 'Article Title'}
               style={styles.contentLead}
             />
             <TransletText
-              text={airtcleDetails?.content || 'No content available.'}
+              text={contentData?.content || 'No content available.'}
               style={styles.contentParagraph}
             />
           </View>
@@ -233,27 +651,46 @@ const ArticleDetails = ({ navigation, route }: any) => {
       </ScrollView>
     </View>
   );
-  
 };
 
-export default ArticleDetails;
+export default ArticleDetailsScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: Colors.button[100],
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 
-  // Header Styles - Separate header at top
+  // Header Styles - Transparent overlay
   headerContainer: {
     width: '100%',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     zIndex: 1000,
   },
   headerContent: {
@@ -268,11 +705,12 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 20,
   },
   backIcon: {
-    width: 24,
-    height: 24,
-    tintColor: '#000',
+    width: 20,
+    height: 20,
   },
   titleContainer: {
     flex: 1,
@@ -280,22 +718,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginHorizontal: 8,
   },
-  headerTitle: {
-    color: '#000',
-    fontWeight: '600',
-    textAlign: 'center',
-    fontSize: Platform.OS === 'ios' ? 17 : 18,
-  },
-  placeholderButton: {
+  shareButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 20,
   },
   shareIcon: {
-    width: 24,
-    height: 24,
-    tintColor: '#000',
+    width: 20,
+    height: 20,
   },
 
   // Scroll View
@@ -303,12 +736,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Image Section - Below header
-  imageContainer: {
+  // Carousel Container
+  carouselContainer: {
     width: '100%',
+    position: 'relative',
+  },
+  carouselItem: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerImage: {
     width: '100%',
+    height: '100%',
+  },
+
+  // Pagination Dots
+  paginationContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    marginHorizontal: 4,
+  },
+  paginationDotActive: {
+    width: 20,
+    backgroundColor: '#fff',
+  },
+
+  // Image Counter
+  imageCounter: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  imageCounterText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   // Content Section
@@ -317,8 +794,8 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 40,
     marginTop: Platform.OS === 'ios' ? -20 : -15,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   titleWrapper: {
     paddingHorizontal: 20,
@@ -363,6 +840,17 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: Platform.OS === 'ios' ? 12 : 13,
     fontWeight: '400',
+  },
+
+  // Author Container
+  authorContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  authorText: {
+    fontSize: 14,
+    color: Colors.button[100],
+    fontWeight: '500',
   },
 
   // Content Body

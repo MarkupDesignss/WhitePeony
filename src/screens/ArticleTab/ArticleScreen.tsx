@@ -58,9 +58,11 @@ const ArticleScreen = ({ navigation }: any) => {
   const [trendingModalVisible, setTrendingModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const { translatedText: searchPlaceholder } = useAutoTranslate('Search Articles....');
-  const { translatedText: searchResultsText } = useAutoTranslate('Search Results');
-
+  const { translatedText: searchPlaceholder } = useAutoTranslate(
+    'Search Articles....',
+  );
+  const { translatedText: searchResultsText } =
+    useAutoTranslate('Search Results');
 
   useEffect(() => {
     ArticleList();
@@ -117,8 +119,8 @@ const ArticleScreen = ({ navigation }: any) => {
     <TouchableOpacity
       style={{ alignSelf: 'center', left: 7, paddingLeft: 5 }}
       onPress={() => {
-        navigation.navigate('ArticleDetails', { article: item.id }),
-          setTrendingModalVisible(false);
+        navigation.navigate('ArticleDetails', { slug: item.slug });
+        setTrendingModalVisible(false);
       }}
       activeOpacity={0.8}
     >
@@ -133,7 +135,6 @@ const ArticleScreen = ({ navigation }: any) => {
               text={`Updated on ${formatDate(item.updated_at)}`}
               style={styles.readBadgeText}
             />
-
           </View>
         </View>
         <View style={styles.upTitleWrap}>
@@ -151,8 +152,8 @@ const ArticleScreen = ({ navigation }: any) => {
     <>
       <TouchableOpacity
         onPress={() => {
-          navigation.navigate('ArticleDetails', { article: item.id }),
-            setJustForYouModalVisible(false);
+          navigation.navigate('ArticleDetails', { slug: item.slug });
+          setJustForYouModalVisible(false);
         }}
         activeOpacity={0.8}
       >
@@ -163,9 +164,14 @@ const ArticleScreen = ({ navigation }: any) => {
           />
           <View style={{ flex: 1 }}>
             <View style={styles.nearBody}>
-              <TransletText text={item.title} numberOfLines={2} style={styles.nearTitle} />
+              <TransletText
+                text={item.title}
+                numberOfLines={2}
+                style={styles.nearTitle}
+              />
             </View>
-            <TransletText text={item.content}
+            <TransletText
+              text={item.content}
               numberOfLines={1.75}
               style={{ color: 'black', marginTop: 3, fontSize: 12 }}
             />
@@ -245,7 +251,7 @@ const ArticleScreen = ({ navigation }: any) => {
               style={styles.backIcon}
             />
           </TouchableOpacity>
-          <TransletText text='Articles' style={styles.headerTitle} />
+          <TransletText text="Articles" style={styles.headerTitle} />
           <View style={styles.headerRightPlaceholder} />
         </View>
 
@@ -284,7 +290,7 @@ const ArticleScreen = ({ navigation }: any) => {
             {searchResultsText || 'Search Results'} ({filteredArticles.length})
           </Text>
           <TouchableOpacity onPress={clearSearch}>
-            <TransletText text='Clear' style={styles.clearSearchText} />
+            <TransletText text="Clear" style={styles.clearSearchText} />
           </TouchableOpacity>
         </View>
       )}
@@ -300,7 +306,10 @@ const ArticleScreen = ({ navigation }: any) => {
                 alignItems: 'center',
               }}
             >
-              <TransletText text="Just For You" style={{ fontSize: 18, fontWeight: '700' }} />
+              <TransletText
+                text="Just For You"
+                style={{ fontSize: 18, fontWeight: '700' }}
+              />
               <TouchableOpacity
                 onPress={() => setJustForYouModalVisible(false)}
               >
@@ -317,7 +326,11 @@ const ArticleScreen = ({ navigation }: any) => {
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <TransletText
-                    text={isSearching ? 'No articles found' : 'No articles available'}
+                    text={
+                      isSearching
+                        ? 'No articles found'
+                        : 'No articles available'
+                    }
                     style={styles.emptyText}
                   />
                 </View>
@@ -338,7 +351,10 @@ const ArticleScreen = ({ navigation }: any) => {
                 alignItems: 'center',
               }}
             >
-              <TransletText text="Trending Articles" style={{ fontSize: 18, fontWeight: '700' }} />
+              <TransletText
+                text="Trending Articles"
+                style={{ fontSize: 18, fontWeight: '700' }}
+              />
               <TouchableOpacity onPress={() => setTrendingModalVisible(false)}>
                 <Text style={{ fontSize: 18, fontWeight: '700' }}>✕</Text>
               </TouchableOpacity>
@@ -352,7 +368,11 @@ const ArticleScreen = ({ navigation }: any) => {
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <TransletText
-                    text={isSearching ? 'No articles found' : 'No articles available'}
+                    text={
+                      isSearching
+                        ? 'No articles found'
+                        : 'No articles available'
+                    }
                     style={styles.emptyText}
                   />
                 </View>
@@ -379,7 +399,9 @@ const ArticleScreen = ({ navigation }: any) => {
                 scrollEnabled={false}
                 ListHeaderComponent={
                   <TransletText
-                    text={`Found ${filteredArticles.length} article${filteredArticles.length !== 1 ? 's' : ''}`}
+                    text={`Found ${filteredArticles.length} article${
+                      filteredArticles.length !== 1 ? 's' : ''
+                    }`}
                     style={styles.resultsCount}
                   />
                 }
@@ -390,8 +412,14 @@ const ArticleScreen = ({ navigation }: any) => {
                   source={require('../../assets/Png/search.png')} // Add a no results icon
                   style={styles.emptyIcon}
                 />
-                <TransletText text="No articles found" style={styles.emptyText} />
-                <TransletText text="Try different keywords or check back later" style={styles.emptySubText} />
+                <TransletText
+                  text="No articles found"
+                  style={styles.emptyText}
+                />
+                <TransletText
+                  text="Try different keywords or check back later"
+                  style={styles.emptySubText}
+                />
               </View>
             )}
           </View>
@@ -438,14 +466,20 @@ const ArticleScreen = ({ navigation }: any) => {
                 </>
               ) : (
                 <View style={styles.emptySection}>
-                  <TransletText text="No articles available" style={styles.emptySectionText} />
+                  <TransletText
+                    text="No articles available"
+                    style={styles.emptySectionText}
+                  />
                 </View>
               )}
             </View>
 
             {/* Trending Articles Section - Only show when not searching */}
             <View style={[styles.sectionHeader, { marginTop: 16 }]}>
-              <TransletText text="Trending Articles" style={styles.sectionTitle} />
+              <TransletText
+                text="Trending Articles"
+                style={styles.sectionTitle}
+              />
               <TouchableOpacity onPress={() => setTrendingModalVisible(true)}>
                 <TransletText text="View all" style={styles.seeMore} />
               </TouchableOpacity>
@@ -462,7 +496,10 @@ const ArticleScreen = ({ navigation }: any) => {
                 />
               ) : (
                 <View style={styles.emptySection}>
-                  <TransletText text="No trending articles" style={styles.emptySectionText} />
+                  <TransletText
+                    text="No trending articles"
+                    style={styles.emptySectionText}
+                  />
                 </View>
               )}
             </View>

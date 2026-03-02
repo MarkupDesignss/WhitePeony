@@ -37,6 +37,22 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+
+         <!-- Deep Linking -->
+  <intent-filter android:autoVerify="true">
+      <action android:name="android.intent.action.VIEW" />
+      <category android:name="android.intent.category.DEFAULT" />
+      <category android:name="android.intent.category.BROWSABLE" />
+
+      <!-- Custom scheme -->
+      <data android:scheme="myapp" />
+
+      <!-- HTTPS domain -->
+      <data
+          android:scheme="https"
+          android:host="www.markupdesigns.net"
+          android:pathPrefix="/whitepeony/article" />
+  </intent-filter>
       </activity>
     </application>
 </manifest>

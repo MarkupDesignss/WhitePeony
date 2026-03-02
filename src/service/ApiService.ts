@@ -237,7 +237,7 @@ export const UserService = {
     return APIKit.get('articles', apiHeaders);
   },
 
-  articleDetail: async (id: string) => {
+  articleDetail: async (slug: string) => {
     const token = await LocalStorage.read('@token');
     const apiHeaders = {
       headers: {
@@ -246,7 +246,7 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    return APIKit.get(`article/${id}`, apiHeaders);
+    return APIKit.get(`article-by-slug/${slug}`, apiHeaders);
   },
 
   address: async () => {
