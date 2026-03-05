@@ -41,8 +41,6 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 import TransletText from '../../components/TransletText';
 import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 
-
-
 type DisplayWishlistItem = {
   id: string; // product id
   wishlistItemId: string;
@@ -125,14 +123,22 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     null,
   );
   const [isFetchingShipping, setIsFetchingShipping] = useState(false);
-  const { translatedText: selectCouponText } = useAutoTranslate('Please select a coupon first');
-  const { translatedText: selectShippingText } = useAutoTranslate('Please select a shipping method');
-  const { translatedText: selectAddressText } = useAutoTranslate('Please, select Address');
-  const { translatedText: cancelPaymentTitle } = useAutoTranslate('Cancel Payment?');
-  const { translatedText: cancelPaymentMessage } = useAutoTranslate('Are you sure you want to cancel this payment?');
+  const { translatedText: selectCouponText } = useAutoTranslate(
+    'Please select a coupon first',
+  );
+  const { translatedText: selectShippingText } = useAutoTranslate(
+    'Please select a shipping method',
+  );
+  const { translatedText: selectAddressText } = useAutoTranslate(
+    'Please, select Address',
+  );
+  const { translatedText: cancelPaymentTitle } =
+    useAutoTranslate('Cancel Payment?');
+  const { translatedText: cancelPaymentMessage } = useAutoTranslate(
+    'Are you sure you want to cancel this payment?',
+  );
   const { translatedText: noText } = useAutoTranslate('No');
   const { translatedText: yesText } = useAutoTranslate('Yes');
-
 
   const [promoOptions, setPromoOptions] = useState<any[]>([]);
   const [promoModalVisible, setPromoModalVisible] = useState(false);
@@ -391,14 +397,23 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               left: widthPercentageToDP(5),
             }}
           >
-            <TransletText text={item.product_name || item.name} style={styles.shipmentName} />
-            <TransletText text={item?.unit || null} style={styles.shipmentWeight} />
+            <TransletText
+              text={item.product_name || item.name}
+              style={styles.shipmentName}
+            />
+            <TransletText
+              text={item?.unit || null}
+              style={styles.shipmentWeight}
+            />
 
             <TouchableOpacity
               onPress={() => moveToWishlist(item.id)}
               style={styles.moveToWishlistBtn}
             >
-              <TransletText text="Move to wishlist" style={styles.moveToWishlistText} />
+              <TransletText
+                text="Move to wishlist"
+                style={styles.moveToWishlistText}
+              />
             </TouchableOpacity>
 
             {/* Price display - show discount if available */}
@@ -476,7 +491,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           }
           style={styles.suggestionImage}
         />
-        <TransletText text={item.name} style={styles.suggestionName} numberOfLines={1} />
+        <TransletText
+          text={item.name}
+          style={styles.suggestionName}
+          numberOfLines={1}
+        />
 
         <View style={{ flexDirection: 'row', marginTop: 0 }}>
           {[1, 2, 3, 4, 5].map(r => {
@@ -589,7 +608,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   useFocusEffect(
     React.useCallback(() => {
       GetCartDetails();
-      return () => { };
+      return () => {};
     }, []),
   );
 
@@ -661,6 +680,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           discounted_total: discountedTotal,
           total_savings: totalSavings,
           id: cartDataFromResponse?.id || null,
+          vat_percentage: res.data?.vat_percentage || 0,
         };
 
         setApiCartData(processedCartData);
@@ -768,11 +788,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       Alert.alert(
         'Currency Conversion Notice',
         `Your order total: ${checkoutBreakdown.displayAmountToPay}\n\n` +
-        `Payment will be processed in EUR: ${displayPrice(
-          checkoutBreakdown.grandTotalEUR,
-        )}\n\n` +
-        'Your bank/card will handle the currency conversion.\n' +
-        "The exact amount may vary based on your bank's exchange rate.",
+          `Payment will be processed in EUR: ${displayPrice(
+            checkoutBreakdown.grandTotalEUR,
+          )}\n\n` +
+          'Your bank/card will handle the currency conversion.\n' +
+          "The exact amount may vary based on your bank's exchange rate.",
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -927,7 +947,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 style={styles.sectionTitle}
               />
 
-
               <FlatList
                 data={cartData?.items || []}
                 keyExtractor={(item, index) =>
@@ -950,7 +969,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   marginTop: 10,
                 }}
               >
-                <TransletText text="You Might Also Like" style={styles.sectionTitle} />
+                <TransletText
+                  text="You Might Also Like"
+                  style={styles.sectionTitle}
+                />
                 <FlatList
                   data={items}
                   horizontal
@@ -1028,9 +1050,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     alignSelf: 'center',
                   }}
                 />
-                <TransletText text={selectedPromoCode?.code?.trim()
-                  ? selectedPromoCode.code
-                  : 'Use Coupons'} style={styles.couponText} />
+                <TransletText
+                  text={
+                    selectedPromoCode?.code?.trim()
+                      ? selectedPromoCode.code
+                      : 'Use Coupons'
+                  }
+                  style={styles.couponText}
+                />
               </View>
               <Image
                 source={require('../../assets/Png/next.png')}
@@ -1083,7 +1110,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     />
                   </View>
 
-                  <TransletText text='Available Coupons'
+                  <TransletText
+                    text="Available Coupons"
                     style={{
                       fontSize: 18,
                       fontWeight: '600',
@@ -1094,7 +1122,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   {isFetchingPromo ? (
                     <ActivityIndicator size="small" color="#5DA53B" />
                   ) : promoOptions.length === 0 ? (
-                    <TransletText text=" No coupons available" style={{ textAlign: 'center', color: '#666' }} />
+                    <TransletText
+                      text=" No coupons available"
+                      style={{ textAlign: 'center', color: '#666' }}
+                    />
                   ) : (
                     <FlatList
                       data={promoOptions}
@@ -1111,8 +1142,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                         // Prepare description text
                         let discountText = '';
                         if (item.discount_type === 'percentage') {
-                          discountText = `${item.discount_value
-                            }% off (max ${displayPrice(item.max_discount)})`;
+                          discountText = `${
+                            item.discount_value
+                          }% off (max ${displayPrice(item.max_discount)})`;
                         } else {
                           discountText = `${displayPrice(
                             item.discount_value,
@@ -1152,12 +1184,20 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                               />
                               <TransletText
                                 text={discountText}
-                                style={{ color: '#666', marginTop: 4, fontSize: 12 }}
+                                style={{
+                                  color: '#666',
+                                  marginTop: 4,
+                                  fontSize: 12,
+                                }}
                               />
                               {item.description ? (
                                 <TransletText
                                   text={item.description}
-                                  style={{ color: '#888', marginTop: 2, fontSize: 11 }}
+                                  style={{
+                                    color: '#888',
+                                    marginTop: 2,
+                                    fontSize: 11,
+                                  }}
                                 />
                               ) : null}
                             </View>
@@ -1166,17 +1206,22 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                               <TransletText
                                 text={
                                   item.start_date
-                                    ? new Date(item.start_date).toLocaleDateString()
+                                    ? new Date(
+                                        item.start_date,
+                                      ).toLocaleDateString()
                                     : ''
                                 }
                                 style={{ fontSize: 12, color: '#888' }}
                               />
                               <TransletText
                                 text={item.is_valid ? 'Valid' : 'Expired'}
-                                style={{ fontSize: 10, color: '#5DA53B', marginTop: 2 }}
+                                style={{
+                                  fontSize: 10,
+                                  color: '#5DA53B',
+                                  marginTop: 2,
+                                }}
                               />
                             </View>
-
                           </TouchableOpacity>
                         );
                       }}
@@ -1204,7 +1249,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                         marginRight: 8,
                       }}
                     >
-                      <TransletText text='Cancel' style={{ color: '#333' }} />
+                      <TransletText text="Cancel" style={{ color: '#333' }} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -1218,20 +1263,45 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                         flex: 1,
                       }}
                     >
-                      <TransletText text={isApplyingPromo ? 'Applying...' : 'Apply Coupon'} style={{ color: '#000', fontWeight: '600' }} />
+                      <TransletText
+                        text={isApplyingPromo ? 'Applying...' : 'Apply Coupon'}
+                        style={{ color: '#000', fontWeight: '600' }}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
               </View>
             </Modal>
 
-            {/* Bill details */}
+            {/* Bill details with VAT */}
+            {/* Bill details with VAT */}
             {cartData && (
               <View style={styles.billSection}>
-                <TransletText text='Bill details' style={styles.billTitle} />
+                <TransletText text="Bill details" style={styles.billTitle} />
 
                 {(() => {
                   const breakdown = checkoutBreakdown;
+
+                  // VAT rate
+                  const vatPercentage = 12;
+
+                  const subtotal = Number(cartData?.subtotal_amount || 0);
+                  const savings = Number(cartData?.total_savings || 0);
+                  const couponDiscount = Number(discountAmount || 0);
+                  const deliveryCost = Number(getShippingCost() || 0);
+
+                  // subtotal after discounts
+                  const subtotalAfterDiscounts =
+                    subtotal - savings - couponDiscount;
+
+                  // taxable amount
+                  const taxableAmount = subtotalAfterDiscounts + deliveryCost;
+
+                  // VAT
+                  const vatAmount = (taxableAmount * vatPercentage) / 100;
+
+                  // grand total
+                  const grandTotalWithVAT = taxableAmount + vatAmount;
 
                   return (
                     <>
@@ -1242,11 +1312,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                           style={styles.billLabel}
                         />
                         <TransletText
-                          text={breakdown.displaySubtotal}
+                          text={displayPrice(cartData?.subtotal_amount || 0)}
                           style={styles.billValue}
                         />
                       </View>
-
 
                       {/* Total savings */}
                       {cartData?.total_savings &&
@@ -1257,18 +1326,23 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                               style={[styles.billLabel, styles.savingsLabel]}
                             />
                             <TransletText
-                              text={breakdown.displaySavings}
+                              text={`-${displayPrice(cartData.total_savings)}`}
                               style={[styles.billValue, styles.savingsValue]}
                             />
                           </View>
                         )}
 
                       {/* Coupon discount */}
-                      {appliedPromo && (
+                      {appliedPromo && discountAmount > 0 && (
                         <View style={styles.billRow}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                            }}
+                          >
                             <TransletText
-                              text={`Coupon (${appliedPromo.code ?? appliedPromo.promo_code})`}
+                              text={`Coupon (${appliedPromo.code})`}
                               style={[styles.billLabel, styles.couponLabel]}
                             />
                             <TouchableOpacity
@@ -1282,12 +1356,23 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                             </TouchableOpacity>
                           </View>
                           <TransletText
-                            text={breakdown.displayCoupon}
+                            text={`-${displayPrice(discountAmount)}`}
                             style={[styles.billValue, styles.couponValue]}
                           />
                         </View>
                       )}
 
+                      {/* Subtotal after discounts */}
+                      {/* <View style={styles.billRow}>
+                        <TransletText
+                          text="Subtotal after discounts"
+                          style={[styles.billLabel, { fontWeight: '500' }]}
+                        />
+                        <TransletText
+                          text={displayPrice(subtotalAfterDiscounts)}
+                          style={[styles.billValue, { fontWeight: '500' }]}
+                        />
+                      </View> */}
 
                       {/* Delivery charges */}
                       <View style={styles.billRow}>
@@ -1296,46 +1381,57 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                           style={[styles.billLabel, styles.deliveryLabel]}
                         />
                         <TransletText
-                          text={breakdown.displayDelivery}
+                          text={displayPrice(deliveryCost)}
                           style={[styles.billValue, styles.deliveryValue]}
                         />
                       </View>
 
+                      {/* Taxable amount */}
+                      <View style={styles.billRow}>
+                        <TransletText
+                          text="Taxable amount"
+                          style={[styles.billLabel, { color: '#666' }]}
+                        />
+                        <TransletText
+                          text={displayPrice(taxableAmount)}
+                          style={[styles.billValue, { color: '#666' }]}
+                        />
+                      </View>
+
+                      {/* VAT */}
+                      <View style={styles.billRow}>
+                        <TransletText
+                          text={`VAT (${vatPercentage}%)`}
+                          style={[styles.billLabel, styles.vatLabel]}
+                        />
+                        <TransletText
+                          text={displayPrice(vatAmount)}
+                          style={[styles.billValue, styles.vatValue]}
+                        />
+                      </View>
 
                       <View style={styles.divider} />
 
-                      {/* Grand total (with conversion) */}
+                      {/* Grand total */}
                       <View style={styles.billRow}>
                         <TransletText
                           text="Grand total"
                           style={[styles.billLabel, styles.grandTotalLabel]}
                         />
                         <TransletText
-                          text={breakdown.displayGrandTotal}
+                          text={displayPrice(grandTotalWithVAT)}
                           style={[styles.billValue, styles.grandTotalValue]}
                         />
                       </View>
 
-
-                      {/* Optional: Show round off if you want */}
-                      {Math.abs(breakdown.roundOffAmount) > 0.01 && (
-                        <View style={styles.billRow}>
-                          <TransletText
-                            text="Round Off"
-                            style={[styles.billLabel, styles.roundOffLabel]}
-                          />
-                          <TransletText
-                            text={breakdown.displayRoundOff}
-                            style={[styles.billValue, styles.roundOffValue]}
-                          />
-                        </View>
-                      )}
-
-                      {/* Amount to Pay (rounded) */}
+                      {/* Amount to Pay */}
                       <View style={[styles.billRow, styles.amountToPayRow]}>
-                        <TransletText text="Amount to Pay" style={styles.amountToPayLabel} />
+                        <TransletText
+                          text="Amount to Pay"
+                          style={styles.amountToPayLabel}
+                        />
                         <Text style={styles.amountToPayValue}>
-                          {breakdown.displayAmountToPay}
+                          {displayPrice(grandTotalWithVAT)}
                         </Text>
                       </View>
                     </>
@@ -1362,9 +1458,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     text={
                       selectedAddress?.address_type
                         ? `Delivering to ${selectedAddress.address_type
-                          ?.toString()
-                          .charAt(0)
-                          .toUpperCase()}${selectedAddress.address_type
+                            ?.toString()
+                            .charAt(0)
+                            .toUpperCase()}${selectedAddress.address_type
                             ?.toString()
                             .slice(1)}`
                         : 'Delivering to Home'
@@ -1374,9 +1470,21 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   <TransletText
                     text={
                       selectedAddress
-                        ? `${selectedAddress.name}, ${selectedAddress.full_address}${selectedAddress.city ? `, ${selectedAddress.city}` : ''
-                        }${selectedAddress.postal_code ? `, ${selectedAddress.postal_code}` : ''}${selectedAddress.phone ? ` • ${selectedAddress.phone}` : ''
-                        }`
+                        ? `${selectedAddress.name}, ${
+                            selectedAddress.full_address
+                          }${
+                            selectedAddress.city
+                              ? `, ${selectedAddress.city}`
+                              : ''
+                          }${
+                            selectedAddress.postal_code
+                              ? `, ${selectedAddress.postal_code}`
+                              : ''
+                          }${
+                            selectedAddress.phone
+                              ? ` • ${selectedAddress.phone}`
+                              : ''
+                          }`
                         : 'Please Select Delivery Address'
                     }
                     style={styles.deliveryAddress}
@@ -1400,7 +1508,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 />
               </TouchableOpacity>
             </View>
-
 
             {/* Checkout Button */}
             <TouchableOpacity
@@ -1439,7 +1546,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           <View
             style={{ justifyContent: 'center', alignSelf: 'center', flex: 1 }}
           >
-            <TransletText text=' Your cart is empty'
+            <TransletText
+              text=" Your cart is empty"
               style={[
                 styles.headerTitle,
                 { alignSelf: 'center', marginBottom: 10 },
@@ -1458,7 +1566,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   alignSelf: 'center',
                 }}
               >
-                <TransletText text='Continue For shopping' style={{ fontSize: 14, alignSelf: 'center' }} />
+                <TransletText
+                  text="Continue For shopping"
+                  style={{ fontSize: 14, alignSelf: 'center' }}
+                />
               </View>
             </TouchableOpacity>
           </View>
@@ -1481,7 +1592,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           }}
         >
           {/* This handles tapping outside the modal to close */}
-          <TouchableWithoutFeedback onPress={() => setShippingModalVisible(false)}>
+          <TouchableWithoutFeedback
+            onPress={() => setShippingModalVisible(false)}
+          >
             <View style={{ flex: 1 }} />
           </TouchableWithoutFeedback>
 
@@ -1509,10 +1622,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 />
               </View>
 
-              <TransletText text='  Delivery Method'
+              <TransletText
+                text="  Delivery Method"
                 style={{ fontSize: 18, fontWeight: '600', marginBottom: 12 }}
               />
-
 
               {isFetchingShipping ? (
                 <ActivityIndicator size="small" color="#E2E689" />
@@ -1521,7 +1634,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   data={shippingOptions}
                   keyExtractor={it => String(it.id)}
                   renderItem={({ item }) => {
-                    const isSelected = Number(item.id) === Number(selectedShippingId);
+                    const isSelected =
+                      Number(item.id) === Number(selectedShippingId);
                     return (
                       <TouchableOpacity
                         onPress={() => {
@@ -1546,13 +1660,21 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                           />
                           <TransletText
                             text={`Estimated Time: ${item.estimated_time}`}
-                            style={{ color: '#666', marginTop: 4, fontSize: 12 }}
+                            style={{
+                              color: '#666',
+                              marginTop: 4,
+                              fontSize: 12,
+                            }}
                           />
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                           <TransletText
                             text="Cost"
-                            style={{ color: '#888', fontSize: 14, fontWeight: '600' }}
+                            style={{
+                              color: '#888',
+                              fontSize: 14,
+                              fontWeight: '600',
+                            }}
                           />
                           <TransletText
                             text={displayPrice(item.cost)}
@@ -1564,7 +1686,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   }}
                   contentContainerStyle={{ paddingBottom: 20 }}
                 />
-
               )}
 
               <TouchableOpacity
@@ -1580,8 +1701,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   marginTop: 8,
                 }}
               >
-                <TransletText text=' Continue to Address' style={{ color: '#000', fontWeight: '700' }} />
-
+                <TransletText
+                  text=" Continue to Address"
+                  style={{ color: '#000', fontWeight: '700' }}
+                />
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
@@ -1625,10 +1748,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             }}
           >
             <View style={{ flex: 1 }}>
-              <TransletText text='Payment Gateway'
+              <TransletText
+                text="Payment Gateway"
                 style={{ fontSize: 18, fontWeight: '600', marginBottom: 4 }}
               />
-
 
               {/* Show both amounts for clarity */}
               <View
@@ -1649,7 +1772,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   />
                 </View>
 
-
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text
                     style={{
@@ -1660,26 +1782,24 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   >
                     ≈ {displayPrice(checkoutBreakdown.grandTotalEUR)}
                   </Text>
-                  <TransletText text='Your card will charge in EUR' style={{ fontSize: 10, color: '#666', marginTop: 2 }} />
-
+                  <TransletText
+                    text="Your card will charge in EUR"
+                    style={{ fontSize: 10, color: '#666', marginTop: 2 }}
+                  />
                 </View>
               </View>
             </View>
 
             <TouchableOpacity
               onPress={() => {
-                Alert.alert(
-                  cancelPaymentTitle,
-                  cancelPaymentMessage,
-                  [
-                    { text: noText, style: 'cancel' },
-                    {
-                      text: yesText,
-                      onPress: () => setShowWebView(false),
-                      style: 'destructive',
-                    },
-                  ],
-                );
+                Alert.alert(cancelPaymentTitle, cancelPaymentMessage, [
+                  { text: noText, style: 'cancel' },
+                  {
+                    text: yesText,
+                    onPress: () => setShowWebView(false),
+                    style: 'destructive',
+                  },
+                ]);
               }}
               style={{ marginLeft: 10 }}
             >
@@ -1877,7 +1997,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   backgroundColor: '#fff',
                 }}
               >
-                <TransletText text='Payment Gateway Error'
+                <TransletText
+                  text="Payment Gateway Error"
                   style={{
                     fontSize: 18,
                     fontWeight: '600',
@@ -1886,7 +2007,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   }}
                 />
 
-                <TransletText text={errorDesc || 'Unable to load payment page'}
+                <TransletText
+                  text={errorDesc || 'Unable to load payment page'}
                   style={{
                     fontSize: 14,
                     color: '#666',
@@ -1904,9 +2026,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   }}
                   onPress={() => setShowWebView(false)}
                 >
-                  <TransletText text='Close' style={{ color: '#000', fontWeight: '600' }} />
-
-
+                  <TransletText
+                    text="Close"
+                    style={{ color: '#000', fontWeight: '600' }}
+                  />
                 </TouchableOpacity>
               </View>
             )}

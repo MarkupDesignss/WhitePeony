@@ -7,9 +7,9 @@ interface LanguageState {
   code: LanguageCode;
 }
 
-// English as default
+// Czech as default
 const initialState: LanguageState = {
-  code: 'en',
+  code: 'cs',
 };
 
 const languageSlice = createSlice({

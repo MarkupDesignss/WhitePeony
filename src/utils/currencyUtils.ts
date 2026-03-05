@@ -1,145 +1,133 @@
 // src/utils/currency.ts
 import { SupportedCurrency } from '../redux/slices/currencySlice';
 
-// Currency symbols (after price for European style)
+// Currency symbols (European style: symbol after number)
 export const CURRENCY_SYMBOLS: Record<SupportedCurrency, string> = {
-    EUR: '€',
-    USD: '$',
-    CZK: 'Kč'
+  EUR: '€',
+  USD: '$',
+  CZK: 'Kč',
 };
 
-// ✅ FIXED: Show 2 decimal places, not rounded
+// Format number to always show 2 decimal places
 export const formatCurrencyNumber = (value: number): string => {
-    // Round to 2 decimal places for accuracy
-    const rounded = Math.round(value * 100) / 100;
-
-    // Handle negative values properly
-    const absValue = Math.abs(rounded);
-
-    // Show 2 decimal places always
-    const formatted = absValue.toFixed(2);
-
-    // Add negative sign back if needed
-    return rounded < 0 ? `-${formatted}` : formatted;
+  const rounded = Math.round(value * 100) / 100;
+  const absValue = Math.abs(rounded);
+  const formatted = absValue.toFixed(2);
+  return rounded < 0 ? `-${formatted}` : formatted;
 };
 
-// ✅ FIXED: Remove rounding here - keep precise
-export const convertFromEUR = (
-    priceEUR: number,
-    selectedCurrency: SupportedCurrency,
-    rates?: Record<string, number>
+// Convert price from CZK → selected currency
+export const convertFromCZK = (
+  priceCZK: number,
+  selectedCurrency: SupportedCurrency,
+  rates?: Record<string, number>,
 ): number => {
-    // Return original if no rates or invalid price
-    if (!rates || typeof priceEUR !== 'number' || isNaN(priceEUR)) return priceEUR;
+  if (!rates || typeof priceCZK !== 'number' || isNaN(priceCZK)) {
+    return priceCZK;
+  }
 
-    // If EUR selected, return original
-    if (selectedCurrency === 'EUR') return priceEUR;
+  // No conversion needed
+  if (selectedCurrency === 'CZK') {
+    return priceCZK;
+  }
 
-    // Get required rates
-    const eurRate = rates['EUR']; // EUR value in USD
-    const targetRate = rates[selectedCurrency]; // Target currency value in USD
+  const rate = rates[selectedCurrency];
 
-    // Both rates must exist
-    if (!eurRate || !targetRate) return priceEUR;
+  if (!rate) {
+    return priceCZK;
+  }
 
-    // Convert: (Price in EUR) / (EUR rate) * (Target rate)
-    // ✅ NO ROUNDING HERE - keep precise
-    return (priceEUR / eurRate) * targetRate;
+  return priceCZK * rate;
 };
 
-// Format price with symbol AFTER the number (European style)
+// Format price with symbol after number
 export const formatPrice = (
-    price: number,
-    selectedCurrency: SupportedCurrency
+  price: number,
+  selectedCurrency: SupportedCurrency,
 ): string => {
-    const symbol = CURRENCY_SYMBOLS[selectedCurrency];
-    const formattedNumber = formatCurrencyNumber(price);
-    return `${formattedNumber} ${symbol}`;
+  const symbol = CURRENCY_SYMBOLS[selectedCurrency];
+  const formattedNumber = formatCurrencyNumber(price);
+  return `${formattedNumber} ${symbol}`;
 };
 
-// Main function - convert EUR price to selected currency and format
+// Convert + format price
 export const convertAndFormatPrice = (
-    priceEUR: number | string | null | undefined,
-    selectedCurrency: SupportedCurrency,
-    rates?: Record<string, number>
+  priceCZK: number | string | null | undefined,
+  selectedCurrency: SupportedCurrency,
+  rates?: Record<string, number>,
 ): string => {
-    // Handle invalid values
-    if (priceEUR === null || priceEUR === undefined || priceEUR === '') {
-        return '0.00 ' + CURRENCY_SYMBOLS[selectedCurrency];
-    }
+  if (priceCZK === null || priceCZK === undefined || priceCZK === '') {
+    return `0.00 ${CURRENCY_SYMBOLS[selectedCurrency]}`;
+  }
 
-    // Convert to number
-    const numericPrice = typeof priceEUR === 'string'
-        ? parseFloat(priceEUR)
-        : priceEUR;
+  const numericPrice =
+    typeof priceCZK === 'string' ? parseFloat(priceCZK) : priceCZK;
 
-    if (isNaN(numericPrice) || typeof numericPrice !== 'number') {
-        return '0.00 ' + CURRENCY_SYMBOLS[selectedCurrency];
-    }
+  if (typeof numericPrice !== 'number' || isNaN(numericPrice)) {
+    return `0.00 ${CURRENCY_SYMBOLS[selectedCurrency]}`;
+  }
 
-    // If EUR selected, format with symbol
-    if (selectedCurrency === 'EUR' || !rates) {
-        const symbol = CURRENCY_SYMBOLS['EUR'];
-        const formattedNumber = formatCurrencyNumber(numericPrice);
-        return `${formattedNumber} ${symbol}`;
-    }
+  // If CZK selected OR rates not loaded
+  if (selectedCurrency === 'CZK' || !rates) {
+    return formatPrice(numericPrice, 'CZK');
+  }
 
-    // Convert currency (no rounding in convertFromEUR now)
-    const convertedPrice = convertFromEUR(numericPrice, selectedCurrency, rates);
+  const convertedPrice = convertFromCZK(numericPrice, selectedCurrency, rates);
 
-    // Handle conversion errors
-    if (isNaN(convertedPrice) || !isFinite(convertedPrice)) {
-        const symbol = CURRENCY_SYMBOLS[selectedCurrency];
-        const formattedNumber = formatCurrencyNumber(numericPrice);
-        return `${formattedNumber} ${symbol}`;
-    }
+  if (isNaN(convertedPrice) || !isFinite(convertedPrice)) {
+    return formatPrice(numericPrice, 'CZK');
+  }
 
-    // Format with symbol after number
-    return formatPrice(convertedPrice, selectedCurrency);
+  return formatPrice(convertedPrice, selectedCurrency);
 };
 
-// For displaying discounted prices
+// Price display interface
 export interface PriceDisplay {
-    current: string;
-    original?: string;
-    hasDiscount: boolean;
+  current: string;
+  original?: string;
+  hasDiscount: boolean;
 }
 
+// Get price display with discount support
 export const getPriceDisplay = (
-    item: any,
-    selectedCurrency: SupportedCurrency,
-    rates?: Record<string, number>
+  item: any,
+  selectedCurrency: SupportedCurrency,
+  rates?: Record<string, number>,
 ): PriceDisplay => {
-    if (!item) return {
-        current: '0.00 ' + CURRENCY_SYMBOLS[selectedCurrency],
-        hasDiscount: false
-    };
-
-    // Get prices in EUR
-    const discountedPriceEUR = item?.variants?.[0]?.actual_price ||
-        item?.actual_price ||
-        item?.price;
-
-    const originalPriceEUR = item?.variants?.[0]?.price ||
-        item?.total_price ||
-        item?.price;
-
-    // Convert both
-    const currentPrice = convertAndFormatPrice(
-        discountedPriceEUR || originalPriceEUR,
-        selectedCurrency,
-        rates
-    );
-
-    const originalPrice = convertAndFormatPrice(originalPriceEUR, selectedCurrency, rates);
-
-    const hasDiscount = discountedPriceEUR &&
-        originalPriceEUR &&
-        discountedPriceEUR < originalPriceEUR;
-
+  if (!item) {
     return {
-        current: currentPrice,
-        original: hasDiscount ? originalPrice : undefined,
-        hasDiscount
+      current: `0.00 ${CURRENCY_SYMBOLS[selectedCurrency]}`,
+      hasDiscount: false,
     };
+  }
+
+  // Prices from backend (CZK)
+  const discountedPriceCZK =
+    item?.variants?.[0]?.actual_price || item?.actual_price || item?.price || 0;
+
+  const originalPriceCZK =
+    item?.variants?.[0]?.price || item?.total_price || item?.price || 0;
+
+  const currentPrice = convertAndFormatPrice(
+    discountedPriceCZK || originalPriceCZK,
+    selectedCurrency,
+    rates,
+  );
+
+  const originalPrice = convertAndFormatPrice(
+    originalPriceCZK,
+    selectedCurrency,
+    rates,
+  );
+
+  const hasDiscount =
+    discountedPriceCZK &&
+    originalPriceCZK &&
+    discountedPriceCZK < originalPriceCZK;
+
+  return {
+    current: currentPrice,
+    original: hasDiscount ? originalPrice : undefined,
+    hasDiscount,
+  };
 };

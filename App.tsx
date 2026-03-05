@@ -31,34 +31,20 @@ const Stack = createNativeStackNavigator();
 
 const linking = {
   prefixes: [
-    'https://www.markupdesigns.net',
-    'http://www.markupdesigns.net',
+    'https://www.markupdesigns.net/whitepeony',
     'whitepeony://',
   ],
   config: {
     screens: {
-      // ArticleDetails is directly in HomeStackNavigator, not nested
-      ArticleDetails: 'article/:slug',
-
-      // If you want to add other deep links
-      ProductDetails: 'product/:id',
-      EventDetails: 'event/:id',
-      // etc...
+      HomeStackNavigator: {
+        screens: {
+          BottomTabScreen: '',
+          ArticleDetails: 'article/:slug',
+          ProductDetails: 'product/:id',
+          EventDetails: 'event/:id',
+        },
+      },
     },
-  },
-  getInitialURL: async () => {
-    const url = await Linking.getInitialURL();
-    console.log('Initial URL:', url);
-    return url;
-  },
-  subscribe: listener => {
-    const onReceiveURL = ({ url }) => {
-      console.log('Deep link received:', url);
-      listener(url);
-    };
-
-    const subscription = Linking.addEventListener('url', onReceiveURL);
-    return () => subscription.remove();
   },
 };
 

@@ -1,5 +1,5 @@
 import { SupportedCurrency } from '../redux/slices/currencySlice';
-import { convertFromEUR } from './currencyUtils';
+import {convertFromCZK} from './currencyUtils';
 
 export interface CheckoutBreakdown {
     // In EUR (from database)
@@ -52,7 +52,7 @@ export const calculateCheckout = (
     // 3. Convert all amounts to selected currency
     const convert = (amountEUR: number): number => {
         if (selectedCurrency === 'EUR' || !rates) return amountEUR;
-        return convertFromEUR(amountEUR, selectedCurrency, rates);
+        return convertFromCZK(amountEUR, selectedCurrency, rates);
     };
 
     const subtotalConverted = convert(safeSubtotalEUR);

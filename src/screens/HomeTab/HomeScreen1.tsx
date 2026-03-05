@@ -111,12 +111,13 @@ const HomeScreen1 = ({ navigation }: any) => {
 
   // Helper function to get current product type
   const getCurrentProductType = () => {
-    // If userType is null or undefined, return null to show ALL products
+    // If userType is null or undefined, default to 'b2c'
     if (userType === null || userType === undefined) {
-      return null;
+      return 'b2c'; // Default to b2c for null users
     }
     return userType; // 'b2c' or 'b2b'
   };
+
 
   // Helper function to filter products by type
   const filterProductsByType = (products: any[]) => {
@@ -124,11 +125,9 @@ const HomeScreen1 = ({ navigation }: any) => {
 
     const currentType = getCurrentProductType();
 
-    // If currentType is null, return ALL products (no filtering)
-    if (currentType === null) {
-      return products;
-    }
+    console.log('Filtering products for user type:', currentType);
 
+    // Filter products by the current user type (always b2c or b2b, never null)
     return products.filter(item => {
       // Check if item has product_type property
       if (!item?.product_type) {
@@ -146,13 +145,10 @@ const HomeScreen1 = ({ navigation }: any) => {
   const getFeaturedProducts = (data: any) => {
     const currentType = getCurrentProductType();
 
-    // If userType is null, combine both b2c and b2b featured products
-    if (currentType === null) {
-      const b2cFeatured = data?.b2c || [];
-      const b2bFeatured = data?.b2b || [];
-      return [...b2cFeatured, ...b2bFeatured];
-    }
+    console.log('Getting featured products for user type:', currentType);
 
+    // Always return products for the current user type (b2c or b2b)
+    // If no data for that type, return empty array
     return data?.[currentType] || [];
   };
 
@@ -160,15 +156,13 @@ const HomeScreen1 = ({ navigation }: any) => {
   const getSalesProducts = (data: any) => {
     const currentType = getCurrentProductType();
 
-    // If userType is null, combine both b2c and b2b sales products
-    if (currentType === null) {
-      const b2cSales = data?.b2c || [];
-      const b2bSales = data?.b2b || [];
-      return [...b2cSales, ...b2bSales];
-    }
+    console.log('Getting sales products for user type:', currentType);
 
+    // Always return products for the current user type (b2c or b2b)
+    // If no data for that type, return empty array
     return data?.[currentType] || [];
   };
+
 
   // Small Card Component
   const ProductSmallCard = ({
@@ -268,48 +262,20 @@ const HomeScreen1 = ({ navigation }: any) => {
     const currentType = getCurrentProductType();
 
     console.log('Current user type for banners:', currentType);
-    console.log('Raw banner data:', data);
-    console.log('isLoggedIn:', isLoggedIn); // Add this to see login state
+    console.log('isLoggedIn:', isLoggedIn);
 
-    // If user is NOT logged in, show only b2c banners
+    // If user is NOT logged in, show b2c banners
     if (!isLoggedIn) {
-      console.log('User not logged in, showing only b2c banners');
+      console.log('User not logged in, showing b2c banners');
       const b2cBanners = data?.b2c || [];
       console.log('B2C banners count:', b2cBanners.length);
-
-      // Remove duplicates and return b2c banners only
       return removeDuplicateBanners(b2cBanners);
     }
 
-    // If userType is null or undefined (logged in but no specific type),
-    // combine both b2c and b2b banners
-    if (currentType === null || currentType === undefined) {
-      console.log('User logged in but no specific type, combining all banners');
-      const b2cBanners = data?.b2c || [];
-      const b2bBanners = data?.b2b || [];
-
-      console.log(
-        'Combining banners - b2c:',
-        b2cBanners.length,
-        'b2b:',
-        b2bBanners.length,
-      );
-
-      // Combine all banners
-      const allBanners = [...b2cBanners, ...b2bBanners];
-
-      // Remove duplicates using multiple criteria
-      const uniqueBanners = removeDuplicateBanners(allBanners);
-
-      console.log('Unique banners after deduplication:', uniqueBanners.length);
-      return uniqueBanners;
-    }
-
-    // For specific user types (b2c or b2b), just return their banners
+    // For logged-in users, show banners based on their user type (b2c or b2b)
     const typeBanners = data?.[currentType] || [];
     console.log(`${currentType} banners:`, typeBanners.length);
 
-    // Still deduplicate in case there are duplicates within the same type
     return removeDuplicateBanners(typeBanners);
   };
 
@@ -348,13 +314,9 @@ const HomeScreen1 = ({ navigation }: any) => {
 
     const currentType = getCurrentProductType();
 
-    // If currentType is null, return ALL orders
-    if (currentType === null) {
-      return orders.filter(
-        order => Array.isArray(order.items) && order.items.length > 0,
-      );
-    }
+    console.log('Filtering orders for user type:', currentType);
 
+    // Filter orders for current user type (b2c or b2b)
     return orders.filter(order => {
       if (!Array.isArray(order.items) || order.items.length === 0) {
         return false;
@@ -428,6 +390,7 @@ const HomeScreen1 = ({ navigation }: any) => {
       const res = await UserService.recommended();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         const fetchedProducts = res.data?.data || [];
+        // This will now filter based on user type (b2c for null users)
         const filteredProducts = filterProductsByType(fetchedProducts);
         setApiRecommend(filteredProducts);
       }
@@ -443,17 +406,17 @@ const HomeScreen1 = ({ navigation }: any) => {
       isLoading,
       sampleItem: wishlistItems?.[0]
         ? {
-            id: wishlistItems[0]?.id,
-            name: wishlistItems[0]?.name,
-            product_type: wishlistItems[0]?.product_type,
-            front_image: wishlistItems[0]?.front_image,
-            variants: wishlistItems[0]?.variants,
-            // Check all possible properties
-            hasProductProperty: !!wishlistItems[0]?.product,
-            productId: wishlistItems[0]?.product?.id,
-            productName: wishlistItems[0]?.product?.name,
-            productFrontImage: wishlistItems[0]?.product?.front_image,
-          }
+          id: wishlistItems[0]?.id,
+          name: wishlistItems[0]?.name,
+          product_type: wishlistItems[0]?.product_type,
+          front_image: wishlistItems[0]?.front_image,
+          variants: wishlistItems[0]?.variants,
+          // Check all possible properties
+          hasProductProperty: !!wishlistItems[0]?.product,
+          productId: wishlistItems[0]?.product?.id,
+          productName: wishlistItems[0]?.product?.name,
+          productFrontImage: wishlistItems[0]?.product?.front_image,
+        }
         : null,
     });
   }, [wishlistItems, isLoggedIn, userType, isLoading]);
@@ -598,6 +561,7 @@ const HomeScreen1 = ({ navigation }: any) => {
       const res = await UserService.featuredproducts();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         const fetchedProducts = res?.data?.data || {};
+        // This will now return b2c for null users, b2c for b2c users, b2b for b2b users
         const typeProducts = getFeaturedProducts(fetchedProducts);
         setFeaturesProduct(typeProducts);
 
@@ -614,6 +578,7 @@ const HomeScreen1 = ({ navigation }: any) => {
       const response = await UserService.order();
       if (response && response.data && response.status === HttpStatusCode.Ok) {
         const orders = response.data?.orders || [];
+        // This will now filter based on user type (b2c for null users)
         const filteredOrders = filterOrdersByType(orders);
         setorderitem(filteredOrders);
       }
@@ -622,13 +587,15 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
+
   const ApiSortingWithoutLoader = async () => {
     try {
       const res = await UserService.Sorting('price_asc');
       if (res?.status === HttpStatusCode.Ok) {
         const sortedProducts = res?.data?.data || [];
+        // This will now filter based on user type (b2c for null users)
         const filteredProducts = filterProductsByType(sortedProducts);
-        console.log('Heyyyyyyy', filteredProducts);
+        console.log('Filtered products by user type:', filteredProducts.length);
         setlowestitem(filteredProducts);
       } else {
         console.log('Failed to sort products:', res);
@@ -646,10 +613,12 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
+
   const GetHeaderWithoutLoader = async () => {
     try {
       const res = await UserService.header();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
+        // This will now return b2c banners for null users
         const banners = getPromotionalBanners(res?.data?.data || {});
         setPromotional(banners);
       }
@@ -658,11 +627,13 @@ const HomeScreen1 = ({ navigation }: any) => {
     }
   };
 
+
   const bigsaleWithoutLoader = async () => {
     try {
       const res = await UserService.bigsales();
       if (res && res.data && res.status === HttpStatusCode.Ok) {
         const fetchedProducts = res.data?.data || {};
+        // This will now return b2c for null users
         const typeProducts = getSalesProducts(fetchedProducts);
         const activeSalesProducts = filterActiveBigSaleProducts(typeProducts);
 
@@ -748,9 +719,8 @@ const HomeScreen1 = ({ navigation }: any) => {
       <View style={{ margin: 12, borderRadius: 12 }}>
         {promotional.map((item: any, index: number) => (
           <View
-            key={`${item?.id || index}-${item?.image_url || ''}-${
-              item?.product_id || ''
-            }`}
+            key={`${item?.id || index}-${item?.image_url || ''}-${item?.product_id || ''
+              }`}
             style={styles.page}
           >
             <Image
@@ -1651,18 +1621,18 @@ const HomeScreen1 = ({ navigation }: any) => {
                             </Text>
                             {item.product.price_range.max >
                               item.product.price_range.min && (
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: '#999999',
-                                }}
-                              >
-                                -{' '}
-                                {displayPrice(
-                                  Math.round(item.product.price_range.max),
-                                )}
-                              </Text>
-                            )}
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    color: '#999999',
+                                  }}
+                                >
+                                  -{' '}
+                                  {displayPrice(
+                                    Math.round(item.product.price_range.max),
+                                  )}
+                                </Text>
+                              )}
                           </View>
 
                           {/* Rating */}
@@ -1940,28 +1910,28 @@ const HomeScreen1 = ({ navigation }: any) => {
                               </Text>
                               {item.product.price_range.max >
                                 item.product.price_range.min && (
-                                <>
-                                  <Text
-                                    style={{
-                                      fontSize: 13,
-                                      color: '#999999',
-                                    }}
-                                  >
-                                    -
-                                  </Text>
-                                  <Text
-                                    style={{
-                                      fontSize: 15,
-                                      fontWeight: '600',
-                                      color: '#2C2C2C',
-                                    }}
-                                  >
-                                    {displayPrice(
-                                      Math.round(item.product.price_range.max),
-                                    )}
-                                  </Text>
-                                </>
-                              )}
+                                  <>
+                                    <Text
+                                      style={{
+                                        fontSize: 13,
+                                        color: '#999999',
+                                      }}
+                                    >
+                                      -
+                                    </Text>
+                                    <Text
+                                      style={{
+                                        fontSize: 15,
+                                        fontWeight: '600',
+                                        color: '#2C2C2C',
+                                      }}
+                                    >
+                                      {displayPrice(
+                                        Math.round(item.product.price_range.max),
+                                      )}
+                                    </Text>
+                                  </>
+                                )}
                             </>
                           ) : (
                             <Text
@@ -1973,7 +1943,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             >
                               {displayPrice(
                                 item?.variants?.[0]?.actual_price ||
-                                  item?.variants?.[0]?.price,
+                                item?.variants?.[0]?.price,
                               )}
                             </Text>
                           )}
@@ -2136,8 +2106,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                   discountedPrice !== originalPrice;
                 const savingsPercentage = hasDiscount
                   ? Math.round(
-                      ((originalPrice - discountedPrice) / originalPrice) * 100,
-                    )
+                    ((originalPrice - discountedPrice) / originalPrice) * 100,
+                  )
                   : null;
 
                 return (
@@ -2688,8 +2658,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                   originalPrice && correctPrice && originalPrice > correctPrice;
                 const discountPercentage = hasDiscount
                   ? Math.round(
-                      ((originalPrice - correctPrice) / originalPrice) * 100,
-                    )
+                    ((originalPrice - correctPrice) / originalPrice) * 100,
+                  )
                   : null;
 
                 return (
@@ -2835,8 +2805,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                         >
                           {displayPrice(
                             correctPrice ||
-                              item.variants[0]?.actual_price ||
-                              item.variants[0]?.price,
+                            item.variants[0]?.actual_price ||
+                            item.variants[0]?.price,
                           )}
                         </Text>
 

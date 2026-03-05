@@ -17,7 +17,7 @@ import EditProfile from '../screens/ProfileTab/EditProfile';
 import NotificationScreen from '../screens/Notification';
 import WishlistScreen from '../screens/HomeTab/Wishlist';
 import OrdersScreen from '../screens/AccountTab/OrdersScreen';
-// import CheckoutScreen from '../screens/HomeTab/CheckoutScreen'; // REMOVED
+import CheckoutScreen from '../screens/HomeTab/CheckoutScreen'; // REMOVED
 import IntroScreen from '../screens/IntroScreen/IntroScreen';
 import PaymentSuccess from '../screens/HomeTab/PaymentSuccess';
 import { checkFirstLaunch, setFirstLaunch } from '../helpers/helpers';

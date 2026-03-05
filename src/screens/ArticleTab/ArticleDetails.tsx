@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import { Image_url, UserService } from '../../service/ApiService';
+import { CommonActions } from '@react-navigation/native';
 import { HttpStatusCode } from 'axios';
 import Toast from 'react-native-toast-message';
 import { formatDate } from '../../helpers/helpers';
@@ -245,9 +246,8 @@ const ArticleDetailsScreen = ({ navigation, route }: any) => {
     }
 
     // Fallback to constructing URL if share_url is not available
-    return `https://www.markupdesigns.net/whitepeony/article/${
-      contentData?.slug || contentData?.id
-    }`;
+    return `https://www.markupdesigns.net/whitepeony/article/${contentData?.slug || contentData?.id
+      }`;
   };
 
   // Share article
@@ -445,8 +445,18 @@ const ArticleDetailsScreen = ({ navigation, route }: any) => {
       <View style={styles.headerContent}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'BottomTabScreen' }],
+                }),
+              );
+            }
+          }}
         >
           <Image
             source={require('../../assets/Png/back.png')}

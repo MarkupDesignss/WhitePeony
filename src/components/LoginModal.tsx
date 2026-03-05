@@ -1,3 +1,4 @@
+// components/LoginModal.tsx
 import React, {
   useCallback,
   useContext,
@@ -19,6 +20,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { CommonLoader } from './CommonLoader/commonLoader';
 import { UserService } from '../service/ApiService';
@@ -26,18 +28,20 @@ import { HttpStatusCode } from 'axios';
 import Toast from 'react-native-toast-message';
 import { UserData, UserDataContext } from '../context/userDataContext';
 import { useCart } from '../context/CartContext';
-import { Colors } from '../constant';
-import { heightPercentageToDP } from '../constant/dimentions';
 import { LocalStorage } from '../helpers/localstorage';
 import TransletText from '../components/TransletText';
 import { useAutoTranslate } from '../hooks/useAutoTranslate';
 import FCMService from '../service/FCMService';
+
 interface AuthModalProps {
   visible: boolean;
   onClose: () => void;
-  onGoogleLogin?: () => void;
-  onFacebookLogin?: () => void;
-  onSuccess?: (userData: any) => void; // Add this prop
+  onGoogleLogin?: () => Promise<{ token: string; user: any } | void>;
+  onFacebookLogin?: () => Promise<{ token: string; user: any } | void>;
+  onSuccess?: (userData: any) => void;
+  navigation?: any;
+  returnTo?: string;
+  returnParams?: any;
 }
 
 const EMPTY_OTP = ['', '', '', '', '', ''];
@@ -48,7 +52,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
   onClose,
   onGoogleLogin,
   onFacebookLogin,
-  onSuccess, // Add this
+  onSuccess,
+  navigation,
+  returnTo,
+  returnParams,
 }) => {
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [otp, setOtp] = useState<string[]>(EMPTY_OTP);
@@ -56,6 +63,8 @@ const LoginModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState('');
   const [step, setStep] = useState<'login' | 'otp'>('login');
   const [loading, setLoading] = useState(false);
+  const [isSyncingCart, setIsSyncingCart] = useState(false);
+
   const { translatedText: invalidInputText } = useAutoTranslate(
     'Please enter a valid email or 10-digit phone number',
   );
@@ -65,6 +74,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
   const { translatedText: phonePlaceholder } = useAutoTranslate(
     'Enter email or phone number',
   );
+  const { translatedText: closeText } = useAutoTranslate('Close');
 
   const { showLoader, hideLoader } = CommonLoader();
   const { setUserData, setIsLoggedIn, setUserType } =
@@ -76,15 +86,44 @@ const LoginModal: React.FC<AuthModalProps> = ({
   /* ================= RESET STATE WHEN MODAL OPENS ================= */
   useEffect(() => {
     if (visible) {
-      setEmailOrPhone('');
-      setOtp([...EMPTY_OTP]);
-      setTimer(RESEND_TIMER);
-      setError('');
-      setStep('login');
-      setLoading(false);
-      inputRefs.current = [];
+      resetModal();
     }
   }, [visible]);
+
+  const resetModal = () => {
+    setEmailOrPhone('');
+    setOtp([...EMPTY_OTP]);
+    setTimer(RESEND_TIMER);
+    setError('');
+    setStep('login');
+    setLoading(false);
+    setIsSyncingCart(false);
+    inputRefs.current = [];
+  };
+
+  /* ================= HANDLE CLOSE ================= */
+  const handleClose = useCallback(() => {
+    if (isSyncingCart) {
+      Alert.alert(
+        'Syncing in Progress',
+        'Cart sync is in progress. Are you sure you want to close?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Close',
+            onPress: () => {
+              resetModal();
+              onClose();
+            },
+            style: 'destructive',
+          },
+        ],
+      );
+    } else {
+      resetModal();
+      onClose();
+    }
+  }, [isSyncingCart, onClose]);
 
   /* ================= BACK BUTTON ================= */
   const handleBackPress = useCallback(() => {
@@ -93,9 +132,9 @@ const LoginModal: React.FC<AuthModalProps> = ({
       setStep('login');
       return true;
     }
-    onClose();
+    handleClose();
     return true;
-  }, [step, onClose]);
+  }, [step, handleClose]);
 
   useEffect(() => {
     if (visible) {
@@ -178,8 +217,20 @@ const LoginModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  /* ================= VERIFY OTP - UPDATED ================= */
-  /* ================= VERIFY OTP - DEBUGGED VERSION ================= */
+  /* ================= HANDLE POST-LOGIN NAVIGATION ================= */
+  const handlePostLoginNavigation = () => {
+    if (returnTo && navigation) {
+      if (returnParams) {
+        navigation.navigate(returnTo, returnParams);
+      } else {
+        navigation.navigate(returnTo);
+      }
+    } else {
+      navigation?.replace('Home');
+    }
+  };
+
+  /* ================= VERIFY OTP WITH CART SYNC ================= */
   const verifyOtp = async () => {
     const enteredOtp = otp.join('');
     if (enteredOtp.length !== 6) {
@@ -191,7 +242,6 @@ const LoginModal: React.FC<AuthModalProps> = ({
       setLoading(true);
       showLoader();
 
-      // Get FCM token
       let fcmToken = FCMService.getFCMToken();
       if (!fcmToken) {
         try {
@@ -208,42 +258,49 @@ const LoginModal: React.FC<AuthModalProps> = ({
         fcm_token: fcmToken || '',
       });
 
-      console.log('Full API Response:', JSON.stringify(res, null, 2));
-
+      console.log('📱 VERIFY OTP FULL RESPONSE:', JSON.stringify(res.data, null, 2));
       hideLoader();
 
-      // Check response structure - simplified
       if (!res || !res.data) {
         setError('No response from server');
+        setLoading(false);
         return;
       }
 
       const responseData = res.data;
 
       if (responseData.success && responseData.user) {
-        const { success, message, access_token, user, tiertype } = responseData;
-
+        const { message, access_token, user, tiertype } = responseData;
         const userType = user?.type;
 
         try {
-          // STRINGIFY ALL OBJECTS BEFORE SAVING TO LOCALSTORAGE
+          // Clear any existing data first
+          await LocalStorage.removeItem('@token');
+          await LocalStorage.removeItem('@user');
+          await LocalStorage.removeItem('@userType');
+          await LocalStorage.removeItem('@tierType');
+          await LocalStorage.removeItem('@login');
+
+          // Save new data
+          console.log('📝 Saving token:', access_token ? 'received' : 'missing');
+
+          // Save each item individually
           await LocalStorage.save('@login', 'true');
-          await LocalStorage.save('@user', JSON.stringify(user)); // Stringify the object
+          await LocalStorage.save('@user', JSON.stringify(user));
           await LocalStorage.save('@token', access_token || '');
           await LocalStorage.save('@userType', userType || '');
           await LocalStorage.save('@tierType', tiertype || '');
 
-          console.log('✅ Data saved successfully');
+          // Verify token was saved
+          const savedToken = await LocalStorage.read('@token');
+          const savedUser = await LocalStorage.read('@user');
+          console.log('✅ Token saved successfully:', savedToken ? 'yes' : 'no');
+          console.log('✅ User saved successfully:', savedUser ? 'yes' : 'no');
 
-          // Update context
+          // Update context with boolean value (not string)
           setUserData(user);
-          setIsLoggedIn('true');
+          setIsLoggedIn(true); // This must be boolean, not string
           setUserType(userType);
-
-          // Sync cart if needed
-          if (syncCartAfterLogin) {
-            syncCartAfterLogin();
-          }
 
           Toast.show({
             type: 'success',
@@ -254,13 +311,54 @@ const LoginModal: React.FC<AuthModalProps> = ({
             onSuccess(user);
           }
 
+          // Close modal first
           onClose();
+
+          // Now sync cart after login
+          setIsSyncingCart(true);
+
+          Toast.show({
+            type: 'info',
+            text1: 'Syncing your cart...',
+            text2: 'Please wait a moment',
+          });
+
+          try {
+            const syncResult = await syncCartAfterLogin(access_token);
+
+            if (syncResult.success) {
+              Toast.show({
+                type: 'success',
+                text1: 'Cart synced!',
+                text2: syncResult.message || 'Your items are ready',
+              });
+            } else {
+              Toast.show({
+                type: 'info',
+                text1: 'Cart sync incomplete',
+                text2: syncResult.message || 'Some items may need review',
+              });
+            }
+          } catch (syncError) {
+            console.log('Cart sync error:', syncError);
+            Toast.show({
+              type: 'info',
+              text1: 'Cart sync delayed',
+              text2: 'Your items will sync shortly',
+            });
+          } finally {
+            setIsSyncingCart(false);
+          }
+
+          handlePostLoginNavigation();
+
         } catch (storageError: any) {
           console.error('❌ Storage error:', {
             message: storageError.message,
             error: storageError,
           });
           setError('Failed to save user data. Please try again.');
+          setLoading(false);
         }
       } else {
         setError(
@@ -268,6 +366,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
           otpErrorText ||
           'Invalid or expired OTP. Please try again.',
         );
+        setLoading(false);
       }
     } catch (err: any) {
       hideLoader();
@@ -280,10 +379,132 @@ const LoginModal: React.FC<AuthModalProps> = ({
       } else {
         setError('Request failed. Please try again.');
       }
-    } finally {
       setLoading(false);
     }
   };
+
+  /* ================= GOOGLE LOGIN HANDLER ================= */
+  const handleGoogleLogin = async () => {
+    if (onGoogleLogin) {
+      try {
+        setLoading(true);
+        showLoader();
+
+        const result = await onGoogleLogin();
+
+        // If social login returns token and user data
+        if (result && 'token' in result && 'user' in result) {
+          const { token, user } = result;
+
+          // Save user data
+          await LocalStorage.removeItem('@token');
+          await LocalStorage.removeItem('@user');
+          await LocalStorage.save('@login', 'true');
+          await LocalStorage.save('@user', JSON.stringify(user));
+          await LocalStorage.save('@token', token);
+          await LocalStorage.save('@userType', user?.type || '');
+          await LocalStorage.save('@tierType', user?.tier?.type || '');
+
+          setUserData(user);
+          setIsLoggedIn(true);
+
+          Toast.show({
+            type: 'success',
+            text1: 'Login successful!',
+          });
+
+          onClose();
+
+          // Sync cart
+          setIsSyncingCart(true);
+          const syncResult = await syncCartAfterLogin(token);
+          setIsSyncingCart(false);
+
+          if (syncResult.success) {
+            Toast.show({
+              type: 'success',
+              text1: 'Cart synced successfully!',
+            });
+          }
+
+          handlePostLoginNavigation();
+        }
+
+        hideLoader();
+      } catch (error) {
+        hideLoader();
+        console.log('Google login error:', error);
+        Toast.show({
+          type: 'error',
+          text1: 'Google login failed',
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  /* ================= FACEBOOK LOGIN HANDLER ================= */
+  const handleFacebookLogin = async () => {
+    if (onFacebookLogin) {
+      try {
+        setLoading(true);
+        showLoader();
+
+        const result = await onFacebookLogin();
+
+        // If social login returns token and user data
+        if (result && 'token' in result && 'user' in result) {
+          const { token, user } = result;
+
+          // Save user data
+          await LocalStorage.removeItem('@token');
+          await LocalStorage.removeItem('@user');
+          await LocalStorage.save('@login', 'true');
+          await LocalStorage.save('@user', JSON.stringify(user));
+          await LocalStorage.save('@token', token);
+          await LocalStorage.save('@userType', user?.type || '');
+          await LocalStorage.save('@tierType', user?.tier?.type || '');
+
+          setUserData(user);
+          setIsLoggedIn(true);
+
+          Toast.show({
+            type: 'success',
+            text1: 'Login successful!',
+          });
+
+          onClose();
+
+          // Sync cart
+          setIsSyncingCart(true);
+          const syncResult = await syncCartAfterLogin(token);
+          setIsSyncingCart(false);
+
+          if (syncResult.success) {
+            Toast.show({
+              type: 'success',
+              text1: 'Cart synced successfully!',
+            });
+          }
+
+          handlePostLoginNavigation();
+        }
+
+        hideLoader();
+      } catch (error) {
+        hideLoader();
+        console.log('Facebook login error:', error);
+        Toast.show({
+          type: 'error',
+          text1: 'Facebook login failed',
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const logo = require('../../src/assets/Png/splashlogo.png');
 
   return (
@@ -292,9 +513,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
       transparent
       animationType="slide"
       statusBarTranslucent
+      onRequestClose={handleBackPress}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={styles.backdrop} onPress={handleClose} />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -306,19 +528,29 @@ const LoginModal: React.FC<AuthModalProps> = ({
             contentContainerStyle={styles.scrollContent}
           >
             <View style={styles.modalContainer}>
-              {/* Header with Logo */}
+              {/* Header with Logo and Close Button */}
               <View style={styles.header}>
                 <View style={styles.handleBar} />
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={handleClose}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
                 <Image source={logo} style={styles.logo} resizeMode="contain" />
-                {/* <TransletText
-                  text="White Peony"
-                  style={styles.brandName}
-                />
-                <TransletText
-                  text="Premium Tea Collection"
-                  style={styles.brandTagline}
-                /> */}
               </View>
+
+              {/* Cart Syncing Indicator */}
+              {isSyncingCart && (
+                <View style={styles.syncIndicator}>
+                  <ActivityIndicator size="small" color="#AEB254" />
+                  <TransletText
+                    text="Syncing your cart..."
+                    style={styles.syncText}
+                  />
+                </View>
+              )}
 
               {step === 'login' ? (
                 <>
@@ -348,9 +580,9 @@ const LoginModal: React.FC<AuthModalProps> = ({
                           style={styles.input}
                           value={emailOrPhone}
                           onChangeText={setEmailOrPhone}
-                          placeholder="Enter email or phone"
+                          placeholder={phonePlaceholder || "Enter email or phone"}
                           placeholderTextColor="#999"
-                          editable={!loading}
+                          editable={!loading && !isSyncingCart}
                         />
                       </View>
                     </View>
@@ -364,10 +596,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.loginButton,
-                        loading && styles.buttonDisabled,
+                        (loading || isSyncingCart) && styles.buttonDisabled,
                       ]}
                       onPress={requestOTP}
-                      disabled={loading}
+                      disabled={loading || isSyncingCart}
                       activeOpacity={0.8}
                     >
                       {loading ? (
@@ -389,8 +621,8 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     <View style={styles.socialRow}>
                       <TouchableOpacity
                         style={styles.socialButton}
-                        onPress={onGoogleLogin}
-                        disabled={loading}
+                        onPress={handleGoogleLogin}
+                        disabled={loading || isSyncingCart}
                         activeOpacity={0.7}
                       >
                         <Image
@@ -400,8 +632,8 @@ const LoginModal: React.FC<AuthModalProps> = ({
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.socialButton}
-                        onPress={onFacebookLogin}
-                        disabled={loading}
+                        onPress={handleFacebookLogin}
+                        disabled={loading || isSyncingCart}
                         activeOpacity={0.7}
                       >
                         <Image
@@ -411,7 +643,6 @@ const LoginModal: React.FC<AuthModalProps> = ({
                       </TouchableOpacity>
                     </View>
 
-                    {/* Terms and Privacy Policy */}
                     <View style={styles.termsContainer}>
                       <TransletText
                         text="By continuing, you agree to our"
@@ -448,7 +679,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                         maxLength={1}
                         value={digit}
                         onChangeText={text => handleChangeOtp(text, index)}
-                        editable={!loading}
+                        editable={!loading && !isSyncingCart}
                         selectTextOnFocus
                       />
                     ))}
@@ -466,7 +697,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                       resetOtpState();
                       setStep('login');
                     }}
-                    disabled={loading}
+                    disabled={loading || isSyncingCart}
                     activeOpacity={0.7}
                   >
                     <TransletText
@@ -488,6 +719,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     ) : (
                       <TouchableOpacity
                         onPress={requestOTP}
+                        disabled={loading || isSyncingCart}
                         activeOpacity={0.7}
                       >
                         <Text style={styles.resendLink}>Resend</Text>
@@ -498,10 +730,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
                   <TouchableOpacity
                     style={[
                       styles.loginButton,
-                      loading && styles.buttonDisabled,
+                      (loading || isSyncingCart) && styles.buttonDisabled,
                     ]}
                     onPress={verifyOtp}
-                    disabled={loading}
+                    disabled={loading || isSyncingCart}
                     activeOpacity={0.8}
                   >
                     {loading ? (
@@ -511,7 +743,6 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     )}
                   </TouchableOpacity>
 
-                  {/* Terms and Privacy Policy for OTP screen */}
                   <View style={styles.termsContainer}>
                     <TransletText
                       text="By verifying, you agree to our"
@@ -533,9 +764,6 @@ const LoginModal: React.FC<AuthModalProps> = ({
   );
 };
 
-export default LoginModal;
-
-/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -572,6 +800,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 30,
+    position: 'relative',
   },
   handleBar: {
     width: 40,
@@ -580,23 +809,39 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginBottom: 16,
   },
+  closeButton: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    padding: 8,
+    zIndex: 10,
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '500',
+  },
   logo: {
     width: 60,
     height: 60,
     marginBottom: 8,
   },
-  brandName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#000',
-    marginBottom: 2,
-    letterSpacing: 0.5,
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F4D7',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginBottom: 16,
+    alignSelf: 'center',
   },
-  brandTagline: {
-    fontSize: 12,
-    color: '#666',
+  syncText: {
+    fontSize: 13,
+    color: '#5F621A',
+    marginLeft: 8,
     fontWeight: '500',
-    letterSpacing: 0.3,
   },
   welcomeSection: {
     alignItems: 'center',
@@ -615,10 +860,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'center',
     lineHeight: 20,
-  },
-  bold: {
-    fontWeight: '600',
-    color: '#000',
   },
   form: {
     width: '100%',
@@ -826,3 +1067,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default LoginModal;
