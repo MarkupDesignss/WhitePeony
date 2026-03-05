@@ -63,6 +63,7 @@ type CartItem = {
   variant_id?: number | string;
   name?: string;
   unit?: string;
+  available_quantity?: number;
 };
 
 type Address = {
@@ -90,7 +91,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
   };
 
-  const { cart } = useCart();
+  const { cart, removeFromCart } = useCart();
   const [modalAddress, setModalAddress] = useState(false);
   const [modalAddressADD, setmodalAddressADD] = useState(false);
   const [items, setItems] = useState<DisplayWishlistItem[]>([]);
@@ -107,6 +108,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingCart, setLoadingCart] = useState(false);
+  const [stockErrors, setStockErrors] = useState<any[]>([]);
+  const [showStockErrorModal, setShowStockErrorModal] = useState(false);
 
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [shippingModalVisible, setShippingModalVisible] = useState(false);
@@ -128,6 +131,16 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   );
   const { translatedText: noText } = useAutoTranslate('No');
   const { translatedText: yesText } = useAutoTranslate('Yes');
+  const { translatedText: stockErrorTitle } = useAutoTranslate(
+    'Insufficient Stock',
+  );
+  const { translatedText: stockErrorMessage } = useAutoTranslate(
+    'Some items in your cart are out of stock or have insufficient quantity.',
+  );
+  const { translatedText: updateCartText } = useAutoTranslate('Update Cart');
+  const { translatedText: removeItemsText } = useAutoTranslate(
+    'Remove Out of Stock Items',
+  );
 
   const [promoOptions, setPromoOptions] = useState<any[]>([]);
   const [promoModalVisible, setPromoModalVisible] = useState(false);
@@ -238,14 +251,32 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         });
         await GetCartDetails();
       } else {
-        Toast.show({ type: 'error', text1: 'Failed to update cart' });
+        // Check for stock error in response
+        if (res?.data?.message?.toLowerCase().includes('stock')) {
+          Toast.show({
+            type: 'error',
+            text1: 'Insufficient Stock',
+            text2: res.data.message,
+          });
+        } else {
+          Toast.show({ type: 'error', text1: 'Failed to update cart' });
+        }
       }
     } catch (err: any) {
       hideLoader();
-      Toast.show({
-        type: 'error',
-        text1: err?.response?.data?.message || 'Something went wrong!',
-      });
+      const errorMessage = err?.response?.data?.message || '';
+      if (errorMessage.toLowerCase().includes('stock')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Insufficient Stock',
+          text2: errorMessage,
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: err?.response?.data?.message || 'Something went wrong!',
+        });
+      }
     }
   };
 
@@ -288,35 +319,47 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     const actualPriceNum = parseFloat(item.actual_price || '0');
     const totalPriceNum = parseFloat(item.total_price || '0');
     const hasDiscount = totalPriceNum > actualPriceNum;
+    const hasStockIssue = item.available_quantity !== undefined &&
+      item.quantity > item.available_quantity;
 
     return (
       <Swipeable
         renderRightActions={() => renderRightActions(item)}
         overshootRight={false}
       >
-        <View style={styles.shipmentItemCard}>
+        <View style={[
+          styles.shipmentItemCard,
+          hasStockIssue && styles.outOfStockItem
+        ]}>
           <Image
             source={{ uri: Image_url + item.front_image }}
             style={styles.shipmentImage}
           />
 
           <View style={styles.itemDetailsContainer}>
-            <TransletText
-              text={item.product_name || item.name}
-              style={styles.shipmentName}
-              numberOfLines={2}
-            />
+            <View style={styles.itemHeader}>
+              <TransletText
+                text={item.product_name || item.name}
+                style={styles.shipmentName}
+                numberOfLines={2}
+              />
+              {hasStockIssue && (
+                <View style={styles.stockWarningBadge}>
+                  <Text style={styles.stockWarningText}>⚠️ Low Stock</Text>
+                </View>
+              )}
+            </View>
 
             {item?.unit && (
               <TransletText text={item.unit} style={styles.shipmentWeight} />
             )}
 
-            <TouchableOpacity
+            {/* <TouchableOpacity
               onPress={() => moveToWishlist(item.id)}
               style={styles.moveToWishlistBtn}
             >
               <Text style={styles.moveToWishlistText}>❤️ Move to wishlist</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             <View style={styles.priceContainer}>
               <Text style={styles.shipmentActualPrice}>
@@ -329,6 +372,12 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 </Text>
               )}
             </View>
+
+            {hasStockIssue && (
+              <Text style={styles.stockErrorText}>
+                Only {item.available_quantity} available
+              </Text>
+            )}
 
             <View style={styles.qtyControlContainer}>
               <TouchableOpacity
@@ -481,30 +530,33 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       if (res && res.data && res.data.cart?.items?.length > 0) {
         const cartDataFromResponse = res.data.cart;
 
-        const processedItems = (cartDataFromResponse?.items || []).map(item => {
-          const variant = item.variants?.[0] || {};
-          let actualPrice =
-            variant.actual_price ||
-            item.actual_price ||
-            variant.price ||
-            item.total_price;
-          let displayPrice = variant.price || item.total_price;
+        const processedItems = (cartDataFromResponse?.items || []).map(
+          item => {
+            const variant = item.variants?.[0] || {};
+            let actualPrice =
+              variant.actual_price ||
+              item.actual_price ||
+              variant.price ||
+              item.total_price;
+            let displayPrice = variant.price || item.total_price;
 
-          if (variant.percentage && parseFloat(variant.percentage) > 0) {
-            const discountPercent = parseFloat(variant.percentage);
-            actualPrice = variant.price;
-            displayPrice =
-              (parseFloat(actualPrice) * 100) / (100 - discountPercent);
-          }
+            if (variant.percentage && parseFloat(variant.percentage) > 0) {
+              const discountPercent = parseFloat(variant.percentage);
+              actualPrice = variant.price;
+              displayPrice =
+                (parseFloat(actualPrice) * 100) / (100 - discountPercent);
+            }
 
-          return {
-            ...item,
-            actual_price: actualPrice,
-            total_price: displayPrice,
-            unit: variant.unit || item.unit,
-            variant_id: variant.id || item.variant_id,
-          };
-        });
+            return {
+              ...item,
+              actual_price: actualPrice,
+              total_price: displayPrice,
+              unit: variant.unit || item.unit,
+              variant_id: variant.id || item.variant_id,
+              available_quantity: variant.quantity || item.quantity,
+            };
+          },
+        );
 
         const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -601,6 +653,75 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
+  const handleStockErrors = (errors: any[]) => {
+    setStockErrors(errors);
+    setShowStockErrorModal(true);
+  };
+
+  const removeOutOfStockItems = async () => {
+    showLoader();
+    try {
+      const outOfStockItems = stockErrors.filter(
+        item => item.available_quantity === 0,
+      );
+
+      for (const item of outOfStockItems) {
+        await removeFromCart(
+          parseInt(String(item.product_id), 10),
+          item.variant_id ? parseInt(String(item.variant_id), 10) : null,
+        );
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Out of stock items removed',
+      });
+
+      setShowStockErrorModal(false);
+      await GetCartDetails();
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to remove items',
+      });
+    } finally {
+      hideLoader();
+    }
+  };
+
+  const updateQuantitiesToAvailable = async () => {
+    showLoader();
+    try {
+      const itemsToUpdate = stockErrors.filter(
+        item => item.available_quantity > 0 && item.quantity > item.available_quantity,
+      );
+
+      for (const item of itemsToUpdate) {
+        const payload = {
+          product_id: item.product_id,
+          quantity: item.available_quantity,
+          variant_id: item.variant_id || null,
+        };
+        await UserService.UpdateCart(payload);
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Cart updated to available quantities',
+      });
+
+      setShowStockErrorModal(false);
+      await GetCartDetails();
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update cart',
+      });
+    } finally {
+      hideLoader();
+    }
+  };
+
   const PlaceOrder = async () => {
     if (!selectedAddress) {
       Alert.alert('', selectAddressText);
@@ -617,6 +738,18 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
 
+    // Check for stock issues before placing order
+    const stockIssues = cartData.items.filter(
+      (item: CartItem) =>
+        item.available_quantity !== undefined &&
+        item.quantity > item.available_quantity,
+    );
+
+    if (stockIssues.length > 0) {
+      handleStockErrors(stockIssues);
+      return;
+    }
+
     const shippingCost = getShippingCost();
     const breakdown = calculateCheckout(
       cartData?.subtotal_amount || 0,
@@ -627,11 +760,17 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       rates,
     );
 
-    if (selectedCurrency !== 'EUR') {
+    // Default currency is CZK, show conversion notice only when currency is not CZK
+    if (selectedCurrency !== 'CZK') {
       Alert.alert(
         'Currency Conversion',
         `Your order: ${breakdown.displayAmountToPay}\n\n` +
-          `Payment in EUR: ${displayPrice(breakdown.grandTotalEUR)}`,
+        `Payment will be processed in CZK: ${displayPrice(
+          breakdown.grandTotalCZK,
+        )}\n\n` +
+        `Exchange rate: 1 ${selectedCurrency} = ${(
+          1 / (rates?.[selectedCurrency] || 1)
+        ).toFixed(2)} CZK`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Continue', onPress: () => proceedWithPayment(breakdown) },
@@ -670,11 +809,39 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         }
       }
     } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Payment failed',
-        text2: err.response?.data?.message || 'Please try again',
-      });
+      // Handle insufficient stock error specifically
+      const errorMessage = err?.response?.data?.message || '';
+      const errorData = err?.response?.data;
+
+      if (
+        errorMessage.toLowerCase().includes('stock') ||
+        errorMessage.toLowerCase().includes('insufficient') ||
+        errorData?.error?.toLowerCase().includes('stock')
+      ) {
+        // Parse stock errors from response if available
+        if (errorData?.errors && Array.isArray(errorData.errors)) {
+          handleStockErrors(errorData.errors);
+        } else {
+          // Show stock error modal with generic message
+          Alert.alert(
+            stockErrorTitle,
+            stockErrorMessage,
+            [
+              {
+                text: updateCartText,
+                onPress: () => GetCartDetails(), // Refresh cart to get updated quantities
+              },
+            ],
+            { cancelable: false },
+          );
+        }
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Payment failed',
+          text2: errorMessage || 'Please try again',
+        });
+      }
     } finally {
       hideLoader();
     }
@@ -755,9 +922,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           <>
             <View style={styles.billRow}>
               <Text style={styles.billLabel}>Taxable Amount</Text>
-              <Text style={styles.billValue}>
-                {displayPrice(taxableAmount)}
-              </Text>
+              <Text style={styles.billValue}>{displayPrice(taxableAmount)}</Text>
             </View>
 
             <View style={styles.billRow}>
@@ -801,9 +966,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             <Text style={styles.headerTitle}>Checkout</Text>
             {cartData?.items?.length > 0 && (
               <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>
-                  {cartData.items.length}
-                </Text>
+                <Text style={styles.cartBadgeText}>{cartData.items.length}</Text>
               </View>
             )}
           </View>
@@ -902,21 +1065,13 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   </Text>
                   <Text style={styles.deliveryAddress} numberOfLines={2}>
                     {selectedAddress
-                      ? `${selectedAddress.name}, ${
-                          selectedAddress.full_address
-                        }${
-                          selectedAddress.city
-                            ? `, ${selectedAddress.city}`
-                            : ''
-                        }${
-                          selectedAddress.postal_code
-                            ? `, ${selectedAddress.postal_code}`
-                            : ''
-                        }${
-                          selectedAddress.phone
-                            ? ` • ${selectedAddress.phone}`
-                            : ''
-                        }`
+                      ? `${selectedAddress.name}, ${selectedAddress.full_address
+                      }${selectedAddress.city ? `, ${selectedAddress.city}` : ''
+                      }${selectedAddress.postal_code
+                        ? `, ${selectedAddress.postal_code}`
+                        : ''
+                      }${selectedAddress.phone ? ` • ${selectedAddress.phone}` : ''
+                      }`
                       : 'No address selected'}
                   </Text>
                 </View>
@@ -940,7 +1095,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               style={[
                 styles.checkoutButton,
                 (!selectedAddress || !selectedShippingId) &&
-                  styles.checkoutButtonDisabled,
+                styles.checkoutButtonDisabled,
               ]}
               activeOpacity={0.8}
               onPress={PlaceOrder}
@@ -968,6 +1123,63 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         )}
       </View>
 
+      {/* Stock Error Modal */}
+      <Modal
+        visible={showStockErrorModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowStockErrorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.stockErrorModalContent}>
+            <Text style={styles.stockErrorModalIcon}>⚠️</Text>
+            <Text style={styles.stockErrorModalTitle}>{stockErrorTitle}</Text>
+            <Text style={styles.stockErrorModalMessage}>
+              {stockErrorMessage}
+            </Text>
+
+            {stockErrors.map((error, index) => (
+              <View key={index} style={styles.stockErrorItem}>
+                <Text style={styles.stockErrorItemName}>
+                  {error.product_name || 'Product'}
+                </Text>
+                <Text style={styles.stockErrorItemDetail}>
+                  Requested: {error.quantity} | Available:{' '}
+                  {error.available_quantity || 0}
+                </Text>
+              </View>
+            ))}
+
+            <View style={styles.stockErrorModalButtons}>
+              <TouchableOpacity
+                style={[styles.stockErrorButton, styles.stockErrorButtonSecondary]}
+                onPress={() => setShowStockErrorModal(false)}
+              >
+                <Text style={styles.stockErrorButtonTextSecondary}>
+                  {updateCartText}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.stockErrorButton, styles.stockErrorButtonPrimary]}
+                onPress={removeOutOfStockItems}
+              >
+                <Text style={styles.stockErrorButtonTextPrimary}>
+                  {removeItemsText}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.stockErrorCloseButton}
+              onPress={() => setShowStockErrorModal(false)}
+            >
+              <Text style={styles.stockErrorCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={shippingModalVisible}
         transparent
@@ -975,9 +1187,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         onRequestClose={() => setShippingModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback
-            onPress={() => setShippingModalVisible(false)}
-          >
+          <TouchableWithoutFeedback onPress={() => setShippingModalVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
@@ -1079,9 +1289,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
                   let discountText = '';
                   if (item.discount_type === 'percentage') {
-                    discountText = `${
-                      item.discount_value
-                    }% off (max ${displayPrice(item.max_discount)})`;
+                    discountText = `${item.discount_value}% off (max ${displayPrice(
+                      item.max_discount,
+                    )})`;
                   } else {
                     discountText = `${displayPrice(item.discount_value)} off`;
                   }
@@ -1103,9 +1313,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     >
                       <View style={styles.couponItemLeft}>
                         <Text style={styles.couponCode}>{code}</Text>
-                        <Text style={styles.couponDiscount}>
-                          {discountText}
-                        </Text>
+                        <Text style={styles.couponDiscount}>{discountText}</Text>
                         {item.description && (
                           <Text style={styles.couponDescription}>
                             {item.description}
@@ -1161,16 +1369,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             <View style={styles.webViewHeaderLeft}>
               <Text style={styles.webViewTitle}>Payment Gateway</Text>
               <Text style={styles.webViewAmount}>
-                {
-                  calculateCheckout(
-                    cartData?.subtotal_amount || 0,
-                    cartData?.total_savings || 0,
-                    discountAmount || 0,
-                    getShippingCost(),
-                    selectedCurrency,
-                    rates,
-                  ).displayAmountToPay
-                }
+                {calculateCheckout(
+                  cartData?.subtotal_amount || 0,
+                  cartData?.total_savings || 0,
+                  discountAmount || 0,
+                  getShippingCost(),
+                  selectedCurrency,
+                  rates,
+                ).displayAmountToPay}
               </Text>
             </View>
 
@@ -1329,6 +1535,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
   },
+  outOfStockItem: {
+    opacity: 0.8,
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#FFE0E0',
+  },
   shipmentImage: {
     width: 80,
     height: 80,
@@ -1339,11 +1551,29 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   shipmentName: {
     fontSize: 14,
     fontWeight: '500',
     color: '#1A1A1A',
     marginBottom: 2,
+    flex: 1,
+  },
+  stockWarningBadge: {
+    backgroundColor: '#FFE0E0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 4,
+  },
+  stockWarningText: {
+    fontSize: 9,
+    color: '#D32F2F',
+    fontWeight: '600',
   },
   shipmentWeight: {
     fontSize: 12,
@@ -1373,6 +1603,12 @@ const styles = StyleSheet.create({
     color: '#999',
     textDecorationLine: 'line-through',
     marginLeft: 6,
+  },
+  stockErrorText: {
+    fontSize: 11,
+    color: '#D32F2F',
+    marginBottom: 4,
+    fontWeight: '500',
   },
   qtyControlContainer: {
     flexDirection: 'row',
@@ -1722,7 +1958,8 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalBackdrop: {
     flex: 1,
@@ -1733,6 +1970,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     padding: 16,
     maxHeight: '80%',
+    width: '100%',
   },
   modalHandle: {
     width: 32,
@@ -1883,6 +2121,88 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginVertical: 24,
+  },
+  stockErrorModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '85%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  stockErrorModalIcon: {
+    fontSize: 40,
+    marginBottom: 12,
+  },
+  stockErrorModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#D32F2F',
+    marginBottom: 8,
+  },
+  stockErrorModalMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  stockErrorItem: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    padding: 10,
+    width: '100%',
+    marginBottom: 6,
+  },
+  stockErrorItemName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 2,
+  },
+  stockErrorItemDetail: {
+    fontSize: 12,
+    color: '#D32F2F',
+  },
+  stockErrorModalButtons: {
+    flexDirection: 'row',
+    marginTop: 16,
+    width: '100%',
+  },
+  stockErrorButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 24,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  stockErrorButtonPrimary: {
+    backgroundColor: '#D32F2F',
+  },
+  stockErrorButtonSecondary: {
+    backgroundColor: '#F5F5F5',
+  },
+  stockErrorButtonTextPrimary: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  stockErrorButtonTextSecondary: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  stockErrorCloseButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stockErrorCloseText: {
+    fontSize: 16,
+    color: '#999',
   },
   webViewContainer: {
     flex: 1,
