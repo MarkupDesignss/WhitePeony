@@ -131,9 +131,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   );
   const { translatedText: noText } = useAutoTranslate('No');
   const { translatedText: yesText } = useAutoTranslate('Yes');
-  const { translatedText: stockErrorTitle } = useAutoTranslate(
-    'Insufficient Stock',
-  );
+  const { translatedText: stockErrorTitle } =
+    useAutoTranslate('Insufficient Stock');
   const { translatedText: stockErrorMessage } = useAutoTranslate(
     'Some items in your cart are out of stock or have insufficient quantity.',
   );
@@ -319,7 +318,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     const actualPriceNum = parseFloat(item.actual_price || '0');
     const totalPriceNum = parseFloat(item.total_price || '0');
     const hasDiscount = totalPriceNum > actualPriceNum;
-    const hasStockIssue = item.available_quantity !== undefined &&
+    const hasStockIssue =
+      item.available_quantity !== undefined &&
       item.quantity > item.available_quantity;
 
     return (
@@ -327,10 +327,12 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         renderRightActions={() => renderRightActions(item)}
         overshootRight={false}
       >
-        <View style={[
-          styles.shipmentItemCard,
-          hasStockIssue && styles.outOfStockItem
-        ]}>
+        <View
+          style={[
+            styles.shipmentItemCard,
+            hasStockIssue && styles.outOfStockItem,
+          ]}
+        >
           <Image
             source={{ uri: Image_url + item.front_image }}
             style={styles.shipmentImage}
@@ -530,33 +532,31 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       if (res && res.data && res.data.cart?.items?.length > 0) {
         const cartDataFromResponse = res.data.cart;
 
-        const processedItems = (cartDataFromResponse?.items || []).map(
-          item => {
-            const variant = item.variants?.[0] || {};
-            let actualPrice =
-              variant.actual_price ||
-              item.actual_price ||
-              variant.price ||
-              item.total_price;
-            let displayPrice = variant.price || item.total_price;
+        const processedItems = (cartDataFromResponse?.items || []).map(item => {
+          const variant = item.variants?.[0] || {};
+          let actualPrice =
+            variant.actual_price ||
+            item.actual_price ||
+            variant.price ||
+            item.total_price;
+          let displayPrice = variant.price || item.total_price;
 
-            if (variant.percentage && parseFloat(variant.percentage) > 0) {
-              const discountPercent = parseFloat(variant.percentage);
-              actualPrice = variant.price;
-              displayPrice =
-                (parseFloat(actualPrice) * 100) / (100 - discountPercent);
-            }
+          if (variant.percentage && parseFloat(variant.percentage) > 0) {
+            const discountPercent = parseFloat(variant.percentage);
+            actualPrice = variant.price;
+            displayPrice =
+              (parseFloat(actualPrice) * 100) / (100 - discountPercent);
+          }
 
-            return {
-              ...item,
-              actual_price: actualPrice,
-              total_price: displayPrice,
-              unit: variant.unit || item.unit,
-              variant_id: variant.id || item.variant_id,
-              available_quantity: variant.quantity || item.quantity,
-            };
-          },
-        );
+          return {
+            ...item,
+            actual_price: actualPrice,
+            total_price: displayPrice,
+            unit: variant.unit || item.unit,
+            variant_id: variant.id || item.variant_id,
+            available_quantity: variant.quantity || item.quantity,
+          };
+        });
 
         const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -693,7 +693,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     showLoader();
     try {
       const itemsToUpdate = stockErrors.filter(
-        item => item.available_quantity > 0 && item.quantity > item.available_quantity,
+        item =>
+          item.available_quantity > 0 &&
+          item.quantity > item.available_quantity,
       );
 
       for (const item of itemsToUpdate) {
@@ -765,12 +767,12 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       Alert.alert(
         'Currency Conversion',
         `Your order: ${breakdown.displayAmountToPay}\n\n` +
-        `Payment will be processed in CZK: ${displayPrice(
-          breakdown.grandTotalCZK,
-        )}\n\n` +
-        `Exchange rate: 1 ${selectedCurrency} = ${(
-          1 / (rates?.[selectedCurrency] || 1)
-        ).toFixed(2)} CZK`,
+          `Payment will be processed in CZK: ${displayPrice(
+            breakdown.grandTotalCZK,
+          )}\n\n` +
+          `Exchange rate: 1 ${selectedCurrency} = ${(
+            1 / (rates?.[selectedCurrency] || 1)
+          ).toFixed(2)} CZK`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Continue', onPress: () => proceedWithPayment(breakdown) },
@@ -922,7 +924,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           <>
             <View style={styles.billRow}>
               <Text style={styles.billLabel}>Taxable Amount</Text>
-              <Text style={styles.billValue}>{displayPrice(taxableAmount)}</Text>
+              <Text style={styles.billValue}>
+                {displayPrice(taxableAmount)}
+              </Text>
             </View>
 
             <View style={styles.billRow}>
@@ -966,7 +970,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             <Text style={styles.headerTitle}>Checkout</Text>
             {cartData?.items?.length > 0 && (
               <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{cartData.items.length}</Text>
+                <Text style={styles.cartBadgeText}>
+                  {cartData.items.length}
+                </Text>
               </View>
             )}
           </View>
@@ -1065,13 +1071,21 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   </Text>
                   <Text style={styles.deliveryAddress} numberOfLines={2}>
                     {selectedAddress
-                      ? `${selectedAddress.name}, ${selectedAddress.full_address
-                      }${selectedAddress.city ? `, ${selectedAddress.city}` : ''
-                      }${selectedAddress.postal_code
-                        ? `, ${selectedAddress.postal_code}`
-                        : ''
-                      }${selectedAddress.phone ? ` • ${selectedAddress.phone}` : ''
-                      }`
+                      ? `${selectedAddress.name}, ${
+                          selectedAddress.full_address
+                        }${
+                          selectedAddress.city
+                            ? `, ${selectedAddress.city}`
+                            : ''
+                        }${
+                          selectedAddress.postal_code
+                            ? `, ${selectedAddress.postal_code}`
+                            : ''
+                        }${
+                          selectedAddress.phone
+                            ? ` • ${selectedAddress.phone}`
+                            : ''
+                        }`
                       : 'No address selected'}
                   </Text>
                 </View>
@@ -1095,7 +1109,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               style={[
                 styles.checkoutButton,
                 (!selectedAddress || !selectedShippingId) &&
-                styles.checkoutButtonDisabled,
+                  styles.checkoutButtonDisabled,
               ]}
               activeOpacity={0.8}
               onPress={PlaceOrder}
@@ -1114,7 +1128,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             </Text>
 
             <TouchableOpacity
-              onPress={() => navigation.navigate('BottomTabScreen')}
+              onPress={() =>
+                navigation.navigate('BottomTabScreen', { screen: 'Category' })
+              }
               style={styles.shopNowButton}
             >
               <Text style={styles.shopNowText}>Continue Shopping →</Text>
@@ -1152,7 +1168,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
             <View style={styles.stockErrorModalButtons}>
               <TouchableOpacity
-                style={[styles.stockErrorButton, styles.stockErrorButtonSecondary]}
+                style={[
+                  styles.stockErrorButton,
+                  styles.stockErrorButtonSecondary,
+                ]}
                 onPress={() => setShowStockErrorModal(false)}
               >
                 <Text style={styles.stockErrorButtonTextSecondary}>
@@ -1161,7 +1180,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.stockErrorButton, styles.stockErrorButtonPrimary]}
+                style={[
+                  styles.stockErrorButton,
+                  styles.stockErrorButtonPrimary,
+                ]}
                 onPress={removeOutOfStockItems}
               >
                 <Text style={styles.stockErrorButtonTextPrimary}>
@@ -1187,7 +1209,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         onRequestClose={() => setShippingModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setShippingModalVisible(false)}>
+          <TouchableWithoutFeedback
+            onPress={() => setShippingModalVisible(false)}
+          >
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
@@ -1289,9 +1313,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
                   let discountText = '';
                   if (item.discount_type === 'percentage') {
-                    discountText = `${item.discount_value}% off (max ${displayPrice(
-                      item.max_discount,
-                    )})`;
+                    discountText = `${
+                      item.discount_value
+                    }% off (max ${displayPrice(item.max_discount)})`;
                   } else {
                     discountText = `${displayPrice(item.discount_value)} off`;
                   }
@@ -1313,7 +1337,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     >
                       <View style={styles.couponItemLeft}>
                         <Text style={styles.couponCode}>{code}</Text>
-                        <Text style={styles.couponDiscount}>{discountText}</Text>
+                        <Text style={styles.couponDiscount}>
+                          {discountText}
+                        </Text>
                         {item.description && (
                           <Text style={styles.couponDescription}>
                             {item.description}
@@ -1369,14 +1395,16 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             <View style={styles.webViewHeaderLeft}>
               <Text style={styles.webViewTitle}>Payment Gateway</Text>
               <Text style={styles.webViewAmount}>
-                {calculateCheckout(
-                  cartData?.subtotal_amount || 0,
-                  cartData?.total_savings || 0,
-                  discountAmount || 0,
-                  getShippingCost(),
-                  selectedCurrency,
-                  rates,
-                ).displayAmountToPay}
+                {
+                  calculateCheckout(
+                    cartData?.subtotal_amount || 0,
+                    cartData?.total_savings || 0,
+                    discountAmount || 0,
+                    getShippingCost(),
+                    selectedCurrency,
+                    rates,
+                  ).displayAmountToPay
+                }
               </Text>
             </View>
 

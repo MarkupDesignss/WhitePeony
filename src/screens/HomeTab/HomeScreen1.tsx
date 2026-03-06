@@ -11,11 +11,17 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   TouchableOpacity,
-  ImageBackground,
   Alert,
   RefreshControl,
 } from 'react-native';
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+} from 'react';
 import {
   heightPercentageToDP,
   widthPercentageToDP,
@@ -36,15 +42,8 @@ import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import TransletText from '../../components/TransletText';
 
-import {
-  convertAndFormatPrice,
-  getPriceDisplay,
-} from '../../utils/currencyUtils';
-// import {
-//   convertAndFormatPrice,
-//   getPriceDisplay,
-//   SupportedCurrency
-// } from '../../utils/currencyUtils';
+import { convertAndFormatPrice } from '../../utils/currencyUtils';
+
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
 const SMALL_CARD_WIDTH = Math.round(width * 0.3);
@@ -54,34 +53,48 @@ const GAP = 12;
 const SMALL_HEIGHT = 120;
 const BIG_HEIGHT = SMALL_HEIGHT * 2 + GAP;
 
+// Create a separate PriceDisplay component that subscribes to currency changes
+const PriceDisplay = ({ price }: { price: number | string | null | undefined }) => {
+  const selectedCurrency = useAppSelector(
+    state => state.currency.selectedCurrency
+  );
+
+  const { data: rates } = useGetRatesQuery();
+
+  const formattedPrice = useMemo(() => {
+    const numericPrice = Number(price) || 0;
+    return convertAndFormatPrice(numericPrice, selectedCurrency, rates);
+  }, [price, selectedCurrency, rates]);
+
+  return <Text>{formattedPrice}</Text>;
+};
+
 const HomeScreen1 = ({ navigation }: any) => {
   const selectedCurrency = useAppSelector(
     state => state.currency.selectedCurrency,
   );
+
+  console.log('Currency:', selectedCurrency);
   // Fetch rates with caching
   const { data: rates } = useGetRatesQuery(undefined, {
     refetchOnMountOrArgChange: false,
     refetchOnReconnect: true,
   });
 
-  // Quick price display helper
-  const displayPrice = (priceEUR: any): string => {
-    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
-  };
-
   const { setUserData, isLoggedIn, userType } =
     useContext<UserData>(UserDataContext);
 
   const {
-    wishlistItems, // Array of wishlist items
-    wishlistIds, // Array of wishlist IDs
-    isWishlisted, // Function to check if item is wishlisted
-    addToWishlist, // Function to add to wishlist
-    removeFromWishlist, // Function to remove from wishlist
-    toggleWishlist, // Function to toggle wishlist status
-    fetchWishlist, // Function to refresh wishlist
-    isLoading, // Loading state
+    wishlistItems,
+    wishlistIds,
+    isWishlisted,
+    addToWishlist,
+    removeFromWishlist,
+    toggleWishlist,
+    fetchWishlist,
+    isLoading,
   } = useContext(WishlistContext);
+
   const [category, setApiCateProducts] = useState([]);
   const [categoryProduct, setcategoryProduct] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
@@ -103,6 +116,12 @@ const HomeScreen1 = ({ navigation }: any) => {
   const [activeRec, setActiveRec] = useState(0);
   const recRef = useRef<FlatList<any>>(null);
 
+  // Add a currency version key to force re-renders of FlatLists when currency changes
+  const currencyVersion = useMemo(
+    () => `${selectedCurrency}-${rates ? Object.keys(rates).length : 0}`,
+    [selectedCurrency, rates],
+  );
+
   const onRecommendedScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / (WISHLIST_CARD_WIDTH + 12));
@@ -110,61 +129,418 @@ const HomeScreen1 = ({ navigation }: any) => {
   };
 
   // Helper function to get current product type
-  const getCurrentProductType = () => {
-    // If userType is null or undefined, default to 'b2c'
+  const getCurrentProductType = useCallback(() => {
     if (userType === null || userType === undefined) {
-      return 'b2c'; // Default to b2c for null users
+      return 'b2c';
     }
-    return userType; // 'b2c' or 'b2b'
-  };
-
+    return userType;
+  }, [userType]);
 
   // Helper function to filter products by type
-  const filterProductsByType = (products: any[]) => {
+  const filterProductsByType = useCallback(
+    (products: any[]) => {
+      if (!Array.isArray(products)) return [];
+
+      const currentType = getCurrentProductType();
+
+      console.log('Filtering products for user type:', currentType);
+
+      return products.filter(item => {
+        if (!item?.product_type) {
+          if (item?.product?.product_type) {
+            return item.product.product_type === currentType;
+          }
+          return false;
+        }
+        return item.product_type === currentType;
+      });
+    },
+    [getCurrentProductType],
+  );
+
+  // Helper function to get featured products based on user type
+  const getFeaturedProducts = useCallback(
+    (data: any) => {
+      const currentType = getCurrentProductType();
+      console.log('Getting featured products for user type:', currentType);
+      return data?.[currentType] || [];
+    },
+    [getCurrentProductType],
+  );
+
+  // Helper function to get sales products based on user type
+  const getSalesProducts = useCallback(
+    (data: any) => {
+      const currentType = getCurrentProductType();
+      console.log('Getting sales products for user type:', currentType);
+      return data?.[currentType] || [];
+    },
+    [getCurrentProductType],
+  );
+
+  // Helper function to get promotional banners based on user type
+  const getPromotionalBanners = useCallback(
+    (data: any) => {
+      const currentType = getCurrentProductType();
+
+      console.log('Current user type for banners:', currentType);
+      console.log('isLoggedIn:', isLoggedIn);
+
+      if (!isLoggedIn) {
+        console.log('User not logged in, showing b2c banners');
+        const b2cBanners = data?.b2c || [];
+        console.log('B2C banners count:', b2cBanners.length);
+        return removeDuplicateBanners(b2cBanners);
+      }
+
+      const typeBanners = data?.[currentType] || [];
+      console.log(`${currentType} banners:`, typeBanners.length);
+
+      return removeDuplicateBanners(typeBanners);
+    },
+    [getCurrentProductType, isLoggedIn],
+  );
+
+  const removeDuplicateBanners = (banners: any[]) => {
+    if (!Array.isArray(banners) || banners.length === 0) return [];
+
+    const seenCombinations = new Set();
+    const uniqueBanners = [];
+
+    for (const banner of banners) {
+      if (!banner || typeof banner !== 'object') continue;
+
+      const combinationKey = [
+        banner?.id,
+        banner?.image_url,
+        banner?.product_id,
+        banner?.title,
+      ]
+        .filter(Boolean)
+        .join('|');
+
+      if (combinationKey && !seenCombinations.has(combinationKey)) {
+        seenCombinations.add(combinationKey);
+        uniqueBanners.push(banner);
+      }
+    }
+
+    return uniqueBanners;
+  };
+
+  // Helper function to filter orders by product type
+  const filterOrdersByType = useCallback(
+    (orders: any[]) => {
+      if (!Array.isArray(orders)) return [];
+
+      const currentType = getCurrentProductType();
+
+      console.log('Filtering orders for user type:', currentType);
+
+      return orders.filter(order => {
+        if (!Array.isArray(order.items) || order.items.length === 0) {
+          return false;
+        }
+
+        return order.items.some(
+          item => item?.product?.product_type === currentType,
+        );
+      });
+    },
+    [getCurrentProductType],
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Home screen focused, refreshing data...');
+      loadDataSilently();
+
+      return () => {
+        console.log('Home screen unfocused');
+      };
+    }, [userType, isLoggedIn]),
+  );
+
+  const loadDataSilently = async () => {
+    try {
+      await Promise.all([
+        GetCategoryProductsWithoutLoader(),
+        bigsaleWithoutLoader(),
+        RecommendProductsWithoutLoader(),
+        ApiSortingWithoutLoader(),
+        GetHeaderWithoutLoader(),
+      ]);
+
+      if (isLoggedIn) {
+        await OrderListWithoutLoader();
+        await fetchWishlist();
+      }
+    } catch (error) {
+      console.log('Error loading data silently:', error);
+    }
+  };
+
+  const RecommendProductsWithoutLoader = async () => {
+    try {
+      const res = await UserService.recommended();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res.data?.data || [];
+        const filteredProducts = filterProductsByType(fetchedProducts);
+        setApiRecommend(filteredProducts);
+      }
+    } catch (err) {
+      console.log('recommenderror', err);
+    }
+  };
+
+  useEffect(() => {
+    console.log('Wishlist Context Detailed Debug:', {
+      isLoggedIn,
+      userType,
+      wishlistItemsCount: wishlistItems?.length || 0,
+      isLoading,
+      sampleItem: wishlistItems?.[0]
+        ? {
+          id: wishlistItems[0]?.id,
+          name: wishlistItems[0]?.name,
+          product_type: wishlistItems[0]?.product_type,
+          front_image: wishlistItems[0]?.front_image,
+          variants: wishlistItems[0]?.variants,
+          hasProductProperty: !!wishlistItems[0]?.product,
+          productId: wishlistItems[0]?.product?.id,
+          productName: wishlistItems[0]?.product?.name,
+          productFrontImage: wishlistItems[0]?.product?.front_image,
+        }
+        : null,
+    });
+  }, [wishlistItems, isLoggedIn, userType, isLoading]);
+
+  useEffect(() => {
+    console.log('Wishlist items updated:', wishlistItems.length);
+  }, [wishlistItems]);
+
+  // Add this function to get the correct price
+  const getCorrectPrice = useCallback((item: any) => {
+    if (!item) return null;
+
+    const priceSources = [
+      {
+        source: 'variants[0].actual_price',
+        value: item?.variants?.[0]?.actual_price,
+      },
+      { source: 'variants[0].price', value: item?.variants?.[0]?.price },
+      { source: 'price', value: item?.price },
+      { source: 'main_price', value: item?.main_price },
+      {
+        source: 'product.variants[0].actual_price',
+        value: item?.product?.variants?.[0]?.actual_price,
+      },
+      {
+        source: 'product.variants[0].price',
+        value: item?.product?.variants?.[0]?.price,
+      },
+      { source: 'product.main_price', value: item?.product?.main_price },
+      {
+        source: 'originalItem.product.variants[0].actual_price',
+        value: item?.originalItem?.product?.variants?.[0]?.actual_price,
+      },
+      {
+        source: 'originalItem.product.variants[0].price',
+        value: item?.originalItem?.product?.variants?.[0]?.price,
+      },
+      {
+        source: 'originalItem.product.main_price',
+        value: item?.originalItem?.product?.main_price,
+      },
+    ];
+
+    for (const priceSource of priceSources) {
+      if (
+        priceSource.value !== undefined &&
+        priceSource.value !== null &&
+        priceSource.value !== ''
+      ) {
+        let priceValue = priceSource.value;
+        if (typeof priceValue === 'string') {
+          priceValue = parseFloat(priceValue);
+        }
+
+        if (priceValue === 100) {
+          if (
+            item?.variants?.[0]?.actual_price &&
+            item.variants[0].actual_price > 100
+          ) {
+            return item.variants[0].actual_price;
+          }
+          if (item?.variants?.[0]?.price && item.variants[0].price > 100) {
+            return item.variants[0].price;
+          }
+        }
+
+        return priceValue;
+      }
+    }
+
+    return null;
+  }, []);
+
+  const GetCategoryProductsWithoutLoader = async () => {
+    try {
+      setIsLoadingCategory(true);
+      const res = await UserService.GetCategory();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res.data?.categories || [];
+        setApiCateProducts(fetchedProducts);
+        const defaultId = fetchedProducts?.[0]?.id ?? 1;
+        setSelectedCategoryId(defaultId);
+        await GetCategoryIDWithoutLoader(defaultId);
+      }
+    } catch (err) {
+      console.log('error category', err);
+    } finally {
+      setIsLoadingCategory(false);
+    }
+  };
+
+  const featuredproductWithoutLoader = async () => {
+    try {
+      const res = await UserService.featuredproducts();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res?.data?.data || {};
+        const typeProducts = getFeaturedProducts(fetchedProducts);
+        setFeaturesProduct(typeProducts);
+
+        if (isLoggedIn) {
+          await OrderListWithoutLoader();
+        }
+      }
+    } catch (err) {
+      console.log('error featuredproduct', err);
+    }
+  };
+
+  const OrderListWithoutLoader = async () => {
+    try {
+      const response = await UserService.order();
+      if (response && response.data && response.status === HttpStatusCode.Ok) {
+        const orders = response.data?.orders || [];
+        const filteredOrders = filterOrdersByType(orders);
+        setorderitem(filteredOrders);
+      }
+    } catch (err) {
+      console.log('Order fetch exception:', err);
+    }
+  };
+
+  const ApiSortingWithoutLoader = async () => {
+    try {
+      const res = await UserService.Sorting('price_asc');
+      if (res?.status === HttpStatusCode.Ok) {
+        const sortedProducts = res?.data?.data || [];
+        const filteredProducts = filterProductsByType(sortedProducts);
+        console.log('Filtered products by user type:', filteredProducts.length);
+        setlowestitem(filteredProducts);
+      } else {
+        console.log('Failed to sort products:', res);
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to sort products',
+        });
+      }
+    } catch (err) {
+      console.log('Sorting error:', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to sort products',
+      });
+    }
+  };
+
+  const GetHeaderWithoutLoader = async () => {
+    try {
+      const res = await UserService.header();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const banners = getPromotionalBanners(res?.data?.data || {});
+        setPromotional(banners);
+      }
+    } catch (err) {
+      console.log('GetHeader error:', err);
+    }
+  };
+
+  const bigsaleWithoutLoader = async () => {
+    try {
+      const res = await UserService.bigsales();
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res.data?.data || {};
+        const typeProducts = getSalesProducts(fetchedProducts);
+        const activeSalesProducts = filterActiveBigSaleProducts(typeProducts);
+
+        if (
+          Array.isArray(activeSalesProducts) &&
+          activeSalesProducts.length > 0
+        ) {
+          setsalesProduct(activeSalesProducts);
+        } else {
+          setsalesProduct([]);
+        }
+      }
+    } catch (err) {
+      console.log('error bigsale', err);
+      setsalesProduct([]);
+    }
+  };
+
+  const GetCategoryIDWithoutLoader = async (categoryId: any) => {
+    try {
+      setIsLoadingCategory(true);
+      const res = await UserService.GetCategoryByID(categoryId);
+      if (res && res.data && res.status === HttpStatusCode.Ok) {
+        const fetchedProducts = res?.data?.data || [];
+        const filteredProducts = filterProductsByType(fetchedProducts);
+        setcategoryProduct(filteredProducts);
+        await featuredproductWithoutLoader();
+      }
+    } catch (err) {
+      console.log('error category', err);
+    } finally {
+      setIsLoadingCategory(false);
+    }
+  };
+
+  // Helper function to check if sale is currently active
+  const isSaleActive = (startDate: string, endDate: string) => {
+    try {
+      const today = new Date();
+      const end = new Date(endDate.split(' ')[0]);
+
+      const todayDateOnly = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+      const endDateOnly = new Date(
+        end.getFullYear(),
+        end.getMonth(),
+        end.getDate(),
+      );
+
+      return todayDateOnly <= endDateOnly;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const filterActiveBigSaleProducts = (products: any[]) => {
     if (!Array.isArray(products)) return [];
 
-    const currentType = getCurrentProductType();
-
-    console.log('Filtering products for user type:', currentType);
-
-    // Filter products by the current user type (always b2c or b2b, never null)
     return products.filter(item => {
-      // Check if item has product_type property
-      if (!item?.product_type) {
-        // If product_type doesn't exist, check if it's a nested object
-        if (item?.product?.product_type) {
-          return item.product.product_type === currentType;
-        }
-        return false;
-      }
-      return item.product_type === currentType;
+      if (!item?.start_date || !item?.end_date) return false;
+      return isSaleActive(item.start_date, item.end_date);
     });
   };
 
-  // Helper function to get featured products based on user type
-  const getFeaturedProducts = (data: any) => {
-    const currentType = getCurrentProductType();
-
-    console.log('Getting featured products for user type:', currentType);
-
-    // Always return products for the current user type (b2c or b2b)
-    // If no data for that type, return empty array
-    return data?.[currentType] || [];
-  };
-
-  // Helper function to get sales products based on user type
-  const getSalesProducts = (data: any) => {
-    const currentType = getCurrentProductType();
-
-    console.log('Getting sales products for user type:', currentType);
-
-    // Always return products for the current user type (b2c or b2b)
-    // If no data for that type, return empty array
-    return data?.[currentType] || [];
-  };
-
-
-  // Small Card Component
+  // Small Card Component - FIXED: Using PriceDisplay instead of displayPrice
   const ProductSmallCard = ({
     product,
     onPress,
@@ -214,7 +590,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                 color: '#1A1A1A',
               }}
             >
-              {displayPrice(product.variants[0].actual_price)}
+              <PriceDisplay price={product.variants[0].actual_price} />
             </Text>
           )}
           <Text
@@ -226,7 +602,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                 : 'none',
             }}
           >
-            {displayPrice(product.variants[0].price)}
+            <PriceDisplay price={product.variants[0].price} />
           </Text>
         </View>
       )}
@@ -254,459 +630,6 @@ const HomeScreen1 = ({ navigation }: any) => {
       )}
     </TouchableOpacity>
   );
-
-  // Helper function to get promotional banners based on user type
-  // Helper function to get promotional banners based on user type
-  // Helper function to get promotional banners based on user type
-  const getPromotionalBanners = (data: any) => {
-    const currentType = getCurrentProductType();
-
-    console.log('Current user type for banners:', currentType);
-    console.log('isLoggedIn:', isLoggedIn);
-
-    // If user is NOT logged in, show b2c banners
-    if (!isLoggedIn) {
-      console.log('User not logged in, showing b2c banners');
-      const b2cBanners = data?.b2c || [];
-      console.log('B2C banners count:', b2cBanners.length);
-      return removeDuplicateBanners(b2cBanners);
-    }
-
-    // For logged-in users, show banners based on their user type (b2c or b2b)
-    const typeBanners = data?.[currentType] || [];
-    console.log(`${currentType} banners:`, typeBanners.length);
-
-    return removeDuplicateBanners(typeBanners);
-  };
-
-  const removeDuplicateBanners = (banners: any[]) => {
-    if (!Array.isArray(banners) || banners.length === 0) return [];
-
-    const seenCombinations = new Set();
-    const uniqueBanners = [];
-
-    for (const banner of banners) {
-      if (!banner || typeof banner !== 'object') continue;
-
-      // Create a unique key using multiple properties
-      const combinationKey = [
-        banner?.id,
-        banner?.image_url,
-        banner?.product_id,
-        banner?.title,
-      ]
-        .filter(Boolean)
-        .join('|');
-
-      // If we haven't seen this combination, add it to unique banners
-      if (combinationKey && !seenCombinations.has(combinationKey)) {
-        seenCombinations.add(combinationKey);
-        uniqueBanners.push(banner);
-      }
-    }
-
-    return uniqueBanners;
-  };
-
-  // Helper function to filter orders by product type
-  const filterOrdersByType = (orders: any[]) => {
-    if (!Array.isArray(orders)) return [];
-
-    const currentType = getCurrentProductType();
-
-    console.log('Filtering orders for user type:', currentType);
-
-    // Filter orders for current user type (b2c or b2b)
-    return orders.filter(order => {
-      if (!Array.isArray(order.items) || order.items.length === 0) {
-        return false;
-      }
-
-      // Check if any item in the order has the matching product type
-      return order.items.some(
-        item => item?.product?.product_type === currentType,
-      );
-    });
-  };
-  // const refreshAllData = async () => {
-  //   try {
-  //     showLoader(); // Only show loader once
-
-  //     // Execute all async operations in parallel or sequence
-  //     await Promise.all([
-  //       GetCategoryProducts(),
-  //       bigsale(),
-  //       RecommendProducts(),
-  //       OrderList(),
-  //       ApiSorting(),
-  //       GetHeader(),
-  //     ]);
-
-  //     await fetchWishlist();
-  //   } catch (error) {
-  //     console.log('Error refreshing data:', error);
-  //   } finally {
-  //     hideLoader(); // Hide loader once all operations complete
-  //   }
-  // };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('Home screen focused, refreshing data...');
-
-      // Use silent loading without loader
-      loadDataSilently();
-
-      return () => {
-        console.log('Home screen unfocused');
-      };
-    }, [userType, isLoggedIn]),
-  );
-
-  // Add this function for silent loading:
-  const loadDataSilently = async () => {
-    try {
-      await Promise.all([
-        GetCategoryProductsWithoutLoader(),
-        bigsaleWithoutLoader(),
-        RecommendProductsWithoutLoader(),
-        ApiSortingWithoutLoader(),
-        GetHeaderWithoutLoader(),
-      ]);
-
-      if (isLoggedIn) {
-        await OrderListWithoutLoader();
-        await fetchWishlist();
-      }
-    } catch (error) {
-      console.log('Error loading data silently:', error);
-    }
-  };
-  // Inside your HomeScreen1 component, add these logs:
-  // Replace your current useEffect debug logs with this more detailed version:
-
-  const RecommendProductsWithoutLoader = async () => {
-    try {
-      const res = await UserService.recommended();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res.data?.data || [];
-        // This will now filter based on user type (b2c for null users)
-        const filteredProducts = filterProductsByType(fetchedProducts);
-        setApiRecommend(filteredProducts);
-      }
-    } catch (err) {
-      console.log('recommenderror', err);
-    }
-  };
-  useEffect(() => {
-    console.log('Wishlist Context Detailed Debug:', {
-      isLoggedIn,
-      userType,
-      wishlistItemsCount: wishlistItems?.length || 0,
-      isLoading,
-      sampleItem: wishlistItems?.[0]
-        ? {
-          id: wishlistItems[0]?.id,
-          name: wishlistItems[0]?.name,
-          product_type: wishlistItems[0]?.product_type,
-          front_image: wishlistItems[0]?.front_image,
-          variants: wishlistItems[0]?.variants,
-          // Check all possible properties
-          hasProductProperty: !!wishlistItems[0]?.product,
-          productId: wishlistItems[0]?.product?.id,
-          productName: wishlistItems[0]?.product?.name,
-          productFrontImage: wishlistItems[0]?.product?.front_image,
-        }
-        : null,
-    });
-  }, [wishlistItems, isLoggedIn, userType, isLoading]);
-
-  // update wishlist items depending on login state (server vs local)
-
-  useEffect(() => {
-    // The context already handles loading wishlist based on login state
-    // No need for local state management
-    console.log('Wishlist items updated:', wishlistItems.length);
-  }, [wishlistItems]);
-
-  // Add this function to get the correct price
-  const getCorrectPrice = (item: any) => {
-    if (!item) return null;
-
-    console.log('=== PRICE DEBUG ===');
-    console.log('Item:', item?.name || 'Unknown');
-    console.log('Full item structure:', JSON.stringify(item, null, 2));
-
-    // Check multiple possible price locations
-    const priceSources = [
-      // First variant's actual_price (discounted price)
-      {
-        source: 'variants[0].actual_price',
-        value: item?.variants?.[0]?.actual_price,
-      },
-      // First variant's price (original price)
-      { source: 'variants[0].price', value: item?.variants?.[0]?.price },
-      // Direct price property
-      { source: 'price', value: item?.price },
-      // Main price property
-      { source: 'main_price', value: item?.main_price },
-      // From product object if nested
-      {
-        source: 'product.variants[0].actual_price',
-        value: item?.product?.variants?.[0]?.actual_price,
-      },
-      {
-        source: 'product.variants[0].price',
-        value: item?.product?.variants?.[0]?.price,
-      },
-      { source: 'product.main_price', value: item?.product?.main_price },
-      // From originalItem
-      {
-        source: 'originalItem.product.variants[0].actual_price',
-        value: item?.originalItem?.product?.variants?.[0]?.actual_price,
-      },
-      {
-        source: 'originalItem.product.variants[0].price',
-        value: item?.originalItem?.product?.variants?.[0]?.price,
-      },
-      {
-        source: 'originalItem.product.main_price',
-        value: item?.originalItem?.product?.main_price,
-      },
-    ];
-
-    // Find the first valid price
-    for (const priceSource of priceSources) {
-      if (
-        priceSource.value !== undefined &&
-        priceSource.value !== null &&
-        priceSource.value !== ''
-      ) {
-        console.log(
-          `Found price in ${priceSource.source}: ${priceSource.value}`,
-        );
-
-        // Convert to number if it's a string
-        let priceValue = priceSource.value;
-        if (typeof priceValue === 'string') {
-          priceValue = parseFloat(priceValue);
-        }
-
-        // Check if price looks suspicious (100 when it should be 225/250)
-        if (priceValue === 100) {
-          console.log(
-            'WARNING: Price is 100 - checking if this is correct or should be variant price',
-          );
-          // Check if there are variants with higher prices
-          if (
-            item?.variants?.[0]?.actual_price &&
-            item.variants[0].actual_price > 100
-          ) {
-            console.log(
-              `Found higher variant price: ${item.variants[0].actual_price}, using that instead`,
-            );
-            return item.variants[0].actual_price;
-          }
-          if (item?.variants?.[0]?.price && item.variants[0].price > 100) {
-            console.log(
-              `Found higher variant price: ${item.variants[0].price}, using that instead`,
-            );
-            return item.variants[0].price;
-          }
-        }
-
-        return priceValue;
-      }
-    }
-
-    console.log('No valid price found in any source');
-    return null;
-  };
-
-  // Simple price formatter
-  const formatPrice = (price: any) => {
-    if (!price && price !== 0) return '0';
-
-    const priceNum = parseFloat(String(price));
-    if (isNaN(priceNum)) return '0';
-
-    // If price has decimals like 250.00, remove .00
-    if (priceNum === Math.floor(priceNum)) {
-      return priceNum.toString();
-    } else {
-      return priceNum.toFixed(2);
-    }
-  };
-
-  const GetCategoryProductsWithoutLoader = async () => {
-    try {
-      setIsLoadingCategory(true);
-      const res = await UserService.GetCategory();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res.data?.categories || [];
-        setApiCateProducts(fetchedProducts);
-        const defaultId = fetchedProducts?.[0]?.id ?? 1;
-        setSelectedCategoryId(defaultId);
-        await GetCategoryIDWithoutLoader(defaultId);
-      }
-    } catch (err) {
-      console.log('error category', err);
-    } finally {
-      setIsLoadingCategory(false);
-    }
-  };
-
-  const featuredproductWithoutLoader = async () => {
-    try {
-      const res = await UserService.featuredproducts();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res?.data?.data || {};
-        // This will now return b2c for null users, b2c for b2c users, b2b for b2b users
-        const typeProducts = getFeaturedProducts(fetchedProducts);
-        setFeaturesProduct(typeProducts);
-
-        if (isLoggedIn) {
-          await OrderListWithoutLoader();
-        }
-      }
-    } catch (err) {
-      console.log('error featuredproduct', err);
-    }
-  };
-  const OrderListWithoutLoader = async () => {
-    try {
-      const response = await UserService.order();
-      if (response && response.data && response.status === HttpStatusCode.Ok) {
-        const orders = response.data?.orders || [];
-        // This will now filter based on user type (b2c for null users)
-        const filteredOrders = filterOrdersByType(orders);
-        setorderitem(filteredOrders);
-      }
-    } catch (err) {
-      console.log('Order fetch exception:', err);
-    }
-  };
-
-
-  const ApiSortingWithoutLoader = async () => {
-    try {
-      const res = await UserService.Sorting('price_asc');
-      if (res?.status === HttpStatusCode.Ok) {
-        const sortedProducts = res?.data?.data || [];
-        // This will now filter based on user type (b2c for null users)
-        const filteredProducts = filterProductsByType(sortedProducts);
-        console.log('Filtered products by user type:', filteredProducts.length);
-        setlowestitem(filteredProducts);
-      } else {
-        console.log('Failed to sort products:', res);
-        Toast.show({
-          type: 'error',
-          text1: 'Failed to sort products',
-        });
-      }
-    } catch (err) {
-      console.log('Sorting error:', err);
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to sort products',
-      });
-    }
-  };
-
-
-  const GetHeaderWithoutLoader = async () => {
-    try {
-      const res = await UserService.header();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        // This will now return b2c banners for null users
-        const banners = getPromotionalBanners(res?.data?.data || {});
-        setPromotional(banners);
-      }
-    } catch (err) {
-      console.log('GetHeader error:', err);
-    }
-  };
-
-
-  const bigsaleWithoutLoader = async () => {
-    try {
-      const res = await UserService.bigsales();
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res.data?.data || {};
-        // This will now return b2c for null users
-        const typeProducts = getSalesProducts(fetchedProducts);
-        const activeSalesProducts = filterActiveBigSaleProducts(typeProducts);
-
-        if (
-          Array.isArray(activeSalesProducts) &&
-          activeSalesProducts.length > 0
-        ) {
-          setsalesProduct(activeSalesProducts);
-        } else {
-          setsalesProduct([]);
-        }
-      }
-    } catch (err) {
-      console.log('error bigsale', err);
-      setsalesProduct([]);
-    }
-  };
-
-  const GetCategoryIDWithoutLoader = async (categoryId: any) => {
-    try {
-      setIsLoadingCategory(true);
-      const res = await UserService.GetCategoryByID(categoryId);
-      if (res && res.data && res.status === HttpStatusCode.Ok) {
-        const fetchedProducts = res?.data?.data || [];
-        const filteredProducts = filterProductsByType(fetchedProducts);
-        setcategoryProduct(filteredProducts);
-        await featuredproductWithoutLoader();
-      }
-    } catch (err) {
-      console.log('error category', err);
-    } finally {
-      setIsLoadingCategory(false);
-    }
-  };
-
-  {
-    console.log('HEY', wishlistItems);
-  }
-
-  // Helper function to check if sale is currently active
-  const isSaleActive = (startDate: string, endDate: string) => {
-    try {
-      const today = new Date();
-      const end = new Date(endDate.split(' ')[0]); // Get date only
-
-      // Reset time to compare only dates
-      const todayDateOnly = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-      );
-      const endDateOnly = new Date(
-        end.getFullYear(),
-        end.getMonth(),
-        end.getDate(),
-      );
-
-      return todayDateOnly <= endDateOnly;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const filterActiveBigSaleProducts = (products: any[]) => {
-    if (!Array.isArray(products)) return [];
-
-    return products.filter(item => {
-      if (!item?.start_date || !item?.end_date) return false;
-      return isSaleActive(item.start_date, item.end_date);
-    });
-  };
-
-  // Call this function when adding/removing from wishlist
 
   // PromotionalBanner component
   const PromotionalBanner: React.FC<{
@@ -769,7 +692,7 @@ const HomeScreen1 = ({ navigation }: any) => {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFF0' }}>
       <StatusBar barStyle={'dark-content'} />
 
-      {/* Header - Refined Dark Theme */}
+      {/* Header */}
       <View
         style={{
           flexDirection: 'row',
@@ -779,10 +702,10 @@ const HomeScreen1 = ({ navigation }: any) => {
           paddingHorizontal: widthPercentageToDP(5),
           backgroundColor: '#FFFFF0',
           borderBottomWidth: 1,
-          borderBottomColor: '#E0E0E0', // Subtle gray line instead of gold
+          borderBottomColor: '#E0E0E0',
         }}
       >
-        {/* Left Side - Minimal Decorative */}
+        {/* Left Side */}
         <View
           style={{
             width: 40,
@@ -795,18 +718,12 @@ const HomeScreen1 = ({ navigation }: any) => {
             style={{
               width: 20,
               height: 2,
-              // backgroundColor: '#888888', // Dark gray
-              // borderRadius: 1,
-              // marginBottom: 4,
             }}
           />
           <View
             style={{
               width: 12,
               height: 2,
-              // backgroundColor: '#888888',
-              // borderRadius: 1,
-              // opacity: 0.5,
             }}
           />
         </View>
@@ -828,7 +745,7 @@ const HomeScreen1 = ({ navigation }: any) => {
           <Text
             style={{
               fontSize: 9,
-              color: '#888888', // Dark gray
+              color: '#888888',
               letterSpacing: 2,
               textTransform: 'uppercase',
               marginTop: 2,
@@ -890,7 +807,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar - Refined */}
+      {/* Search Bar */}
       <View
         style={{
           paddingHorizontal: widthPercentageToDP(5),
@@ -918,11 +835,10 @@ const HomeScreen1 = ({ navigation }: any) => {
               height: 52,
               paddingHorizontal: 16,
               backgroundColor: '#FFFFFF',
-              borderWidth: 1, // Single border
+              borderWidth: 1,
               borderColor: '#E0E0E0',
             }}
           >
-            {/* Search Icon */}
             <View
               style={{
                 width: 36,
@@ -945,7 +861,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
             </View>
 
-            {/* Search Text */}
             <View style={{ flex: 1 }}>
               <TransletText
                 text="Search for premium teas..."
@@ -958,7 +873,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
             </View>
 
-            {/* Voice Icon - Fixed cutting issue */}
             <View
               style={{
                 width: 36,
@@ -982,8 +896,6 @@ const HomeScreen1 = ({ navigation }: any) => {
             </View>
           </View>
         </TouchableOpacity>
-
-        {/* Removed decorative line */}
       </View>
 
       <ScrollView
@@ -1017,6 +929,7 @@ const HomeScreen1 = ({ navigation }: any) => {
               marginTop: heightPercentageToDP(-2.2),
             }}
           />
+
           {/* Categories Grid - Horizontal Scrolling */}
           {isLoadingCategory ? (
             <View
@@ -1085,7 +998,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                 </View>
               </View>
 
-              {/* Category Chips - Light Backgrounds for Dark Icons */}
+              {/* Category Chips */}
               <View
                 style={{
                   paddingVertical: heightPercentageToDP(2),
@@ -1113,7 +1026,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          backgroundColor: isActive ? '#E8E8E8' : '#F8F8F8', // Light backgrounds
+                          backgroundColor: isActive ? '#E8E8E8' : '#F8F8F8',
                           paddingVertical: 10,
                           paddingHorizontal: 18,
                           borderRadius: 40,
@@ -1121,7 +1034,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           borderColor: isActive ? '#D0D0D0' : '#F0F0F0',
                         }}
                       >
-                        {/* Icon - No tint, original colors */}
                         <Image
                           source={{ uri: Image_url + item?.icon }}
                           style={{
@@ -1132,7 +1044,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           }}
                         />
 
-                        {/* Category Name */}
                         <TransletText
                           text={item?.name}
                           style={{
@@ -1146,9 +1057,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                   }}
                 />
               </View>
+
               {/* Products - Horizontal Scroll */}
               {Array.isArray(categoryProduct) && categoryProduct.length > 0 ? (
                 <FlatList
+                  key={`category-products-${currencyVersion}`}
                   data={categoryProduct}
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -1168,7 +1081,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                         })
                       }
                       style={{
-                        width: 140, // Fixed width for horizontal items
+                        width: 140,
                         backgroundColor: '#FFFFFF',
                         borderRadius: 16,
                         borderWidth: 1,
@@ -1176,7 +1089,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Image Container */}
                       <View
                         style={{
                           backgroundColor: '#F8F8F8',
@@ -1193,7 +1105,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           }}
                         />
 
-                        {/* Wishlist Button */}
                         <TouchableOpacity
                           onPress={async e => {
                             e.stopPropagation();
@@ -1234,7 +1145,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         </TouchableOpacity>
                       </View>
 
-                      {/* Product Info */}
                       <View
                         style={{
                           padding: 10,
@@ -1252,20 +1162,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                         >
                           {item?.name || 'Products'}
                         </Text>
-                        {/* <TransletText
-                          text={item?.name || 'Product'}
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '400',
-                            color: '#1A1A1A',
-                            marginBottom: 4,
-                            lineHeight: 16,
-                            height: 32,
-                          }}
-                          numberOfLines={2}
-                        /> */}
 
-                        {/* Price */}
                         <Text
                           style={{
                             fontSize: 13,
@@ -1273,9 +1170,13 @@ const HomeScreen1 = ({ navigation }: any) => {
                             color: '#1A1A1A',
                           }}
                         >
-                          {displayPrice(
-                            item?.variants?.[0]?.price || item?.main_price || 0,
-                          )}
+                          <PriceDisplay
+                            price={
+                              item?.variants?.[0]?.price ||
+                              item?.main_price ||
+                              0
+                            }
+                          />
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -1311,7 +1212,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                   }
                 />
               ) : (
-                // Empty State
                 <View
                   style={{
                     marginHorizontal: widthPercentageToDP(3),
@@ -1342,6 +1242,7 @@ const HomeScreen1 = ({ navigation }: any) => {
               )}
             </View>
           )}
+
           {/* Frequently Bought */}
           <View
             style={{
@@ -1357,6 +1258,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                 />
 
                 <FlatList
+                  key={`freq-${currencyVersion}`}
                   data={orderitem}
                   keyExtractor={item => String(item.id)}
                   horizontal
@@ -1407,7 +1309,6 @@ const HomeScreen1 = ({ navigation }: any) => {
             ) : null}
 
             {/* Featured This Week */}
-            {/* Featured This Week - Redesigned */}
             <View
               style={{
                 marginTop: heightPercentageToDP(2),
@@ -1416,7 +1317,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                 paddingVertical: 16,
               }}
             >
-              {/* Elegant Header */}
               <View
                 style={{
                   paddingHorizontal: widthPercentageToDP(3),
@@ -1451,7 +1351,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                     />
                   </View>
 
-                  {/* Optional subtle "View all" link */}
                   <TouchableOpacity
                     onPress={() => navigation.navigate('Category')}
                     style={{
@@ -1480,8 +1379,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                 </View>
               </View>
 
-              {/* Featured Products Carousel */}
               <FlatList
+                key={`featured-${currencyVersion}`}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 data={FeaturesProduct}
@@ -1493,7 +1392,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                   gap: 16,
                 }}
                 renderItem={({ item }) => {
-                  // Calculate discount percentage if applicable
                   const discountPercentage =
                     item.product?.discount ||
                     (() => {
@@ -1524,7 +1422,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         borderColor: '#F2F2F2',
                       }}
                     >
-                      {/* Image Container */}
                       <View
                         style={{
                           position: 'relative',
@@ -1543,7 +1440,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           }}
                         />
 
-                        {/* Minimal Tag - Only if exists */}
                         {item.tag && (
                           <View
                             style={{
@@ -1571,13 +1467,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                         )}
                       </View>
 
-                      {/* Content */}
                       <View
                         style={{
                           padding: 12,
                         }}
                       >
-                        {/* Product Name */}
                         <Text
                           style={{
                             fontSize: 13,
@@ -1591,7 +1485,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           {item.product?.name || 'Product Name'}
                         </Text>
 
-                        {/* Price and Rating Row */}
                         <View
                           style={{
                             flexDirection: 'row',
@@ -1600,7 +1493,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                             marginBottom: 8,
                           }}
                         >
-                          {/* Price */}
                           <View
                             style={{
                               flexDirection: 'row',
@@ -1615,9 +1507,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                                 color: '#1A1A1A',
                               }}
                             >
-                              {displayPrice(
-                                Math.round(item.product.price_range.min || 0),
-                              )}
+                              <PriceDisplay
+                                price={Math.round(
+                                  item.product.price_range.min || 0,
+                                )}
+                              />
                             </Text>
                             {item.product.price_range.max >
                               item.product.price_range.min && (
@@ -1628,14 +1522,15 @@ const HomeScreen1 = ({ navigation }: any) => {
                                   }}
                                 >
                                   -{' '}
-                                  {displayPrice(
-                                    Math.round(item.product.price_range.max),
-                                  )}
+                                  <PriceDisplay
+                                    price={Math.round(
+                                      item.product.price_range.max,
+                                    )}
+                                  />
                                 </Text>
                               )}
                           </View>
 
-                          {/* Rating */}
                           <View
                             style={{
                               flexDirection: 'row',
@@ -1667,7 +1562,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           </View>
                         </View>
 
-                        {/* Delivery Badge - Minimal */}
                         {item.product?.fastDelivery && (
                           <View
                             style={{
@@ -1701,7 +1595,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                 }}
               />
 
-              {/* Subtle Pagination Dots - Optional */}
               {FeaturesProduct.length > 4 && (
                 <View
                   style={{
@@ -1727,7 +1620,8 @@ const HomeScreen1 = ({ navigation }: any) => {
               )}
             </View>
           </View>
-          {/* Big Sale Section - Redesigned */}
+
+          {/* Big Sale Section */}
           {salesProduct.length > 0 && (
             <View
               style={{
@@ -1735,10 +1629,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                 marginTop: 20,
                 marginBottom: 10,
                 paddingVertical: 15,
-                backgroundColor: '#F8F6F0', // Soft, neutral background
+                backgroundColor: '#F8F6F0',
               }}
             >
-              {/* Section Header */}
               <View
                 style={{
                   paddingHorizontal: widthPercentageToDP(3),
@@ -1773,8 +1666,8 @@ const HomeScreen1 = ({ navigation }: any) => {
                 )}
               </View>
 
-              {/* Carousel */}
               <FlatList
+                key={`sales-${currencyVersion}`}
                 data={salesProduct}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -1784,7 +1677,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                   gap: 12,
                 }}
                 renderItem={({ item }) => {
-                  // Calculate discount percentage if not provided
                   const discountPercentage =
                     item?.percentage ||
                     (() => {
@@ -1820,7 +1712,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         borderColor: '#F0F0F0',
                       }}
                     >
-                      {/* Image Container */}
                       <View
                         style={{
                           position: 'relative',
@@ -1840,7 +1731,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           }}
                         />
 
-                        {/* Discount Badge - Optional, remove if you want even more minimal */}
                         {discountPercentage && (
                           <View
                             style={{
@@ -1867,7 +1757,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         )}
                       </View>
 
-                      {/* Content */}
                       <View
                         style={{
                           padding: 12,
@@ -1883,11 +1772,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                           }}
                           numberOfLines={2}
                         >
-                          {' '}
                           {item?.product?.name || item?.name || 'Product'}
                         </Text>
 
-                        {/* Price */}
                         <View
                           style={{
                             flexDirection: 'row',
@@ -1904,9 +1791,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                                   color: '#2C2C2C',
                                 }}
                               >
-                                {displayPrice(
-                                  Math.round(item.product.price_range.min),
-                                )}
+                                <PriceDisplay
+                                  price={Math.round(
+                                    item.product.price_range.min,
+                                  )}
+                                />
                               </Text>
                               {item.product.price_range.max >
                                 item.product.price_range.min && (
@@ -1926,9 +1815,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                                         color: '#2C2C2C',
                                       }}
                                     >
-                                      {displayPrice(
-                                        Math.round(item.product.price_range.max),
-                                      )}
+                                      <PriceDisplay
+                                        price={Math.round(
+                                          item.product.price_range.max,
+                                        )}
+                                      />
                                     </Text>
                                   </>
                                 )}
@@ -1941,15 +1832,16 @@ const HomeScreen1 = ({ navigation }: any) => {
                                 color: '#2C2C2C',
                               }}
                             >
-                              {displayPrice(
-                                item?.variants?.[0]?.actual_price ||
-                                item?.variants?.[0]?.price,
-                              )}
+                              <PriceDisplay
+                                price={
+                                  item?.variants?.[0]?.actual_price ||
+                                  item?.variants?.[0]?.price
+                                }
+                              />
                             </Text>
                           )}
                         </View>
 
-                        {/* Shop Now Link */}
                         <View
                           style={{
                             flexDirection: 'row',
@@ -1983,8 +1875,8 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
             </View>
           )}
+
           {/* Lowest Prices Ever */}
-          {/* Lowest Prices Ever - Redesigned */}
           <View
             style={{
               width: '100%',
@@ -1993,7 +1885,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               paddingVertical: 20,
             }}
           >
-            {/* Simple Decorative Header Line */}
             <View
               style={{
                 flexDirection: 'row',
@@ -2034,7 +1925,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
             </View>
 
-            {/* Subtitle */}
             <TransletText
               text="Unbeatable prices on premium products"
               style={{
@@ -2046,8 +1936,8 @@ const HomeScreen1 = ({ navigation }: any) => {
               }}
             />
 
-            {/* Products Carousel */}
             <FlatList
+              key={`lowest-${currencyVersion}`}
               data={lowestitem}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -2059,7 +1949,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               renderItem={({ item }) => {
                 const wished = isWishlisted(item.id);
 
-                // Extract price information
                 const getPriceInfo = (product: any) => {
                   if (!product)
                     return { discountedPrice: null, originalPrice: null };
@@ -2127,7 +2016,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                       overflow: 'hidden',
                     }}
                   >
-                    {/* Image Container */}
                     <View
                       style={{
                         position: 'relative',
@@ -2143,7 +2031,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         }}
                       />
 
-                      {/* Savings Badge - Only show if significant savings */}
                       {savingsPercentage && savingsPercentage > 10 && (
                         <View
                           style={{
@@ -2169,7 +2056,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         </View>
                       )}
 
-                      {/* Wishlist Button - Subtle */}
                       <TouchableOpacity
                         activeOpacity={0.8}
                         onPress={async e => {
@@ -2211,7 +2097,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Product Info */}
                     <View
                       style={{
                         padding: 12,
@@ -2231,7 +2116,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         {item?.name || 'Unnamed Product'}
                       </Text>
 
-                      {/* Price Section */}
                       <View
                         style={{
                           flexDirection: 'row',
@@ -2248,7 +2132,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                                 color: '#2C2C2C',
                               }}
                             >
-                              {displayPrice(discountedPrice)}
+                              <PriceDisplay price={discountedPrice} />
                             </Text>
                             <Text
                               style={{
@@ -2257,7 +2141,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                                 textDecorationLine: 'line-through',
                               }}
                             >
-                              {displayPrice(originalPrice)}
+                              <PriceDisplay price={originalPrice} />
                             </Text>
                           </>
                         ) : originalPrice ? (
@@ -2268,7 +2152,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                               color: '#2C2C2C',
                             }}
                           >
-                            {displayPrice(originalPrice)}
+                            <PriceDisplay price={originalPrice} />
                           </Text>
                         ) : (
                           <TransletText
@@ -2282,7 +2166,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         )}
                       </View>
 
-                      {/* View Details Link */}
                       <View
                         style={{
                           flexDirection: 'row',
@@ -2315,7 +2198,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               }}
             />
 
-            {/* See All Link - Minimal */}
             <TouchableOpacity
               onPress={() => navigation.navigate('Category')}
               style={{
@@ -2346,7 +2228,8 @@ const HomeScreen1 = ({ navigation }: any) => {
               </Text>
             </TouchableOpacity>
           </View>
-          // Wishlist Section - Replace your current wishlist section with this
+
+          {/* Wishlist Section */}
           {wishlistItems && wishlistItems.length > 0 ? (
             <View
               style={{
@@ -2360,14 +2243,12 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
 
               <FlatList
+                key={`wishlist-${currencyVersion}`}
                 data={wishlistItems}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={(item, index) => {
-                  // Use multiple possible ID sources
-
                   const id = item?.id || item?.product_id || index.toString();
-
                   return `wishlist-${id}-${index}`;
                 }}
                 contentContainerStyle={{ paddingVertical: 8 }}
@@ -2376,15 +2257,11 @@ const HomeScreen1 = ({ navigation }: any) => {
 
                   if (!item) return null;
 
-                  // Extract data from the transformed item structure
                   const productId = item?.id || item?.product_id;
                   const productName = item?.name || 'Product';
-                  const price = item?.price || item?.main_price;
 
-                  // Get image - use the pre-transformed image URL first, then fallback
                   let imageUri = item?.image;
                   if (!imageUri && item?.front_image) {
-                    // Check if front_image already has full URL
                     if (item.front_image.startsWith('http')) {
                       imageUri = item.front_image;
                     } else {
@@ -2392,7 +2269,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                     }
                   }
 
-                  // Also check originalItem for image
                   if (!imageUri && item?.originalItem?.product?.front_image) {
                     const frontImage = item.originalItem.product.front_image;
                     if (frontImage.startsWith('http')) {
@@ -2402,7 +2278,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                     }
                   }
 
-                  // Check if wishlisted
                   const wished = isWishlisted(item.id);
                   const correctPrice = getCorrectPrice(item);
 
@@ -2422,7 +2297,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           { width: WISHLIST_CARD_WIDTH, marginRight: 12 },
                         ]}
                       >
-                        {/* Image with fallback */}
                         {imageUri ? (
                           <Image
                             source={{ uri: imageUri }}
@@ -2451,7 +2325,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           </View>
                         )}
 
-                        {/* Product Name */}
                         <Text
                           style={[
                             styles.wishlistTitle,
@@ -2464,20 +2337,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                         >
                           {productName}
                         </Text>
-                        {/* <TransletText
-                          text={productName}
-                          style={[
-                            styles.wishlistTitle,
-                            {
-                              fontWeight: '400',
-                              height: heightPercentageToDP(4),
-                              marginTop: 8,
-                            },
-                          ]}
-                          numberOfLines={2}
-                        /> */}
 
-                        {/* Price */}
                         {correctPrice !== null ? (
                           <View
                             style={{
@@ -2487,7 +2347,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             }}
                           >
                             <Text style={styles.smallPrice}>
-                              {displayPrice(correctPrice)}
+                              <PriceDisplay price={correctPrice} />
                             </Text>
                           </View>
                         ) : (
@@ -2501,7 +2361,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                           />
                         )}
 
-                        {/* Wishlist Heart Button */}
                         <TouchableOpacity
                           activeOpacity={0.8}
                           onPress={async e => {
@@ -2543,7 +2402,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
             </View>
           ) : (
-            // Empty wishlist state
             <View
               style={{
                 paddingHorizontal: widthPercentageToDP(3),
@@ -2589,13 +2447,14 @@ const HomeScreen1 = ({ navigation }: any) => {
               </View>
             </View>
           )}
+
           {/* Promotional Banner */}
           <PromotionalBanner
             promotional={Promotional}
             navigation={navigation}
           />
+
           {/* Recommended For You */}
-          {/* Recommended For You - Redesigned */}
           <View
             style={{
               marginTop: heightPercentageToDP(3),
@@ -2606,7 +2465,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               borderTopColor: '#F0F0F0',
             }}
           >
-            {/* Sophisticated Header */}
             <View
               style={{
                 paddingHorizontal: widthPercentageToDP(3),
@@ -2634,8 +2492,8 @@ const HomeScreen1 = ({ navigation }: any) => {
               />
             </View>
 
-            {/* Recommended Carousel */}
             <FlatList
+              key={`recommended-${currencyVersion}`}
               ref={recRef}
               data={apiRecommend}
               horizontal
@@ -2652,7 +2510,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                 const wished = isWishlisted(item.id);
                 const correctPrice = getCorrectPrice(item);
 
-                // Get original price if available
                 const originalPrice = item.variants?.[0]?.price;
                 const hasDiscount =
                   originalPrice && correctPrice && originalPrice > correctPrice;
@@ -2679,7 +2536,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                       borderColor: '#F2F2F2',
                     }}
                   >
-                    {/* Image Container */}
                     <View
                       style={{
                         position: 'relative',
@@ -2696,7 +2552,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         }}
                       />
 
-                      {/* Subtle Discount Indicator - Only if significant */}
                       {discountPercentage && discountPercentage > 5 && (
                         <View
                           style={{
@@ -2722,7 +2577,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         </View>
                       )}
 
-                      {/* Wishlist Button - Refined */}
                       <TouchableOpacity
                         onPress={async e => {
                           e.stopPropagation();
@@ -2767,13 +2621,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Content */}
                     <View
                       style={{
                         padding: 12,
                       }}
                     >
-                      {/* Product Name */}
                       <Text
                         style={{
                           fontSize: 13,
@@ -2788,7 +2640,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                         {item?.name || 'Unnamed Product'}
                       </Text>
 
-                      {/* Price Section */}
                       <View
                         style={{
                           flexDirection: 'row',
@@ -2803,11 +2654,13 @@ const HomeScreen1 = ({ navigation }: any) => {
                             color: '#1A1A1A',
                           }}
                         >
-                          {displayPrice(
-                            correctPrice ||
-                            item.variants[0]?.actual_price ||
-                            item.variants[0]?.price,
-                          )}
+                          <PriceDisplay
+                            price={
+                              correctPrice ||
+                              item.variants[0]?.actual_price ||
+                              item.variants[0]?.price
+                            }
+                          />
                         </Text>
 
                         {hasDiscount && (
@@ -2818,12 +2671,11 @@ const HomeScreen1 = ({ navigation }: any) => {
                               textDecorationLine: 'line-through',
                             }}
                           >
-                            {displayPrice(originalPrice)}
+                            <PriceDisplay price={originalPrice} />
                           </Text>
                         )}
                       </View>
 
-                      {/* Quick View Indicator */}
                       <View
                         style={{
                           flexDirection: 'row',
@@ -2856,7 +2708,6 @@ const HomeScreen1 = ({ navigation }: any) => {
               }}
             />
 
-            {/* Minimal Pagination Dots */}
             {Array.isArray(apiRecommend) && apiRecommend.length > 0 && (
               <View
                 style={{
@@ -2875,7 +2726,6 @@ const HomeScreen1 = ({ navigation }: any) => {
                       height: 4,
                       borderRadius: 2,
                       backgroundColor: activeRec === i ? '#1A1A1A' : '#E0E0E0',
-                      transition: 'all 0.2s ease',
                     }}
                   />
                 ))}
@@ -3059,7 +2909,6 @@ const styles = StyleSheet.create({
 
   featuredCard: {
     width: 110,
-    // height: 130,
     borderRadius: 10,
     marginRight: 12,
     padding: 8,
@@ -3087,7 +2936,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 
-  /* New small card styles */
   smallCard: {
     borderRadius: 8,
     padding: 8,
@@ -3117,7 +2965,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
 
-  /* Wishlist / recommended cards */
   wishlistCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
@@ -3141,7 +2988,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  /* Pagination dots */
   dotsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
