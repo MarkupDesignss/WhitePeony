@@ -20,6 +20,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import AddressModal from '../../components/AddressModal';
 import Toast from 'react-native-toast-message';
 import { formatDate, handleSignout } from '../../helpers/helpers';
+import { WishlistContext } from '../../context'
 import { UserData, UserDataContext } from '../../context/userDataContext';
 import { Image_url, UserService } from '../../service/ApiService';
 import LoginModal from '../../components/LoginModal';
@@ -30,7 +31,7 @@ import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import { useAutoTranslate } from '../../hooks/useAutoTranslate';
-import TransletText from '../../components/TransletText';
+
 
 const { width } = Dimensions.get('window');
 
@@ -103,7 +104,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   const { translatedText: notificationText } = useAutoTranslate('Notification');
   const { translatedText: myFavoritiesText } = useAutoTranslate('My Favorities');
   const { translatedText: logoutSuccessText } = useAutoTranslate('Log Out Successfully!');
-
+  const { clearWishlist } = useContext(WishlistContext);
   // Function to open external URLs with InAppBrowser
   const openInAppBrowser = async (url: string, title?: string) => {
     try {
@@ -174,25 +175,54 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
   };
 
   const signout = async () => {
-    Alert.alert('White Peony', 'Are you sure you want to logout?', [
-      {
-        text: 'Cancel',
-        onPress: () => console.log('Cancel Pressed'),
-        style: 'cancel',
-      },
-      {
-        text: 'OK',
-        onPress: async () => {
-          setIsLoading(true);
-          await handleSignout(setIsLoggedIn);
-          Toast.show({
-            type: 'success',
-            text1: logoutSuccessText || 'Log Out Successfully!',
-          });
-          setIsLoading(false);
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
         },
-      },
-    ]);
+        {
+          text: 'Logout',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+
+              // Clear all states and storage in parallel
+              await Promise.all([
+                // Clear wishlist first
+                clearWishlist?.(),
+
+                // Clear user data and logout
+                (async () => {
+                  await LocalStorage.save('@login', false);
+                  await LocalStorage.save('@user', null);
+                  await LocalStorage.flushQuestionKeys?.();
+                  setIsLoggedIn(false);
+                })(),
+              ]);
+
+              Toast.show({
+                type: 'success',
+                text1: logoutSuccessText || 'Logged out successfully',
+              });
+            } catch (error) {
+              console.log('Logout error:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'Failed to logout properly',
+              });
+            } finally {
+              setIsLoading(false);
+            }
+          },
+          style: 'destructive',
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const DeleteAccount = async () => {

@@ -71,26 +71,27 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
   const { isLoggedIn, userType } = useContext(UserDataContext);
 
   const { translatedText: addedWishlistText } =
-  useAutoTranslate('Added to wishlist');
-const { translatedText: savedAccountText } =
-  useAutoTranslate('Saved to your account');
-const { translatedText: savedLocalText } =
-  useAutoTranslate('Saved locally');
+    useAutoTranslate('Added to wishlist');
+  const { translatedText: savedAccountText } = useAutoTranslate(
+    'Saved to your account',
+  );
+  const { translatedText: savedLocalText } = useAutoTranslate('Saved locally');
 
-const { translatedText: errorText } =
-  useAutoTranslate('Error');
-const { translatedText: failedWishlistText } =
-  useAutoTranslate('Failed to add item to wishlist');
+  const { translatedText: errorText } = useAutoTranslate('Error');
+  const { translatedText: failedWishlistText } = useAutoTranslate(
+    'Failed to add item to wishlist',
+  );
 
-  const { translatedText: removedText } =
-  useAutoTranslate('Removed from wishlist');
+  const { translatedText: removedText } = useAutoTranslate(
+    'Removed from wishlist',
+  );
 
-const { translatedText: removedAccountText } =
-  useAutoTranslate('Removed from your account');
+  const { translatedText: removedAccountText } = useAutoTranslate(
+    'Removed from your account',
+  );
 
-const { translatedText: removedLocalText } =
-  useAutoTranslate('Removed locally');
-
+  const { translatedText: removedLocalText } =
+    useAutoTranslate('Removed locally');
 
   // Extract IDs from wishlist items
   const wishlistIds = useMemo(
@@ -126,6 +127,8 @@ const { translatedText: removedLocalText } =
     if (isLoggedIn) {
       fetchWishlist();
     } else {
+      // Clear wishlist when user logs out
+      clearWishlist();
       loadLocalWishlist();
     }
   }, [isLoggedIn, userType]);
@@ -428,14 +431,14 @@ const { translatedText: removedLocalText } =
         text2: isLoggedIn
           ? savedAccountText || 'Saved to your account'
           : savedLocalText || 'Saved locally',
-      });      
+      });
     } catch (error) {
       console.log('Error adding to wishlist:', error);
       Toast.show({
         type: 'error',
         text1: errorText || 'Error',
         text2: failedWishlistText || 'Failed to add item to wishlist',
-      });      
+      });
     } finally {
       setIsLoading(false);
     }
@@ -502,16 +505,26 @@ const { translatedText: removedLocalText } =
     [wishlistIds],
   );
 
-  // 6. CLEAR WISHLIST
-  const clearWishlist = async () => {
+  // 6. CLEAR WISHLIST - Fix: Remove duplicate and fix implementation
+  const clearWishlist = useCallback(async () => {
     try {
       console.log('Clearing wishlist');
 
       // Only call API if user is logged in
       if (isLoggedIn) {
         try {
-          // Assuming you have a clear wishlist API endpoint
+          // If you have a clear all wishlist API endpoint, uncomment this:
           // await UserService.clearWishlist();
+
+          // Alternatively, remove items one by one (if no bulk delete endpoint)
+          // This is a fallback - you might want to implement a bulk delete endpoint
+          for (const item of wishlistItems) {
+            try {
+              await UserService.wishlistDelete(item.id);
+            } catch (e) {
+              // Ignore individual deletion errors
+            }
+          }
         } catch (apiError) {
           console.log(
             'API error while clearing wishlist, continuing locally:',
@@ -522,14 +535,6 @@ const { translatedText: removedLocalText } =
 
       setWishlistItems([]);
       await saveLocalWishlist([]);
-
-      Toast.show({
-        type: 'success',
-        text1: 'Wishlist cleared',
-        text2: isLoggedIn
-          ? 'All items have been removed from your account'
-          : 'All items have been removed locally',
-      });
     } catch (error) {
       console.log('Clear wishlist error:', error);
       Toast.show({
@@ -538,9 +543,9 @@ const { translatedText: removedLocalText } =
         text2: 'Failed to clear wishlist',
       });
     }
-  };
+  }, [isLoggedIn, wishlistItems]);
 
-  // Context value
+  // Context value - Fix: Remove duplicate clearWishlist
   const value = useMemo<WishlistContextValue>(
     () => ({
       wishlistItems,
@@ -554,7 +559,18 @@ const { translatedText: removedLocalText } =
       isLoading,
       error,
     }),
-    [wishlistItems, wishlistIds, isWishlisted, isLoading, error],
+    [
+      wishlistItems,
+      wishlistIds,
+      isWishlisted,
+      addToWishlist,
+      removeFromWishlist,
+      toggleWishlist,
+      clearWishlist,
+      fetchWishlist,
+      isLoading,
+      error,
+    ],
   );
 
   return (
