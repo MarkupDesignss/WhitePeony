@@ -119,11 +119,12 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const [zoomVisible, setZoomVisible] = useState(false);
   const [zoomIndex, setZoomIndex] = useState(0);
   const { translatedText: noReviewText } = useAutoTranslate('No Review Found');
-  const { translatedText: addedToCartText } =
-  useAutoTranslate('Added to cart successfully!');
-const { translatedText: somethingWrongText } =
-  useAutoTranslate('Something went wrong!');
-
+  const { translatedText: addedToCartText } = useAutoTranslate(
+    'Added to cart successfully!',
+  );
+  const { translatedText: somethingWrongText } = useAutoTranslate(
+    'Something went wrong!',
+  );
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
@@ -481,34 +482,44 @@ const { translatedText: somethingWrongText } =
   const handleCartAction = useCallback(async () => {
     if (!productData || !selectedVariant) return;
 
+    // If already in cart → go to Cart tab
     if (isInCart) {
-      navigation.navigate('CheckoutScreen');
+      navigation.navigate('BottomTabScreen', {
+        screen: 'Cart',
+      });
       return;
     }
 
     try {
       await addToCart(productData.id, selectedVariant.id);
-      // setIsInCart will be updated automatically via checkSelectedVariantInCart
+
       Toast.show({
         type: 'success',
         text1: addedToCartText || 'Added to cart successfully!',
       });
+
     } catch (error: any) {
-      if (error.status === 401) {
+      if (error?.status === 401) {
         setModalVisible(true);
       } else {
         Toast.show({
           type: 'error',
-          text1: error?.message
-          ? error.message
-          : somethingWrongText || 'Something went wrong!',
+          text1:
+            error?.message ||
+            somethingWrongText ||
+            'Something went wrong!',
         });
       }
     }
-  }, [productData, isInCart, selectedVariant, addToCart, navigation, addedToCartText,
-    somethingWrongText
+  }, [
+    productData,
+    selectedVariant,
+    isInCart,
+    addToCart,
+    navigation,
+    addedToCartText,
+    somethingWrongText,
   ]);
-
   const checkoutAction = useCallback(async () => {
     if (!productData || !selectedVariant) return;
 
@@ -532,13 +543,20 @@ const { translatedText: somethingWrongText } =
         Toast.show({
           type: 'error',
           text1: error?.message
-          ? error.message
-          : somethingWrongText || 'Something went wrong!',
+            ? error.message
+            : somethingWrongText || 'Something went wrong!',
         });
       }
     }
-  }, [productData, isInCart, selectedVariant, addToCart, navigation , addedToCartText,
-    somethingWrongText]);
+  }, [
+    productData,
+    isInCart,
+    selectedVariant,
+    addToCart,
+    navigation,
+    addedToCartText,
+    somethingWrongText,
+  ]);
 
   const openZoom = useCallback((index: number) => {
     setZoomIndex(index);
@@ -567,7 +585,6 @@ const { translatedText: somethingWrongText } =
             text={isInCart ? 'Go to Cart' : 'Add to Bag'}
             style={styles.cartButtonText}
           />
-
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -765,7 +782,10 @@ const { translatedText: somethingWrongText } =
             </>
           ) : (
             <View style={styles.noImageContainer}>
-              <TransletText text="No images available" style={styles.noImageText} />
+              <TransletText
+                text="No images available"
+                style={styles.noImageText}
+              />
             </View>
           )}
         </View>
@@ -773,7 +793,9 @@ const { translatedText: somethingWrongText } =
         {/* Product Info */}
         <View style={styles.productInfo}>
           <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={2}>{productData.name || ''}</Text>
+            <Text style={styles.title} numberOfLines={2}>
+              {productData.name || ''}
+            </Text>
             <Text style={styles.rating}>
               ★{' '}
               <Text style={styles.ratingCount}>
@@ -830,7 +852,6 @@ const { translatedText: somethingWrongText } =
                           isSelected && styles.variantTextSelected,
                         ]}
                       />
-
                     </TouchableOpacity>
                   );
                 })}
@@ -871,11 +892,13 @@ const { translatedText: somethingWrongText } =
             )}
           </View>
 
-
           {/* Recommended Products */}
           {relatedProducts.length > 0 && (
             <View style={styles.recommendedSection}>
-              <TransletText text="Recommended For You" style={styles.sectionTitle} />
+              <TransletText
+                text="Recommended For You"
+                style={styles.sectionTitle}
+              />
               <FlatList
                 data={relatedProducts}
                 keyExtractor={item => `recommended_${item.id}`}
@@ -927,12 +950,8 @@ const { translatedText: somethingWrongText } =
                 </View>
                 <Text style={styles.reviewsCount}>
                   {reviews.length}{' '}
-                  <TransletText
-                    text="Reviews"
-                    style={styles.reviewsCount}
-                  />
+                  <TransletText text="Reviews" style={styles.reviewsCount} />
                 </Text>
-
               </View>
 
               <View style={styles.reviewsRight}>
@@ -964,7 +983,6 @@ const { translatedText: somethingWrongText } =
                 style={styles.showReviewsButtonText}
               />
             </TouchableOpacity>
-
           </View>
         </View>
       </ScrollView>
@@ -1025,7 +1043,10 @@ const { translatedText: somethingWrongText } =
               renderItem={({ item }) => (
                 <View style={styles.reviewItem}>
                   <View style={styles.reviewHeader}>
-                    <TransletText text={item.customer?.name || 'Anonymous'} style={styles.reviewerName} />
+                    <TransletText
+                      text={item.customer?.name || 'Anonymous'}
+                      style={styles.reviewerName}
+                    />
                     <Text style={styles.reviewDate}>
                       {formatDate(item.updated_at)}
                     </Text>
