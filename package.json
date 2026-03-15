@@ -27,6 +27,7 @@
     "@reduxjs/toolkit": "^2.11.2",
     "@rneui/base": "^0.0.0-edge.2",
     "@rneui/themed": "^0.0.0-edge.2",
+    "@stripe/stripe-react-native": "^0.59.2",
     "axios": "^1.6.1",
     "formik": "^2.4.6",
     "i": "^0.3.7",

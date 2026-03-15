@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { CommonLoader } from './CommonLoader/commonLoader';
 import { UserService } from '../service/ApiService';
-import { HttpStatusCode } from 'axios';
+
 import Toast from 'react-native-toast-message';
 import { UserData, UserDataContext } from '../context/userDataContext';
 import { useCart } from '../context/CartContext';

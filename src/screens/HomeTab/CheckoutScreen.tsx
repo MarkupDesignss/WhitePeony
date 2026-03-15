@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,40 +7,29 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
-  Dimensions,
   Alert,
-  Platform,
-  StatusBar,
   Modal,
   TouchableWithoutFeedback,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-
+import { useStripe } from '@stripe/stripe-react-native';
 import { Image_url, UserService } from '../../service/ApiService';
 import { HttpStatusCode } from 'axios';
 import { CommonLoader } from '../../components/CommonLoader/commonLoader';
 import Toast from 'react-native-toast-message';
 import AddressModal from '../../components/AddressModal';
 import { useFocusEffect } from '@react-navigation/native';
-import {
-  heightPercentageToDP,
-  widthPercentageToDP,
-} from '../../constant/dimentions';
 import { useCart } from '../../context/CartContext';
-import { WebView } from 'react-native-webview';
-import { Colors, Images } from '../../constant';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import { convertAndFormatPrice } from '../../utils/currencyUtils';
-import { calculateCheckout } from '../../utils/checkoutCalculator';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 import TransletText from '../../components/TransletText';
 import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 
+// Types
 type DisplayWishlistItem = {
   id: string;
   wishlistItemId: string;
@@ -78,6 +67,7 @@ type Address = {
 };
 
 const CheckoutScreen = ({ navigation }: { navigation: any }) => {
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const selectedCurrency = useAppSelector(
     state => state.currency.selectedCurrency,
   );
@@ -87,16 +77,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     refetchOnReconnect: true,
   });
 
-  const displayPrice = (priceEUR: any): string => {
-    return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
+  const displayPrice = (price: any): string => {
+    return convertAndFormatPrice(price, selectedCurrency, rates);
   };
 
-  const { cart, removeFromCart } = useCart();
+  const { cart, removeFromCart, clearCart } = useCart();
   const [modalAddress, setModalAddress] = useState(false);
   const [modalAddressADD, setmodalAddressADD] = useState(false);
   const [items, setItems] = useState<DisplayWishlistItem[]>([]);
-  const [showWebView, setShowWebView] = useState(false);
-  const [paymentUrl, setPaymentUrl] = useState('');
   const { showLoader, hideLoader } = CommonLoader();
   const [cartData, setApiCartData] = useState<any>({
     items: [],
@@ -118,19 +106,17 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   );
   const [isFetchingShipping, setIsFetchingShipping] = useState(false);
 
+  // Payment state
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const { translatedText: selectShippingText } = useAutoTranslate(
     'Please select a shipping method',
   );
   const { translatedText: selectAddressText } = useAutoTranslate(
     'Please select address',
   );
-  const { translatedText: cancelPaymentTitle } =
-    useAutoTranslate('Cancel Payment?');
-  const { translatedText: cancelPaymentMessage } = useAutoTranslate(
-    'Are you sure you want to cancel this payment?',
-  );
-  const { translatedText: noText } = useAutoTranslate('No');
-  const { translatedText: yesText } = useAutoTranslate('Yes');
   const { translatedText: stockErrorTitle } =
     useAutoTranslate('Insufficient Stock');
   const { translatedText: stockErrorMessage } = useAutoTranslate(
@@ -158,9 +144,82 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       const selectedShipping = shippingOptions.find(
         s => Number(s.id) === Number(selectedShippingId),
       );
-      return selectedShipping?.cost || 0;
+      return Number(selectedShipping?.cost) || 0;
     }
     return 0;
+  };
+
+  // 🟢 Calculate final amount correctly
+  const calculateFinalAmount = (): {
+    subtotal: number;
+    savings: number;
+    couponDiscount: number;
+    shippingCost: number;
+    vatAmount: number;
+    grandTotal: number;
+  } => {
+    if (!cartData || !cartData.items?.length) {
+      return {
+        subtotal: 0,
+        savings: 0,
+        couponDiscount: 0,
+        shippingCost: 0,
+        vatAmount: 0,
+        grandTotal: 0,
+      };
+    }
+
+    try {
+      const subtotal = Number(cartData?.subtotal_amount || 0);
+      const savings = Number(cartData?.total_savings || 0);
+      const couponDiscount = Number(discountAmount || 0);
+      const shippingCost = Number(getShippingCost() || 0);
+      const vatPercentage = Number(cartData.vat_percentage || 0);
+
+      console.log('💰 Raw values:', {
+        subtotal,
+        savings,
+        couponDiscount,
+        shippingCost,
+        vatPercentage,
+      });
+
+      const priceAfterDiscounts = subtotal - savings - couponDiscount;
+      const priceWithShipping = priceAfterDiscounts + shippingCost;
+
+      const vatAmount = vatPercentage > 0
+        ? (priceAfterDiscounts * vatPercentage) / 100
+        : 0;
+
+      const grandTotal = priceWithShipping + vatAmount;
+      const roundedGrandTotal = Math.round(grandTotal * 100) / 100;
+
+      console.log('💰 Calculated:', {
+        priceAfterDiscounts,
+        priceWithShipping,
+        vatAmount,
+        grandTotal: roundedGrandTotal,
+      });
+
+      return {
+        subtotal: Math.round(subtotal * 100) / 100,
+        savings: Math.round(savings * 100) / 100,
+        couponDiscount: Math.round(couponDiscount * 100) / 100,
+        shippingCost: Math.round(shippingCost * 100) / 100,
+        vatAmount: Math.round(vatAmount * 100) / 100,
+        grandTotal: roundedGrandTotal,
+      };
+    } catch (error) {
+      console.log('Error calculating final amount:', error);
+      return {
+        subtotal: 0,
+        savings: 0,
+        couponDiscount: 0,
+        shippingCost: 0,
+        vatAmount: 0,
+        grandTotal: 0,
+      };
+    }
   };
 
   const recalculateCoupon = () => {
@@ -215,10 +274,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     fetchInitialData();
   }, []);
 
-  const moveToWishlist = (itemId: string | number | undefined) => {
-    Alert.alert('✨', 'Item moved to wishlist');
-  };
-
   const UpdateCart = async (item: CartItem, change: number) => {
     showLoader();
     try {
@@ -250,7 +305,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         });
         await GetCartDetails();
       } else {
-        // Check for stock error in response
         if (res?.data?.message?.toLowerCase().includes('stock')) {
           Toast.show({
             type: 'error',
@@ -315,8 +369,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const renderShipmentItem = ({ item }: { item: CartItem }) => {
-    const actualPriceNum = parseFloat(item.actual_price || '0');
-    const totalPriceNum = parseFloat(item.total_price || '0');
+    const actualPriceNum = parseFloat(item.actual_price?.toString() || '0');
+    const totalPriceNum = parseFloat(item.total_price?.toString() || '0');
     const hasDiscount = totalPriceNum > actualPriceNum;
     const hasStockIssue =
       item.available_quantity !== undefined &&
@@ -355,13 +409,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             {item?.unit && (
               <TransletText text={item.unit} style={styles.shipmentWeight} />
             )}
-
-            {/* <TouchableOpacity
-              onPress={() => moveToWishlist(item.id)}
-              style={styles.moveToWishlistBtn}
-            >
-              <Text style={styles.moveToWishlistText}>❤️ Move to wishlist</Text>
-            </TouchableOpacity> */}
 
             <View style={styles.priceContainer}>
               <Text style={styles.shipmentActualPrice}>
@@ -462,8 +509,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const SetPromo = () => {
     if (!selectedPromoCode?.code) return;
 
-    const total =
-      Number(cartData?.discounted_total) || Number(cartData?.total_amount) || 0;
+    const total = Number(cartData?.discounted_total) || Number(cartData?.total_amount) || 0;
     const discountType = String(selectedPromoCode.type).toLowerCase();
     const discountValue = parseFloat(selectedPromoCode.discount);
     const maxDiscount = parseFloat(selectedPromoCode.max_discount) || Infinity;
@@ -526,64 +572,47 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       setLoadingCart(true);
       const res = await UserService.viewCart();
 
-      // Get VAT percentage from API response
-      const vatPercentage = res?.data?.vat_percentage || 0;
+      const vatPercentage = Number(res?.data?.vat_percentage || 0);
 
       if (res && res.data && res.data.cart?.items?.length > 0) {
         const cartDataFromResponse = res.data.cart;
 
         const processedItems = (cartDataFromResponse?.items || []).map(item => {
           const variant = item.variants?.[0] || {};
-          let actualPrice =
-            variant.actual_price ||
-            item.actual_price ||
-            variant.price ||
-            item.total_price;
-          let displayPrice = variant.price || item.total_price;
-
-          if (variant.percentage && parseFloat(variant.percentage) > 0) {
-            const discountPercent = parseFloat(variant.percentage);
-            actualPrice = variant.price;
-            displayPrice =
-              (parseFloat(actualPrice) * 100) / (100 - discountPercent);
-          }
 
           return {
             ...item,
-            actual_price: actualPrice,
-            total_price: displayPrice,
+            actual_price: Number(item.actual_price || item.total_price || 0),
+            total_price: Number(item.total_price || 0),
             unit: variant.unit || item.unit,
             variant_id: variant.id || item.variant_id,
-            available_quantity: variant.quantity || item.quantity,
+            available_quantity: Number(variant.quantity || item.quantity || 0),
+            quantity: Number(item.quantity || 1),
           };
         });
 
-        const round = (n: number) => Math.round(n * 100) / 100;
+        const subtotal = processedItems.reduce((sum, item) => {
+          return sum + (Number(item.actual_price || 0) * Number(item.quantity || 1));
+        }, 0);
 
-        const discountedTotal = round(
-          processedItems.reduce((sum, item) => {
-            const price =
-              Number(item.actual_price || 0) * Number(item.quantity || 1);
-            return sum + price;
-          }, 0),
-        );
+        const originalTotal = processedItems.reduce((sum, item) => {
+          return sum + (Number(item.total_price || 0) * Number(item.quantity || 1));
+        }, 0);
 
-        const originalTotal = round(
-          processedItems.reduce((sum, item) => {
-            const price =
-              Number(item.total_price || 0) * Number(item.quantity || 1);
-            return sum + price;
-          }, 0),
-        );
+        const totalSavings = originalTotal - subtotal;
 
-        const totalSavings = originalTotal - discountedTotal;
+        console.log('🛒 Cart Totals:', {
+          subtotal: Math.round(subtotal * 100) / 100,
+          originalTotal: Math.round(originalTotal * 100) / 100,
+          savings: Math.round(totalSavings * 100) / 100,
+        });
 
         const processedCartData = {
           items: processedItems,
-          total_amount: discountedTotal,
-          subtotal_amount: originalTotal,
-          discounted_total: discountedTotal,
-          total_savings: totalSavings,
+          total_amount: Math.round(subtotal * 100) / 100,
+          subtotal_amount: Math.round(originalTotal * 100) / 100,
+          discounted_total: Math.round(subtotal * 100) / 100,
+          total_savings: Math.round(totalSavings * 100) / 100,
           id: cartDataFromResponse?.id || null,
           vat_percentage: vatPercentage,
         };
@@ -616,9 +645,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     try {
       setIsFetchingPromo(true);
       const res = await UserService.GetPromo_Code();
-      const data = Array.isArray(res?.data)
-        ? res.data
-        : res?.data?.data ?? res?.data;
+      const data = Array.isArray(res?.data) ? res.data : res?.data?.data ?? res?.data;
       setPromoOptions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log('GetPromo error', err);
@@ -628,25 +655,102 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
+  // 🟢 FIXED: Getshiping function - handles all response formats
   const Getshiping = async () => {
     try {
       setIsFetchingShipping(true);
+      console.log('📦 Fetching shipping methods...');
+
       const res = await UserService.Shiping();
+      console.log('📦 Shipping API Full Response:', JSON.stringify(res.data, null, 2));
+
+      let options = [];
+
       if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
-        const data = Array.isArray(res.data)
-          ? res.data
-          : res.data?.data ?? res.data?.error ?? res.data;
-        const options = Array.isArray(data) ? data : [];
-        setShippingOptions(options);
-        const firstActive =
-          options.find((o: any) => o.is_active === '1' || o.is_active === 1) ||
-          options[0];
-        if (firstActive) setSelectedShippingId(Number(firstActive.id));
-        return options;
+        // Case 1: Direct array
+        if (Array.isArray(res.data)) {
+          console.log('📦 Case 1: Direct array');
+          options = res.data;
+        }
+        // Case 2: { data: [...] }
+        else if (res.data?.data && Array.isArray(res.data.data)) {
+          console.log('📦 Case 2: data.data array');
+          options = res.data.data;
+        }
+        // Case 3: { shipping: [...] }
+        else if (res.data?.shipping && Array.isArray(res.data.shipping)) {
+          console.log('📦 Case 3: data.shipping array');
+          options = res.data.shipping;
+        }
+        // Case 4: { result: [...] } or { items: [...] }
+        else if (res.data?.result && Array.isArray(res.data.result)) {
+          console.log('📦 Case 4: data.result array');
+          options = res.data.result;
+        }
+        else if (res.data?.items && Array.isArray(res.data.items)) {
+          console.log('📦 Case 5: data.items array');
+          options = res.data.items;
+        }
+        // Case 5: Object with numeric keys
+        else if (typeof res.data === 'object' && res.data !== null) {
+          console.log('📦 Case 6: Checking object for array-like structure');
+          for (let key in res.data) {
+            if (Array.isArray(res.data[key])) {
+              console.log(`📦 Found array in key: ${key}`);
+              options = res.data[key];
+              break;
+            }
+          }
+        }
+
+        console.log('📦 Raw options before processing:', options);
+
+        if (options.length > 0) {
+          const processedOptions = options.map((opt, index) => {
+            const id = Number(opt.id || opt.shipping_id || opt.method_id || opt.ID || index + 1);
+            const type = opt.type || opt.name || opt.method_name || opt.title || opt.shipping_method || `Shipping Method ${id}`;
+            const cost = Number(opt.cost || opt.price || opt.amount || opt.rate || opt.shipping_cost || 0);
+            const estimated_time = opt.estimated_time || opt.delivery_time || opt.time || opt.duration || '3-5 business days';
+            const is_active = opt.is_active === '1' || opt.is_active === 1 || opt.is_active === true || opt.status === 'active';
+
+            return {
+              id,
+              type,
+              cost,
+              estimated_time,
+              is_active,
+              original: opt
+            };
+          });
+
+          console.log('📦 Processed shipping options:', processedOptions);
+          setShippingOptions(processedOptions);
+
+          const firstActive = processedOptions.find(o => o.is_active) || processedOptions[0];
+          if (firstActive) {
+            console.log('📦 Auto-selecting shipping:', firstActive);
+            setSelectedShippingId(firstActive.id);
+          }
+
+          return processedOptions;
+        } else {
+          console.log('📦 No shipping options found in response');
+          Toast.show({
+            type: 'info',
+            text1: 'No shipping methods available',
+          });
+          return [];
+        }
       }
       return [];
-    } catch (err) {
-      console.log('Getshiping error', err);
+    } catch (err: any) {
+      console.log('❌ Getshiping error:', err);
+      console.log('❌ Error response:', err?.response?.data);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to load shipping methods',
+        text2: err?.response?.data?.message || err.message,
+      });
       return [];
     } finally {
       setIsFetchingShipping(false);
@@ -689,38 +793,106 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
-  const updateQuantitiesToAvailable = async () => {
-    showLoader();
+  // 🟢 FIXED: Initialize Payment Sheet with correct amount
+  const initializePaymentSheet = async () => {
     try {
-      const itemsToUpdate = stockErrors.filter(
-        item =>
-          item.available_quantity > 0 &&
-          item.quantity > item.available_quantity,
-      );
+      setIsProcessing(true);
 
-      for (const item of itemsToUpdate) {
-        const payload = {
-          product_id: item.product_id,
-          quantity: item.available_quantity,
-          variant_id: item.variant_id || null,
-        };
-        await UserService.UpdateCart(payload);
+      const breakdown = calculateFinalAmount();
+      const amountToPay = breakdown.grandTotal;
+
+      console.log('========== 💳 STRIPE PAYMENT ==========');
+      console.log('Amount to Pay (Bill Summary):', amountToPay, selectedCurrency);
+      console.log('Amount in cents:', Math.round(amountToPay * 100));
+      console.log('===========================================');
+
+      const payload = {
+        cart_id: cartid,
+        address_id: selectedAddress?.id,
+        shipping_id: selectedShippingId,
+        ...(appliedPromo && { promo_code: appliedPromo.code }),
+        amount: Math.round(amountToPay * 100),
+        currency: selectedCurrency,
+      };
+
+      console.log('📦 Payload to backend:', JSON.stringify(payload, null, 2));
+
+      const response = await UserService.Placeorder(payload);
+      console.log('✅ Backend Response:', response.data);
+
+      if (!response?.data?.client_secret) {
+        throw new Error('No client secret received');
       }
 
-      Toast.show({
-        type: 'success',
-        text1: 'Cart updated to available quantities',
+      setPaymentIntentId(response.data.payment_intent_id);
+      setOrderId(response.data.order_id);
+
+      const { error } = await initPaymentSheet({
+        merchantDisplayName: 'White Peony',
+        paymentIntentClientSecret: response.data.client_secret,
+        defaultBillingDetails: {
+          name: selectedAddress?.name || '',
+          email: selectedAddress?.email || '',
+          phone: selectedAddress?.phone || '',
+        },
+        testEnv: __DEV__,
+        allowsDelayedPaymentMethods: true,
+        returnURL: 'whitepeony://stripe-redirect',
       });
 
-      setShowStockErrorModal(false);
-      await GetCartDetails();
-    } catch (error) {
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error: any) {
+      console.log('❌ Payment initialization error:', error);
       Toast.show({
         type: 'error',
-        text1: 'Failed to update cart',
+        text1: 'Payment Failed',
+        text2: error?.message,
       });
+      return { success: false };
     } finally {
-      hideLoader();
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePayment = async () => {
+    try {
+      setIsProcessing(true);
+      const { error } = await presentPaymentSheet();
+
+      if (error) {
+        if (error.code === 'Canceled') {
+          Toast.show({ type: 'info', text1: 'Payment cancelled' });
+        } else {
+          Toast.show({ type: 'error', text1: 'Payment Failed', text2: error.message });
+        }
+        return;
+      }
+
+      await clearCart();
+      await GetCartDetails();
+
+      const breakdown = calculateFinalAmount();
+
+      navigation.reset({
+        index: 0,
+        routes: [{
+          name: 'PaymentSuccess',
+          params: {
+            orderId,
+            paymentIntentId,
+            amount: breakdown.grandTotal,
+            currency: selectedCurrency,
+          },
+        }],
+      });
+
+    } catch (error: any) {
+      console.log('Payment error:', error);
+      Toast.show({ type: 'error', text1: 'Payment Failed' });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -740,7 +912,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
 
-    // Check for stock issues before placing order
     const stockIssues = cartData.items.filter(
       (item: CartItem) =>
         item.available_quantity !== undefined &&
@@ -752,128 +923,32 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
 
-    const shippingCost = getShippingCost();
-    const breakdown = calculateCheckout(
-      cartData?.subtotal_amount || 0,
-      cartData?.total_savings || 0,
-      discountAmount || 0,
-      shippingCost,
-      selectedCurrency,
-      rates,
+    const breakdown = calculateFinalAmount();
+    const amountToPay = breakdown.grandTotal;
+
+    Alert.alert(
+      'Confirm Payment',
+      `Total amount: ${displayPrice(amountToPay)}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Pay Now',
+          onPress: async () => {
+            const result = await initializePaymentSheet();
+            if (result.success) {
+              await handlePayment();
+            }
+          },
+        },
+      ],
     );
-
-    // Default currency is CZK, show conversion notice only when currency is not CZK
-    if (selectedCurrency !== 'CZK') {
-      Alert.alert(
-        'Currency Conversion',
-        `Your order: ${breakdown.displayAmountToPay}\n\n` +
-          `Payment will be processed in CZK: ${displayPrice(
-            breakdown.grandTotalCZK,
-          )}\n\n` +
-          `Exchange rate: 1 ${selectedCurrency} = ${(
-            1 / (rates?.[selectedCurrency] || 1)
-          ).toFixed(2)} CZK`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Continue', onPress: () => proceedWithPayment(breakdown) },
-        ],
-      );
-    } else {
-      await proceedWithPayment(breakdown);
-    }
-  };
-
-  const proceedWithPayment = async (breakdown: any) => {
-    const payload = {
-      cart_id: cartid,
-      address_id: selectedAddress?.id,
-      shipping_id: selectedShippingId || 1,
-      ...(appliedPromo && { promo_code: appliedPromo.code }),
-      currency: selectedCurrency,
-      grand_total: breakdown.amountToPay,
-      amount_to_pay: breakdown.amountToPay,
-    };
-
-    try {
-      showLoader();
-      const res = await UserService.Placeorder(payload);
-
-      if (
-        res &&
-        res.data &&
-        (res.status === HttpStatusCode.Ok || res.status === 200)
-      ) {
-        if (res.data.payment_url) {
-          setPaymentUrl(res.data.payment_url);
-          setShowWebView(true);
-        } else {
-          Toast.show({ type: 'error', text1: 'No payment URL received' });
-        }
-      }
-    } catch (err: any) {
-      // Handle insufficient stock error specifically
-      const errorMessage = err?.response?.data?.message || '';
-      const errorData = err?.response?.data;
-
-      if (
-        errorMessage.toLowerCase().includes('stock') ||
-        errorMessage.toLowerCase().includes('insufficient') ||
-        errorData?.error?.toLowerCase().includes('stock')
-      ) {
-        // Parse stock errors from response if available
-        if (errorData?.errors && Array.isArray(errorData.errors)) {
-          handleStockErrors(errorData.errors);
-        } else {
-          // Show stock error modal with generic message
-          Alert.alert(
-            stockErrorTitle,
-            stockErrorMessage,
-            [
-              {
-                text: updateCartText,
-                onPress: () => GetCartDetails(), // Refresh cart to get updated quantities
-              },
-            ],
-            { cancelable: false },
-          );
-        }
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Payment failed',
-          text2: errorMessage || 'Please try again',
-        });
-      }
-    } finally {
-      hideLoader();
-    }
   };
 
   const renderBillDetails = () => {
     if (!cartData || !cartData.items?.length) return null;
 
-    const shippingCost = getShippingCost();
-    const breakdown = calculateCheckout(
-      cartData?.subtotal_amount || 0,
-      cartData?.total_savings || 0,
-      discountAmount || 0,
-      shippingCost,
-      selectedCurrency,
-      rates,
-    );
-
-    const vatPercentage = cartData.vat_percentage || 0;
-
-    const subtotal = Number(cartData?.subtotal_amount || 0);
-    const savings = Number(cartData?.total_savings || 0);
-    const couponDiscount = Number(discountAmount || 0);
-    const deliveryCost = Number(shippingCost || 0);
-
-    const subtotalAfterDiscounts = subtotal - savings - couponDiscount;
-    const taxableAmount = subtotalAfterDiscounts + deliveryCost;
-    const vatAmount =
-      vatPercentage > 0 ? (taxableAmount * vatPercentage) / 100 : 0;
-    const grandTotalWithVAT = taxableAmount + vatAmount;
+    const breakdown = calculateFinalAmount();
+    const vatPercentage = Number(cartData.vat_percentage || 0);
 
     return (
       <View style={styles.billSection}>
@@ -883,21 +958,23 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           <Text style={styles.billLabel}>
             Subtotal ({cartData.items.length} items)
           </Text>
-          <Text style={styles.billValue}>{displayPrice(subtotal)}</Text>
+          <Text style={styles.billValue}>
+            {displayPrice(cartData.subtotal_amount)}
+          </Text>
         </View>
 
-        {savings > 0 && (
+        {breakdown.savings > 0 && (
           <View style={styles.billRow}>
             <Text style={[styles.billLabel, styles.savingsLabel]}>
               Total Savings
             </Text>
             <Text style={[styles.billValue, styles.savingsValue]}>
-              -{displayPrice(savings)}
+              -{displayPrice(breakdown.savings)}
             </Text>
           </View>
         )}
 
-        {appliedPromo && discountAmount > 0 && (
+        {appliedPromo && breakdown.couponDiscount > 0 && (
           <View style={styles.billRow}>
             <View style={styles.couponRow}>
               <Text style={[styles.billLabel, styles.couponLabel]}>
@@ -908,7 +985,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               </TouchableOpacity>
             </View>
             <Text style={[styles.billValue, styles.couponValue]}>
-              -{displayPrice(discountAmount)}
+              -{displayPrice(breakdown.couponDiscount)}
             </Text>
           </View>
         )}
@@ -916,24 +993,19 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         <View style={styles.billRow}>
           <Text style={styles.billLabel}>Delivery Charges</Text>
           <Text style={[styles.billValue, styles.deliveryValue]}>
-            {deliveryCost > 0 ? displayPrice(deliveryCost) : 'Free'}
+            {breakdown.shippingCost > 0
+              ? displayPrice(breakdown.shippingCost)
+              : 'Free'}
           </Text>
         </View>
 
         {vatPercentage > 0 && (
-          <>
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Taxable Amount</Text>
-              <Text style={styles.billValue}>
-                {displayPrice(taxableAmount)}
-              </Text>
-            </View>
-
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>VAT ({vatPercentage}%)</Text>
-              <Text style={styles.billValue}>{displayPrice(vatAmount)}</Text>
-            </View>
-          </>
+          <View style={styles.billRow}>
+            <Text style={styles.billLabel}>VAT ({vatPercentage}%)</Text>
+            <Text style={styles.billValue}>
+              {displayPrice(breakdown.vatAmount)}
+            </Text>
+          </View>
         )}
 
         <View style={styles.divider} />
@@ -941,14 +1013,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         <View style={styles.billRow}>
           <Text style={styles.grandTotalLabel}>Grand Total</Text>
           <Text style={styles.grandTotalValue}>
-            {displayPrice(grandTotalWithVAT)}
+            {displayPrice(breakdown.grandTotal)}
           </Text>
         </View>
 
         <View style={[styles.billRow, styles.amountToPayRow]}>
           <Text style={styles.amountToPayLabel}>Amount to Pay</Text>
           <Text style={styles.amountToPayValue}>
-            {displayPrice(grandTotalWithVAT)}
+            {displayPrice(breakdown.grandTotal)} {selectedCurrency}
           </Text>
         </View>
       </View>
@@ -959,24 +1031,17 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
-
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Checkout</Text>
             {cartData?.items?.length > 0 && (
               <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>
-                  {cartData.items.length}
-                </Text>
+                <Text style={styles.cartBadgeText}>{cartData.items.length}</Text>
               </View>
             )}
           </View>
-
           <View style={styles.headerRight} />
         </View>
 
@@ -990,25 +1055,16 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={['#AEB254']}
-                tintColor="#AEB254"
-              />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#AEB254']} />
             }
           >
             <View style={styles.shipmentSection}>
               <Text style={styles.sectionTitle}>
-                Shipment ({cartData.items.length}{' '}
-                {cartData.items.length === 1 ? 'item' : 'items'})
+                Shipment ({cartData.items.length} {cartData.items.length === 1 ? 'item' : 'items'})
               </Text>
-
               <FlatList
                 data={cartData.items}
-                keyExtractor={(item, index) =>
-                  (item.id ?? `${item.product_id}-${index}`).toString()
-                }
+                keyExtractor={(item, index) => (item.id ?? `${item.product_id}-${index}`).toString()}
                 renderItem={renderShipmentItem}
                 scrollEnabled={false}
               />
@@ -1017,7 +1073,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             {items.length > 0 && (
               <View style={styles.suggestionsSection}>
                 <Text style={styles.sectionTitle}>You Might Also Like</Text>
-
                 <FlatList
                   data={items}
                   horizontal
@@ -1027,17 +1082,44 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   contentContainerStyle={styles.suggestionsList}
                   ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
                 />
-
                 {items.length >= 3 && (
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('WishlistScreen')}
-                    style={styles.seeAllButton}
-                  >
+                  <TouchableOpacity onPress={() => navigation.navigate('WishlistScreen')} style={styles.seeAllButton}>
                     <Text style={styles.seeAllText}>See all products →</Text>
                   </TouchableOpacity>
                 )}
               </View>
             )}
+
+            {/* Shipping Method Card */}
+            <TouchableOpacity
+              style={styles.shippingSelectorCard}
+              onPress={async () => {
+                console.log('📦 Shipping card pressed');
+                setIsFetchingShipping(true);
+                const opts = await Getshiping();
+                if (opts && opts.length > 0) {
+                  setShippingModalVisible(true);
+                }
+                setIsFetchingShipping(false);
+              }}
+            >
+              <View style={styles.shippingIconContainer}>
+                <Text style={styles.shippingIcon}>🚚</Text>
+                <View style={styles.shippingDetails}>
+                  <Text style={styles.shippingTitle}>Shipping Method</Text>
+                  {isFetchingShipping ? (
+                    <ActivityIndicator size="small" color="#AEB254" />
+                  ) : (
+                    <Text style={styles.shippingSelected}>
+                      {selectedShippingId
+                        ? (shippingOptions.find(s => Number(s.id) === Number(selectedShippingId))?.type || 'Select shipping')
+                        : 'Select shipping method'}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <Text style={styles.changeShipping}>Change →</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.couponButton}
@@ -1050,9 +1132,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               <View style={styles.couponButtonContent}>
                 <Text style={styles.couponButtonIcon}>🏷️</Text>
                 <Text style={styles.couponButtonText}>
-                  {selectedPromoCode?.code?.trim()
-                    ? selectedPromoCode.code
-                    : 'Apply Coupon'}
+                  {selectedPromoCode?.code?.trim() ? selectedPromoCode.code : 'Apply Coupon'}
                 </Text>
               </View>
               <Text style={styles.couponButtonArrow}>→</Text>
@@ -1060,77 +1140,56 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
             {renderBillDetails()}
 
+            {/* Address Card */}
             <View style={styles.deliveryAddressCard}>
               <View style={styles.addressIconContainer}>
                 <Text style={styles.addressIcon}>🏠</Text>
                 <View style={styles.addressDetails}>
                   <Text style={styles.deliveryAddressTitle}>
-                    {selectedAddress?.address_type
-                      ? `Deliver to ${selectedAddress.address_type}`
-                      : 'Delivery Address'}
+                    {selectedAddress?.address_type ? `Deliver to ${selectedAddress.address_type}` : 'Delivery Address'}
                   </Text>
                   <Text style={styles.deliveryAddress} numberOfLines={2}>
                     {selectedAddress
-                      ? `${selectedAddress.name}, ${
-                          selectedAddress.full_address
-                        }${
-                          selectedAddress.city
-                            ? `, ${selectedAddress.city}`
-                            : ''
-                        }${
-                          selectedAddress.postal_code
-                            ? `, ${selectedAddress.postal_code}`
-                            : ''
-                        }${
-                          selectedAddress.phone
-                            ? ` • ${selectedAddress.phone}`
-                            : ''
-                        }`
+                      ? `${selectedAddress.name}, ${selectedAddress.full_address}${selectedAddress.city ? `, ${selectedAddress.city}` : ''
+                      }${selectedAddress.postal_code ? `, ${selectedAddress.postal_code}` : ''}${selectedAddress.phone ? ` • ${selectedAddress.phone}` : ''
+                      }`
                       : 'No address selected'}
                   </Text>
                 </View>
               </View>
-
-              <TouchableOpacity
-                onPress={async () => {
-                  const opts = await Getshiping();
-                  if (opts && opts.length) {
-                    setShippingModalVisible(true);
-                  }
-                }}
-              >
-                <Text style={styles.changeAddress}>
-                  {selectedAddress ? 'Change' : 'Select'} →
-                </Text>
+              <TouchableOpacity onPress={() => setModalAddress(true)}>
+                <Text style={styles.changeAddress}>{selectedAddress ? 'Change' : 'Select Address'} →</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               style={[
                 styles.checkoutButton,
-                (!selectedAddress || !selectedShippingId) &&
-                  styles.checkoutButtonDisabled,
+                (!selectedAddress || !selectedShippingId || isProcessing) && styles.checkoutButtonDisabled,
               ]}
               activeOpacity={0.8}
               onPress={PlaceOrder}
-              disabled={!selectedAddress || !selectedShippingId}
+              disabled={!selectedAddress || !selectedShippingId || isProcessing}
             >
-              <Text style={styles.checkoutButtonIcon}>🛒</Text>
-              <Text style={styles.checkoutBtnText}>Proceed to Payment</Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={styles.checkoutButtonIcon}>💳</Text>
+                  <Text style={styles.checkoutBtnText}>
+                    Pay {displayPrice(calculateFinalAmount().grandTotal)}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           </ScrollView>
         ) : (
           <View style={styles.emptyCartContainer}>
             <Text style={styles.emptyCartIcon}>🛒</Text>
             <Text style={styles.emptyCartTitle}>Your cart is empty</Text>
-            <Text style={styles.emptyCartSubtitle}>
-              Looks like you haven't added anything yet
-            </Text>
-
+            <Text style={styles.emptyCartSubtitle}>Looks like you haven't added anything yet</Text>
             <TouchableOpacity
-              onPress={() =>
-                navigation.navigate('BottomTabScreen', { screen: 'Category' })
-              }
+              onPress={() => navigation.navigate('BottomTabScreen', { screen: 'Category' })}
               style={styles.shopNowButton}
             >
               <Text style={styles.shopNowText}>Continue Shopping →</Text>
@@ -1139,69 +1198,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         )}
       </View>
 
-      {/* Stock Error Modal */}
-      <Modal
-        visible={showStockErrorModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowStockErrorModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.stockErrorModalContent}>
-            <Text style={styles.stockErrorModalIcon}>⚠️</Text>
-            <Text style={styles.stockErrorModalTitle}>{stockErrorTitle}</Text>
-            <Text style={styles.stockErrorModalMessage}>
-              {stockErrorMessage}
-            </Text>
-
-            {stockErrors.map((error, index) => (
-              <View key={index} style={styles.stockErrorItem}>
-                <Text style={styles.stockErrorItemName}>
-                  {error.product_name || 'Product'}
-                </Text>
-                <Text style={styles.stockErrorItemDetail}>
-                  Requested: {error.quantity} | Available:{' '}
-                  {error.available_quantity || 0}
-                </Text>
-              </View>
-            ))}
-
-            <View style={styles.stockErrorModalButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.stockErrorButton,
-                  styles.stockErrorButtonSecondary,
-                ]}
-                onPress={() => setShowStockErrorModal(false)}
-              >
-                <Text style={styles.stockErrorButtonTextSecondary}>
-                  {updateCartText}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.stockErrorButton,
-                  styles.stockErrorButtonPrimary,
-                ]}
-                onPress={removeOutOfStockItems}
-              >
-                <Text style={styles.stockErrorButtonTextPrimary}>
-                  {removeItemsText}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.stockErrorCloseButton}
-              onPress={() => setShowStockErrorModal(false)}
-            >
-              <Text style={styles.stockErrorCloseText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
+      {/* Shipping Modal */}
       <Modal
         visible={shippingModalVisible}
         transparent
@@ -1209,35 +1206,36 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         onRequestClose={() => setShippingModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback
-            onPress={() => setShippingModalVisible(false)}
-          >
+          <TouchableWithoutFeedback onPress={() => setShippingModalVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
-
-            <Text style={styles.modalTitle}>Delivery Method</Text>
+            <Text style={styles.modalTitle}>Select Shipping Method</Text>
 
             {isFetchingShipping ? (
-              <ActivityIndicator
-                size="small"
-                color="#AEB254"
-                style={styles.modalLoader}
-              />
+              <ActivityIndicator size="large" color="#AEB254" style={styles.modalLoader} />
+            ) : shippingOptions.length === 0 ? (
+              <Text style={styles.noShippingText}>No shipping methods available</Text>
             ) : (
               <FlatList
                 data={shippingOptions}
-                keyExtractor={item => String(item.id)}
+                keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
                 renderItem={({ item }) => {
-                  const isSelected =
-                    Number(item.id) === Number(selectedShippingId);
+                  const isSelected = Number(item.id) === Number(selectedShippingId);
                   return (
                     <TouchableOpacity
                       onPress={() => {
+                        console.log('✅ Selected shipping:', item);
                         setSelectedShippingId(Number(item.id));
-                        GetCartDetails();
+                        setShippingModalVisible(false);
+                        setApiCartData({ ...cartData });
+                        Toast.show({
+                          type: 'success',
+                          text1: `${item.type} selected`,
+                          text2: `Delivery: ${item.cost > 0 ? displayPrice(item.cost) : 'Free'}`,
+                        });
                       }}
                       style={[
                         styles.shippingOption,
@@ -1245,16 +1243,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                       ]}
                     >
                       <View style={styles.shippingOptionLeft}>
-                        <Text style={styles.shippingOptionType}>
-                          {item.type}
-                        </Text>
-                        <Text style={styles.shippingOptionTime}>
-                          {item.estimated_time}
-                        </Text>
+                        <Text style={styles.shippingOptionType}>{item.type || 'Standard Shipping'}</Text>
+                        {item.estimated_time && (
+                          <Text style={styles.shippingOptionTime}>{item.estimated_time}</Text>
+                        )}
                       </View>
                       <View style={styles.shippingOptionRight}>
                         <Text style={styles.shippingOptionCost}>
-                          {displayPrice(item.cost)}
+                          {item.cost > 0 ? displayPrice(item.cost) : 'Free'}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -1265,18 +1261,16 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             )}
 
             <TouchableOpacity
-              onPress={() => {
-                setShippingModalVisible(false);
-                setModalAddress(true);
-              }}
+              onPress={() => setShippingModalVisible(false)}
               style={styles.modalButton}
             >
-              <Text style={styles.modalButtonText}>Continue to Address →</Text>
+              <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
+      {/* Promo Modal */}
       <Modal
         visible={promoModalVisible}
         transparent
@@ -1290,32 +1284,24 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
-
             <Text style={styles.modalTitle}>Available Coupons</Text>
 
             {isFetchingPromo ? (
-              <ActivityIndicator
-                size="small"
-                color="#AEB254"
-                style={styles.modalLoader}
-              />
+              <ActivityIndicator size="large" color="#AEB254" style={styles.modalLoader} />
             ) : promoOptions.length === 0 ? (
               <Text style={styles.noCouponsText}>No coupons available</Text>
             ) : (
               <FlatList
                 data={promoOptions}
-                keyExtractor={(item, idx) =>
-                  (item.id ?? item.code ?? idx).toString()
-                }
+                keyExtractor={(item, idx) => (item.id ?? item.code ?? idx).toString()}
                 renderItem={({ item }) => {
                   const code = item?.coupon_code || item?.code || '';
                   const isSelected = selectedPromoCode?.code === code;
 
                   let discountText = '';
                   if (item.discount_type === 'percentage') {
-                    discountText = `${
-                      item.discount_value
-                    }% off (max ${displayPrice(item.max_discount)})`;
+                    discountText = `${item.discount_value}% off${item.max_discount ? ` (max ${displayPrice(item.max_discount)})` : ''
+                      }`;
                   } else {
                     discountText = `${displayPrice(item.discount_value)} off`;
                   }
@@ -1324,10 +1310,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     <TouchableOpacity
                       onPress={() => {
                         setSelectedPromoCode({
-                          code: item.coupon_code,
+                          code: item.coupon_code || item.code,
                           type: item.discount_type,
                           discount: item.discount_value,
-                          max_discount: item.max_discount,
+                          max_discount: item.max_discount || '',
                         });
                       }}
                       style={[
@@ -1337,31 +1323,17 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     >
                       <View style={styles.couponItemLeft}>
                         <Text style={styles.couponCode}>{code}</Text>
-                        <Text style={styles.couponDiscount}>
-                          {discountText}
-                        </Text>
+                        <Text style={styles.couponDiscount}>{discountText}</Text>
                         {item.description && (
-                          <Text style={styles.couponDescription}>
-                            {item.description}
-                          </Text>
+                          <Text style={styles.couponDescription}>{item.description}</Text>
                         )}
                       </View>
                       <View style={styles.couponItemRight}>
-                        {item.start_date && (
+                        {item.expiry_date && (
                           <Text style={styles.couponDate}>
-                            {new Date(item.start_date).toLocaleDateString()}
+                            Exp: {new Date(item.expiry_date).toLocaleDateString()}
                           </Text>
                         )}
-                        <Text
-                          style={[
-                            styles.couponStatus,
-                            item.is_valid
-                              ? styles.couponValid
-                              : styles.couponExpired,
-                          ]}
-                        >
-                          {item.is_valid ? 'Valid' : 'Expired'}
-                        </Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -1389,70 +1361,57 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         </View>
       </Modal>
 
-      {showWebView && (
-        <SafeAreaView style={styles.webViewContainer}>
-          <View style={styles.webViewHeader}>
-            <View style={styles.webViewHeaderLeft}>
-              <Text style={styles.webViewTitle}>Payment Gateway</Text>
-              <Text style={styles.webViewAmount}>
-                {
-                  calculateCheckout(
-                    cartData?.subtotal_amount || 0,
-                    cartData?.total_savings || 0,
-                    discountAmount || 0,
-                    getShippingCost(),
-                    selectedCurrency,
-                    rates,
-                  ).displayAmountToPay
-                }
-              </Text>
+      {/* Stock Error Modal */}
+      <Modal
+        visible={showStockErrorModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowStockErrorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.stockErrorModalContent}>
+            <Text style={styles.stockErrorModalIcon}>⚠️</Text>
+            <Text style={styles.stockErrorModalTitle}>{stockErrorTitle}</Text>
+            <Text style={styles.stockErrorModalMessage}>{stockErrorMessage}</Text>
+
+            {stockErrors.map((error, index) => (
+              <View key={index} style={styles.stockErrorItem}>
+                <Text style={styles.stockErrorItemName}>
+                  {error.product_name || 'Product'}
+                </Text>
+                <Text style={styles.stockErrorItemDetail}>
+                  Requested: {error.quantity} | Available: {error.available_quantity || 0}
+                </Text>
+              </View>
+            ))}
+
+            <View style={styles.stockErrorModalButtons}>
+              <TouchableOpacity
+                style={[styles.stockErrorButton, styles.stockErrorButtonSecondary]}
+                onPress={() => setShowStockErrorModal(false)}
+              >
+                <Text style={styles.stockErrorButtonTextSecondary}>{updateCartText}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.stockErrorButton, styles.stockErrorButtonPrimary]}
+                onPress={removeOutOfStockItems}
+              >
+                <Text style={styles.stockErrorButtonTextPrimary}>{removeItemsText}</Text>
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              onPress={() => {
-                Alert.alert(cancelPaymentTitle, cancelPaymentMessage, [
-                  { text: noText, style: 'cancel' },
-                  { text: yesText, onPress: () => setShowWebView(false) },
-                ]);
-              }}
-              style={styles.webViewCloseButton}
+              style={styles.stockErrorCloseButton}
+              onPress={() => setShowStockErrorModal(false)}
             >
-              <Text style={styles.webViewCloseIcon}>✕</Text>
+              <Text style={styles.stockErrorCloseText}>✕</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
 
-          <WebView
-            style={styles.webView}
-            source={{ uri: paymentUrl }}
-            onNavigationStateChange={navState => {
-              const successPatterns = [
-                'success',
-                'thank-you',
-                'completed',
-                'order-confirmed',
-              ];
-              const isSuccess = successPatterns.some(pattern =>
-                navState.url.toLowerCase().includes(pattern),
-              );
-
-              if (isSuccess) {
-                setTimeout(() => {
-                  setShowWebView(false);
-                  GetCartDetails();
-                  setAppliedPromo(null);
-                  setDiscountAmount(0);
-                  Toast.show({ type: 'success', text1: 'Payment successful!' });
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'OrderConfirmation' }],
-                  });
-                }, 1500);
-              }
-            }}
-          />
-        </SafeAreaView>
-      )}
-
+      {/* Address Modal */}
       <AddressModal
         visible={modalAddress}
         onClose={() => setModalAddress(false)}
@@ -1607,14 +1566,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 4,
-  },
-  moveToWishlistBtn: {
-    marginBottom: 4,
-  },
-  moveToWishlistText: {
-    fontSize: 11,
-    color: '#AEB254',
-    fontWeight: '400',
   },
   priceContainer: {
     flexDirection: 'row',
@@ -1873,6 +1824,48 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#AEB254',
   },
+  shippingSelectorCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  shippingIconContainer: {
+    flexDirection: 'row',
+    flex: 1,
+    marginRight: 8,
+  },
+  shippingIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  shippingDetails: {
+    flex: 1,
+  },
+  shippingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 2,
+  },
+  shippingSelected: {
+    fontSize: 12,
+    color: '#666',
+  },
+  changeShipping: {
+    fontSize: 12,
+    color: '#AEB254',
+    fontWeight: '500',
+  },
   deliveryAddressCard: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 12,
@@ -1986,11 +1979,12 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
   },
   modalBackdrop: {
     flex: 1,
+    width: '100%',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
@@ -2150,6 +2144,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 24,
   },
+  noShippingText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 24,
+  },
   stockErrorModalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -2231,53 +2231,6 @@ const styles = StyleSheet.create({
   stockErrorCloseText: {
     fontSize: 16,
     color: '#999',
-  },
-  webViewContainer: {
-    flex: 1,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    backgroundColor: '#FFFFFF',
-  },
-  webViewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  webViewHeaderLeft: {
-    flex: 1,
-  },
-  webViewTitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 1,
-  },
-  webViewAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#AEB254',
-  },
-  webViewCloseButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  webViewCloseIcon: {
-    fontSize: 16,
-    color: '#666',
-  },
-  webView: {
-    flex: 1,
   },
 });
 

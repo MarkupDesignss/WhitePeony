@@ -5,12 +5,14 @@ import {
   NavigationContainer,
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useColorScheme, Linking } from 'react-native';
+import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './src/redux/store';
 import './src/components/TextOverride';
+import { StripeProvider } from '@stripe/stripe-react-native';
+
 
 import HomeStackNavigator from './src/navigations/HomeStackNavigation';
 import { CommonLoaderProvider } from './src/components/CommonLoader/commonLoader';
@@ -71,21 +73,29 @@ function App() {
               <UserDataContextProvider>
                 <WishlistProvider>
                   <CartProvider>
-                    <NetworkStatus />
-                    <GestureHandlerRootView style={{ flex: 1 }}>
-                      <NavigationContainer
-                        linking={linking}
-                        theme={theme === 'dark' ? DarkTheme : DefaultTheme}
-                      >
-                        <Stack.Navigator screenOptions={{ headerShown: false }}>
-                          <Stack.Screen
-                            name="HomeStackNavigator"
-                            component={HomeStackNavigator}
-                          />
-                        </Stack.Navigator>
-                      </NavigationContainer>
-                    </GestureHandlerRootView>
-                    <Toast />
+                    <StripeProvider
+                      publishableKey={"pk_test_51TAz0xAM0QPX8rok2dpqfDKnm1sNqwDnHkvJPLE0l0A9R4EaEOV8vBtkpTkcoYslz4QSSFWW5LAjk2pPMg1dTVaK00jEfxp6ZC"}
+                    // For Payment Sheet, you only need publishableKey
+                    // These are optional and only needed for specific features:
+                    // merchantIdentifier - Only for Apple Pay
+                    // urlScheme - Only for custom return URLs (not needed for Payment Sheet)
+                    >
+                      <NetworkStatus />
+                      <GestureHandlerRootView style={{ flex: 1 }}>
+                        <NavigationContainer
+                          linking={linking}
+                          theme={theme === 'dark' ? DarkTheme : DefaultTheme}
+                        >
+                          <Stack.Navigator screenOptions={{ headerShown: false }}>
+                            <Stack.Screen
+                              name="HomeStackNavigator"
+                              component={HomeStackNavigator}
+                            />
+                          </Stack.Navigator>
+                        </NavigationContainer>
+                      </GestureHandlerRootView>
+                      <Toast />
+                    </StripeProvider>
                   </CartProvider>
                 </WishlistProvider>
               </UserDataContextProvider>

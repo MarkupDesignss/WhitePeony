@@ -715,6 +715,9 @@ export const UserService = {
     return APIKit.delete(`wishlist/product/${numericProductId}`, apiHeaders);
   },
 
+
+
+
   getProductById: async (id: string | number) => {
     const apiHeaders = {
       headers: {
