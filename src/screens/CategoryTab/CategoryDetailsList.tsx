@@ -20,6 +20,7 @@ import {
   Platform,
   ActivityIndicator,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 import { useCart } from '../../context/CartContext';
 import { UserService, Image_url } from '../../service/ApiService';
@@ -27,7 +28,6 @@ import {
   heightPercentageToDP,
   widthPercentageToDP,
 } from '../../constant/dimentions';
-import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import TransletText from '../../components/TransletText';
@@ -36,23 +36,26 @@ import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { UserDataContext } from '../../context/userDataContext';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width - 36) / 2;
 const LOADER_TIMEOUT = 10000;
 
 // Modern color palette
 const COLORS = {
-  primary: '#2A2A2A', // Dark charcoal
-  secondary: '#5A5A5A', // Medium gray
-  accent: '#D4AF37', // Gold accent
-  background: '#FAF9F7', // Off-white
-  cardBg: '#FFFFFF', // White
-  text: '#1C1C1C', // Almost black
-  textLight: '#767676', // Light gray
-  border: '#EFEFEF', // Very light gray
-  success: '#2E7D32', // Green
-  warning: '#C62828', // Red
-  goldLight: '#F5E7C8', // Light gold
+  primary: '#2A2A2A',
+  secondary: '#5A5A5A',
+  accent: '#D4AF37',
+  background: '#FAF9F7',
+  cardBg: '#FFFFFF',
+  text: '#1C1C1C',
+  textLight: '#767676',
+  border: '#EFEFEF',
+  success: '#2E7D32',
+  successLight: '#E8F5E9',
+  warning: '#C62828',
+  error: '#DC2626',
+  errorLight: '#FFEBEE',
+  goldLight: '#F5E7C8',
   shadow: '#000000',
 };
 
@@ -69,12 +72,15 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     return convertAndFormatPrice(priceEUR, selectedCurrency, rates);
   };
 
-  const { addToCart, cart } = useCart();
+  const { addToCart, cart, cartVersion } = useCart();
   const [apiProducts, setApiProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
   const [sortVisible, setSortVisible] = useState(false);
   const [selectedSort, setSelectedSort] = useState('');
+  const [variantModalVisible, setVariantModalVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
 
   // Get user type from context for B2B/B2C filtering
   const { isLoggedIn, userType } = useContext(UserDataContext);
@@ -160,6 +166,22 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     },
     [getCurrentProductType],
   );
+
+  // Update product cart status when cart changes
+  useEffect(() => {
+    if (apiProducts.length > 0) {
+      const cartIds = new Set(
+        cart.map((c: any) => String(c.id || c.product_id || ''))
+      );
+
+      setApiProducts(prev =>
+        prev.map(product => ({
+          ...product,
+          is_cart: cartIds.has(String(product.id)) ? 'true' : 'false'
+        }))
+      );
+    }
+  }, [cartVersion, cart]);
 
   // Beautiful Product Image Carousel
   const ProductImageCarousel = ({
@@ -265,34 +287,41 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             }
 
             let variants = [];
+
             if (
               Array.isArray(product?.variants) &&
               product.variants.length > 0
             ) {
-              variants = product.variants;
+              variants = product.variants.map((v: any) => ({
+                ...v,
+                id: v.id,
+                unit: v.unit || '',
+                price: Number(v.price || 0),
+                actual_price: Number(v.actual_price || v.price || 0),
+                stock: Number(v.stock || 0),
+                is_out_of_stock: Number(v.stock || 0) <= 0,
+              }));
             } else {
               variants = [
                 {
+                  id: product?.variant_id || null,
+                  unit: String(product?.unit || ''),
                   price: Number(product?.price || product?.main_price || 0),
                   actual_price: Number(
                     product?.actual_price || product?.discounted_price || 0,
                   ),
-                  weight: String(product?.weight || ''),
-                  unit: String(product?.unit || ''),
-                  id: product?.variant_id || null,
+                  stock: Number(
+                    product?.stock_quantity || product?.quantity || product?.stock || 0
+                  ),
+                  is_out_of_stock: Number(
+                    product?.stock_quantity || product?.quantity || product?.stock || 0
+                  ) <= 0,
                 },
               ];
             }
 
-            let stockQuantity = 0;
-            if (product?.stock_quantity !== undefined)
-              stockQuantity = Number(product.stock_quantity);
-            else if (product?.quantity !== undefined)
-              stockQuantity = Number(product.quantity);
-            else if (product?.stock !== undefined)
-              stockQuantity = Number(product.stock);
-            else if (variants[0]?.stock_quantity)
-              stockQuantity = Number(variants[0].stock_quantity);
+            // Check if any variant is in stock
+            const hasAnyStock = variants.some(v => !v.is_out_of_stock);
 
             return {
               ...product,
@@ -305,11 +334,12 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                 product?.average_rating || product?.rating || 0,
               ),
               variants: variants,
-              stock_quantity: stockQuantity,
+              has_any_stock: hasAnyStock,
               is_cart: cartIds.has(productId) ? 'true' : 'false',
-              is_out_of_stock: stockQuantity <= 0,
+              is_out_of_stock: !hasAnyStock,
             };
           } catch (err) {
+            console.error('Error normalizing product:', err);
             return null;
           }
         })
@@ -386,49 +416,22 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
 
       let productsArray: any[] = [];
 
-      console.log('📥 Response data structure:', {
-        hasData: !!response.data,
-        dataType: typeof response.data,
-        keys: response.data ? Object.keys(response.data) : [],
-      });
-
       if (response.data?.data && Array.isArray(response.data.data)) {
         productsArray = response.data.data;
-        console.log(
-          '✅ Found products in response.data.data:',
-          productsArray.length,
-        );
       } else if (
         response.data?.products &&
         Array.isArray(response.data.products)
       ) {
         productsArray = response.data.products;
-        console.log(
-          '✅ Found products in response.data.products:',
-          productsArray.length,
-        );
       } else if (Array.isArray(response.data)) {
         productsArray = response.data;
-        console.log(
-          '✅ Found products in response.data array:',
-          productsArray.length,
-        );
       } else if (Array.isArray(response)) {
         productsArray = response;
-        console.log(
-          '✅ Found products in direct response array:',
-          productsArray.length,
-        );
       } else if (response.data && typeof response.data === 'object') {
         if (response.data.id || response.data.product_id) {
           productsArray = [response.data];
-          console.log('✅ Found single product object');
-        } else {
-          console.warn('⚠️ Unknown response structure:', response.data);
         }
       }
-
-      console.log('📦 Total products extracted:', productsArray.length);
 
       if (productsArray.length === 0) {
         setApiProducts([]);
@@ -440,44 +443,10 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
         return;
       }
 
-      // Log first product for debugging
-      if (productsArray.length > 0) {
-        console.log('📦 Sample product raw:', {
-          id: productsArray[0].id,
-          name: productsArray[0].name,
-          product_type: productsArray[0].product_type,
-          hasVariants: !!productsArray[0].variants,
-          stock_quantity: productsArray[0].stock_quantity,
-        });
-      }
-
       // Apply B2B/B2C filtering
       const typeFilteredProducts = filterProductsByType(productsArray);
-      console.log(
-        '📦 Products after type filtering:',
-        typeFilteredProducts.length,
-      );
 
-      // Mark out of stock instead of filtering
-      const productsWithStockInfo = typeFilteredProducts.map(product => ({
-        ...product,
-        calculated_stock: Number(
-          product?.stock_quantity || product?.quantity || product?.stock || 0,
-        ),
-        is_out_of_stock:
-          Number(
-            product?.stock_quantity || product?.quantity || product?.stock || 0,
-          ) <= 0,
-      }));
-
-      console.log('📦 Products with stock info:', {
-        total: productsWithStockInfo.length,
-        outOfStock: productsWithStockInfo.filter(p => p.is_out_of_stock).length,
-        inStock: productsWithStockInfo.filter(p => !p.is_out_of_stock).length,
-      });
-
-      const normalizedProducts = normalizeProducts(productsWithStockInfo);
-      console.log('📦 Normalized products:', normalizedProducts.length);
+      const normalizedProducts = normalizeProducts(typeFilteredProducts);
 
       setApiProducts(normalizedProducts);
 
@@ -520,41 +489,35 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     fetchProducts();
   }, [categoryId, mode, isLoggedIn, userType]);
 
-  useEffect(() => {
-    if (apiProducts.length > 0) {
-      const updatedProducts = normalizeProducts(apiProducts);
-      setApiProducts(updatedProducts);
-    }
-  }, [cart]);
+  // Open variant modal
+  const openVariantModal = (product: any) => {
+    setSelectedProduct(product);
+    // Set default selected variant as first in-stock variant, or first variant if none in stock
+    const firstInStock = product.variants.find((v: any) => !v.is_out_of_stock);
+    setSelectedVariant(firstInStock || product.variants[0]);
+    setVariantModalVisible(true);
+  };
 
-  const handleAddToCart = async (item: any) => {
-    const productId = item?.id ?? item?.product_id;
-    const variantId = item?.variants?.[0]?.id ?? item?.variant_id ?? null;
+  // Handle add to cart with selected variant (quantity always 1)
+  const handleAddToCartWithVariant = async () => {
+    if (!selectedProduct || !selectedVariant) return;
 
-    if (!productId) {
-      Toast.show({
-        type: 'error',
-        text1: 'Cannot Add to Cart',
-        text2: 'Product information is incomplete',
-      });
-      return;
-    }
-
-    if (item?.stock_quantity <= 0) {
+    if (selectedVariant.is_out_of_stock) {
       Toast.show({
         type: 'error',
         text1: 'Out of Stock',
-        text2: 'This product is currently unavailable',
+        text2: 'This variant is currently unavailable',
       });
       return;
     }
 
     try {
-      await addToCart(Number(productId), variantId);
+      await addToCart(Number(selectedProduct.id), selectedVariant.id, 1); // Quantity always 1
+      setVariantModalVisible(false);
       Toast.show({
         type: 'success',
         text1: 'Added to Cart',
-        text2: 'Product has been added to your cart',
+        text2: `${selectedProduct.name} - ${selectedVariant.unit}`,
       });
     } catch (error: any) {
       Toast.show({
@@ -572,7 +535,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     setIsLoading(true);
 
     try {
-      // Simulate sorting or implement actual API call
       let sortedProducts = [...apiProducts];
 
       switch (sortType) {
@@ -638,7 +600,205 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     </View>
   );
 
-  // Beautiful Product Card Render - NO HOOKS INSIDE
+  // Variant Modal Component
+
+  // Variant Modal Component
+  // Variant Modal Component
+  const VariantSelectionModal = () => {
+    const [isAddingToCart, setIsAddingToCart] = useState(false);
+
+    const handleAddToCartPress = async () => {
+      if (!selectedProduct || !selectedVariant) return;
+
+      if (selectedVariant.is_out_of_stock) {
+        Toast.show({
+          type: 'error',
+          text1: 'Out of Stock',
+          text2: 'This variant is currently unavailable',
+        });
+        return;
+      }
+
+      setIsAddingToCart(true);
+
+      try {
+        await addToCart(Number(selectedProduct.id), selectedVariant.id, 1);
+
+        Toast.show({
+          type: 'success',
+          text1: 'Added to Cart',
+          text2: `${selectedProduct.name} - ${selectedVariant.unit}`,
+        });
+
+        // Close modal only after successful addition
+        setVariantModalVisible(false);
+        setSelectedProduct(null);
+        setSelectedVariant(null);
+      } catch (error: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to Add',
+          text2: error.message || 'Please try again',
+        });
+      } finally {
+        setIsAddingToCart(false);
+      }
+    };
+
+    const handleCloseModal = useCallback(() => {
+      if (!isAddingToCart) {
+        setVariantModalVisible(false);
+        // Small delay to ensure modal is closed before resetting state
+        setTimeout(() => {
+          setSelectedProduct(null);
+          setSelectedVariant(null);
+        }, 300);
+      }
+    }, [isAddingToCart]);
+
+    return (
+      <Modal
+        visible={variantModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseModal}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={handleCloseModal}
+          />
+          <View style={styles.variantModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Variant</Text>
+              <TouchableOpacity
+                onPress={handleCloseModal}
+                disabled={isAddingToCart}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Image
+                  source={require('../../assets/Png/close.png')}
+                  style={[styles.closeIcon, isAddingToCart && styles.disabledIcon]}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {selectedProduct && (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={!isAddingToCart}
+              >
+                {/* Product Info */}
+                <View style={styles.selectedProductInfo}>
+                  <Image
+                    source={{ uri: selectedProduct.front_image }}
+                    style={styles.selectedProductImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.selectedProductDetails}>
+                    <Text style={styles.selectedProductName} numberOfLines={2}>
+                      {selectedProduct.name}
+                    </Text>
+                    <Text style={styles.selectedProductPrice}>
+                      {displayPrice(selectedVariant?.actual_price || selectedVariant?.price || 0)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Variant Options */}
+                <Text style={styles.variantSectionTitle}>Available Options</Text>
+                {selectedProduct.variants.map((variant: any) => {
+                  const isSelected = selectedVariant?.id === variant.id;
+
+                  return (
+                    <TouchableOpacity
+                      key={variant.id}
+                      style={[
+                        styles.variantOption,
+                        isSelected && styles.variantOptionSelected,
+                        variant.is_out_of_stock && styles.variantOptionDisabled,
+                        isAddingToCart && styles.variantOptionDisabled,
+                      ]}
+                      onPress={() => {
+                        if (!variant.is_out_of_stock && !isAddingToCart) {
+                          setSelectedVariant(variant);
+                          // Just update selected variant, don't close modal
+                        }
+                      }}
+                      disabled={variant.is_out_of_stock || isAddingToCart}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.variantInfo}>
+                        <Text style={[
+                          styles.variantUnit,
+                          isSelected && styles.variantTextSelected,
+                          variant.is_out_of_stock && styles.variantTextDisabled,
+                        ]}>
+                          {variant.unit}
+                        </Text>
+                        <Text style={[
+                          styles.variantPrice,
+                          isSelected && styles.variantTextSelected,
+                          variant.is_out_of_stock && styles.variantTextDisabled,
+                        ]}>
+                          {displayPrice(variant.actual_price || variant.price)}
+                        </Text>
+                      </View>
+
+                      {/* Stock Status Badge */}
+                      {variant.is_out_of_stock ? (
+                        <View style={styles.outOfStockBadge}>
+                          <Text style={styles.outOfStockBadgeText}>Out of Stock</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.inStockBadge}>
+                          <Text style={styles.inStockBadgeText}>In Stock</Text>
+                        </View>
+                      )}
+
+                      {/* Selected Checkmark - only show if selected and not adding to cart */}
+                      {isSelected && !variant.is_out_of_stock && !isAddingToCart && (
+                        <View style={styles.selectedCheckContainer}>
+                          <Text style={styles.selectedCheck}>✓</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {/* Add to Cart Button with Loader */}
+                <TouchableOpacity
+                  style={[
+                    styles.addToCartModalButton,
+                    (selectedVariant?.is_out_of_stock || isAddingToCart) && styles.disabledButton,
+                  ]}
+                  onPress={handleAddToCartPress}
+                  disabled={selectedVariant?.is_out_of_stock || isAddingToCart}
+                  activeOpacity={0.8}
+                >
+                  {isAddingToCart ? (
+                    <View style={styles.loadingButtonContent}>
+                      <ActivityIndicator size="small" color={COLORS.primary} />
+                      <Text style={styles.addToCartModalButtonText}>Adding to Cart...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.addToCartModalButtonText}>
+                      {selectedVariant?.is_out_of_stock ? 'Out of Stock' : 'Add to Cart'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <Text style={styles.quantityNote}>Quantity: 1 (Default)</Text>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Product Card Render
   const renderItem = ({ item, index }: { item: any; index: number }) => {
     const productId = item?.id || '';
     const productName = item?.name || 'Unnamed Product';
@@ -651,13 +811,12 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
     }
 
     const rating = item?.average_rating || 0;
-    const price = item?.variants?.[0]?.price || 0;
-    const originalPrice = item?.variants?.[0]?.actual_price || 0;
+    const defaultVariant = item?.variants?.[0] || {};
+    const price = defaultVariant?.price || 0;
+    const originalPrice = defaultVariant?.actual_price || 0;
     const hasDiscount = originalPrice > 0 && originalPrice < price;
-    const weight = item?.variants?.[0]?.weight || '';
-    const unit = item?.variants?.[0]?.unit || '';
-    const isOutOfStock =
-      item?.stock_quantity <= 0 || item?.is_out_of_stock === true;
+    const weight = defaultVariant?.unit || '';
+    const isOutOfStock = !item?.has_any_stock;
     const isInCart = item?.is_cart === 'true';
 
     return (
@@ -670,9 +829,9 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             }
           }}
           activeOpacity={0.9}
-          disabled={!productId}
+          disabled={!productId || isOutOfStock}
         >
-          {/* Image Container with Wishlist Button */}
+          {/* Image Container */}
           <View style={styles.cardImageContainer}>
             <ProductImageCarousel
               images={imageUrl ? [{ uri: imageUrl }] : []}
@@ -687,7 +846,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             </TouchableOpacity>
 
             {/* Discount Badge */}
-            {hasDiscount && (
+            {hasDiscount && !isOutOfStock && (
               <View style={styles.discountBadge}>
                 <Text style={styles.discountText}>
                   {Math.round(((price - originalPrice) / price) * 100)}% OFF
@@ -701,8 +860,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
                 <Text style={styles.outOfStockOverlayText}>Out of Stock</Text>
               </View>
             )}
-
-            {/* REMOVE THE BUTTON FROM HERE - DELETE THIS ENTIRE SECTION */}
           </View>
 
           {/* Product Details */}
@@ -737,28 +894,30 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
               <Text style={styles.currentPrice}>
                 {displayPrice(hasDiscount ? originalPrice : price)}
               </Text>
-              {hasDiscount && (
+              {hasDiscount && !isOutOfStock && (
                 <Text style={styles.originalPrice}>{displayPrice(price)}</Text>
               )}
             </View>
 
             {/* Weight/Unit */}
-            {(weight || unit) && (
-              <Text style={styles.weightText}>
-                {weight} {unit}
-              </Text>
-            )}
+            {weight ? (
+              <Text style={styles.weightText}>{weight}</Text>
+            ) : null}
 
-            {/* Add to Cart Button - KEEP THIS ONE */}
+            {/* Action Button */}
+
+
+            // In your renderItem function, update the TouchableOpacity for the add button:
+
             {!isOutOfStock && (
               <TouchableOpacity
                 onPress={e => {
                   e.stopPropagation();
                   if (isInCart) {
-                    // Navigate to Cart tab
-                    navigation.getParent()?.navigate('Cart');
+                    // Navigate directly to Cart tab
+                    navigation.navigate('Cart');
                   } else {
-                    handleAddToCart(item);
+                    openVariantModal(item);
                   }
                 }}
                 style={[styles.addButton, isInCart && styles.goToCartButton]}
@@ -821,7 +980,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
           onPress={() => setSortVisible(true)}
           style={styles.headerButton}
         >
-          {/* Using order.png for sort icon */}
           <Image
             source={require('../../assets/filter.png')}
             style={styles.headerIcon}
@@ -830,7 +988,6 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
 
         <TouchableOpacity
           onPress={() => {
-            // Navigate to Cart tab using parent navigator
             navigation.getParent()?.navigate('Cart');
           }}
           style={styles.headerButton}
@@ -858,7 +1015,7 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
       <View style={styles.container}>
         {renderHeader()}
 
-        {/* Filter Bar - Using text buttons */}
+        {/* Filter Bar */}
         <View style={styles.filterBar}>
           <TouchableOpacity
             style={styles.filterButton}
@@ -904,6 +1061,9 @@ const CategoryDetailsList = ({ navigation, route }: any) => {
             <Text style={styles.loadingText}>Loading products...</Text>
           </View>
         )}
+
+        {/* Variant Selection Modal */}
+        <VariantSelectionModal />
 
         {/* Filter Modal */}
         <Modal
@@ -1216,6 +1376,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
+  // Add these to your existing StyleSheet
+  disabledIcon: {
+    opacity: 0.5,
+  },
+  loadingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   card: {
     width: '100%',
     backgroundColor: COLORS.cardBg,
@@ -1300,7 +1470,7 @@ const styles = StyleSheet.create({
   outOfStockOverlayText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.warning,
+    color: COLORS.error,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -1355,6 +1525,16 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     fontWeight: '400',
   },
+  // Add these styles to your existing StyleSheet
+  disabledIcon: {
+    opacity: 0.5,
+  },
+  loadingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   weightText: {
     fontSize: 11,
     color: COLORS.textLight,
@@ -1362,7 +1542,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   addButton: {
-    backgroundColor: "#AEB254",
+    backgroundColor: '#AEB254',
     borderRadius: 25,
     paddingVertical: 10,
     alignItems: 'center',
@@ -1474,6 +1654,15 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 30,
     maxHeight: '70%',
+  },
+  variantModalContent: {
+    backgroundColor: COLORS.cardBg,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+    maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1642,5 +1831,140 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: COLORS.accent,
     fontWeight: '600',
+  },
+  // Variant Modal Styles
+  selectedProductInfo: {
+    flexDirection: 'row',
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    marginBottom: 16,
+  },
+  selectedProductImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
+  },
+  selectedProductDetails: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  selectedProductName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  selectedProductPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.accent,
+  },
+  variantSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginBottom: 12,
+  },
+  variantOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  variantOptionSelected: {
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.goldLight,
+  },
+  variantOptionDisabled: {
+    backgroundColor: '#F5F5F5',
+    borderColor: COLORS.border,
+    opacity: 0.7,
+  },
+  variantInfo: {
+    flex: 1,
+  },
+  variantUnit: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  variantPrice: {
+    fontSize: 14,
+    color: COLORS.secondary,
+  },
+  variantTextSelected: {
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  variantTextDisabled: {
+    color: COLORS.textLight,
+  },
+  outOfStockBadge: {
+    backgroundColor: COLORS.errorLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  outOfStockBadgeText: {
+    fontSize: 11,
+    color: COLORS.error,
+    fontWeight: '600',
+  },
+  inStockBadge: {
+    backgroundColor: COLORS.successLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  inStockBadgeText: {
+    fontSize: 11,
+    color: COLORS.success,
+    fontWeight: '600',
+  },
+  selectedCheckContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedCheck: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  quantityNote: {
+    textAlign: 'center',
+    marginTop: 12,
+    fontSize: 13,
+    color: COLORS.textLight,
+    fontStyle: 'italic',
+  },
+  addToCartModalButton: {
+    backgroundColor: COLORS.accent,
+    borderRadius: 30,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  disabledButton: {
+    backgroundColor: COLORS.border,
+  },
+  addToCartModalButtonText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

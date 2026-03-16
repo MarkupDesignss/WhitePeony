@@ -81,11 +81,12 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     return convertAndFormatPrice(price, selectedCurrency, rates);
   };
 
-  const { cart, removeFromCart, clearCart } = useCart();
+  const { cart, removeFromCart, clearCart, cartVersion, refreshCart } = useCart();
   const [modalAddress, setModalAddress] = useState(false);
   const [modalAddressADD, setmodalAddressADD] = useState(false);
   const [items, setItems] = useState<DisplayWishlistItem[]>([]);
   const { showLoader, hideLoader } = CommonLoader();
+
   const [cartData, setApiCartData] = useState<any>({
     items: [],
     total_amount: 0,
@@ -106,10 +107,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   );
   const [isFetchingShipping, setIsFetchingShipping] = useState(false);
 
-  // Payment state
+  // Payment state - IMPORTANT: Add all these states
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
+  const [orderAmount, setOrderAmount] = useState<number>(0);
+  const [orderCurrency, setOrderCurrency] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [backendResponse, setBackendResponse] = useState<any>(null);
 
   const { translatedText: selectShippingText } = useAutoTranslate(
     'Please select a shipping method',
@@ -126,6 +131,63 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const { translatedText: removeItemsText } = useAutoTranslate(
     'Remove Out of Stock Items',
   );
+
+  const { translatedText: confirmPaymentText } = useAutoTranslate('Confirm Payment');
+  const { translatedText: totalAmountText } = useAutoTranslate('Total amount');
+  const { translatedText: cancelText } = useAutoTranslate('Cancel');
+  const { translatedText: payNowText } = useAutoTranslate('Pay Now');
+  const { translatedText: couponAppliedText } = useAutoTranslate('Coupon applied! Saved');
+  const { translatedText: couponRemovedText } = useAutoTranslate('Coupon removed');
+  const { translatedText: cartUpdatedText } = useAutoTranslate('Cart updated!');
+  const { translatedText: updateCartFailedText } = useAutoTranslate('Failed to update cart');
+  const { translatedText: insufficientStockText } = useAutoTranslate('Insufficient Stock');
+  const { translatedText: itemRemovedText } = useAutoTranslate('Item removed from cart');
+  const { translatedText: removeFailedText } = useAutoTranslate('Failed to remove item');
+  const { translatedText: minQuantityText } = useAutoTranslate('Minimum quantity is 1');
+  const { translatedText: maxQuantityText } = useAutoTranslate('Maximum quantity is 99');
+  const { translatedText: cartEmptyText } = useAutoTranslate('Cart is empty');
+  const { translatedText: selectShippingMethodText } = useAutoTranslate('Select shipping method');
+  const { translatedText: shippingMethodSelectedText } = useAutoTranslate('selected');
+  const { translatedText: freeText } = useAutoTranslate('Free');
+  const { translatedText: deliveryText } = useAutoTranslate('Delivery');
+  const { translatedText: noShippingMethodsText } = useAutoTranslate('No shipping methods available');
+  const { translatedText: failedToLoadShippingText } = useAutoTranslate('Failed to load shipping methods');
+  const { translatedText: outOfStockItemsRemovedText } = useAutoTranslate('Out of stock items removed');
+  const { translatedText: failedToRemoveItemsText } = useAutoTranslate('Failed to remove items');
+  const { translatedText: paymentFailedText } = useAutoTranslate('Payment Failed');
+  const { translatedText: paymentCancelledText } = useAutoTranslate('Payment Cancelled');
+  const { translatedText: couldNotInitializePaymentText } = useAutoTranslate('Could not initialize payment');
+  const { translatedText: unexpectedErrorText } = useAutoTranslate('Unexpected error occurred');
+  const { translatedText: loadingYourCartText } = useAutoTranslate('Loading your cart...');
+  const { translatedText: shipmentText } = useAutoTranslate('Shipment');
+  const { translatedText: itemText } = useAutoTranslate('item');
+  const { translatedText: itemsText } = useAutoTranslate('items');
+  const { translatedText: youMightAlsoLikeText } = useAutoTranslate('You Might Also Like');
+  const { translatedText: seeAllProductsText } = useAutoTranslate('See all products →');
+  const { translatedText: shippingMethodText } = useAutoTranslate('Shipping Method');
+  const { translatedText: changeText } = useAutoTranslate('Change');
+  const { translatedText: applyCouponText } = useAutoTranslate('Apply Coupon');
+  const { translatedText: availableCouponsText } = useAutoTranslate('Available Coupons');
+  const { translatedText: noCouponsAvailableText } = useAutoTranslate('No coupons available');
+  const { translatedText: closeText } = useAutoTranslate('Close');
+  const { translatedText: selectShippingMethodModalText } = useAutoTranslate('Select Shipping Method');
+  const { translatedText: billDetailsText } = useAutoTranslate('Bill Details');
+  const { translatedText: subtotalText } = useAutoTranslate('Subtotal');
+  const { translatedText: totalSavingsText } = useAutoTranslate('Total Savings');
+  const { translatedText: deliveryChargesText } = useAutoTranslate('Delivery Charges');
+  const { translatedText: vatText } = useAutoTranslate('VAT');
+  const { translatedText: grandTotalText } = useAutoTranslate('Grand Total');
+  const { translatedText: amountToPayText } = useAutoTranslate('Amount to Pay');
+  const { translatedText: deliverToText } = useAutoTranslate('Deliver to');
+  const { translatedText: deliveryAddressText } = useAutoTranslate('Delivery Address');
+  const { translatedText: noAddressSelectedText } = useAutoTranslate('No address selected');
+  const { translatedText: selectAddressButtonText } = useAutoTranslate('Select Address');
+  const { translatedText: yourCartIsEmptyText } = useAutoTranslate('Your cart is empty');
+  const { translatedText: looksLikeText } = useAutoTranslate("Looks like you haven't added anything yet");
+  const { translatedText: continueShoppingText } = useAutoTranslate('Continue Shopping →');
+  const { translatedText: payText } = useAutoTranslate('Pay');
+  const { translatedText: onlyAvailableText } = useAutoTranslate('Only available');
+  const { translatedText: lowStockText } = useAutoTranslate('Low Stock');
 
   const [promoOptions, setPromoOptions] = useState<any[]>([]);
   const [promoModalVisible, setPromoModalVisible] = useState(false);
@@ -144,12 +206,13 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       const selectedShipping = shippingOptions.find(
         s => Number(s.id) === Number(selectedShippingId),
       );
+      console.log('📦 Selected Shipping:', selectedShipping);
       return Number(selectedShipping?.cost) || 0;
     }
     return 0;
   };
 
-  // 🟢 Calculate final amount correctly
+  // Calculate final amount correctly
   const calculateFinalAmount = (): {
     subtotal: number;
     savings: number;
@@ -170,39 +233,36 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     }
 
     try {
-      const subtotal = Number(cartData?.subtotal_amount || 0);
+      const discountedTotal = Number(cartData?.discounted_total || 0);
       const savings = Number(cartData?.total_savings || 0);
       const couponDiscount = Number(discountAmount || 0);
       const shippingCost = Number(getShippingCost() || 0);
       const vatPercentage = Number(cartData.vat_percentage || 0);
 
-      console.log('💰 Raw values:', {
-        subtotal,
+      console.log('💰 Calculation Input:', {
+        discountedTotal,
         savings,
         couponDiscount,
         shippingCost,
         vatPercentage,
       });
 
-      const priceAfterDiscounts = subtotal - savings - couponDiscount;
-      const priceWithShipping = priceAfterDiscounts + shippingCost;
-
+      const afterCouponDiscount = discountedTotal - couponDiscount;
       const vatAmount = vatPercentage > 0
-        ? (priceAfterDiscounts * vatPercentage) / 100
+        ? (afterCouponDiscount * vatPercentage) / 100
         : 0;
-
-      const grandTotal = priceWithShipping + vatAmount;
+      const grandTotal = afterCouponDiscount + shippingCost + vatAmount;
       const roundedGrandTotal = Math.round(grandTotal * 100) / 100;
 
-      console.log('💰 Calculated:', {
-        priceAfterDiscounts,
-        priceWithShipping,
+      console.log('💰 Calculation Result:', {
+        afterCouponDiscount,
         vatAmount,
+        shippingCost,
         grandTotal: roundedGrandTotal,
       });
 
       return {
-        subtotal: Math.round(subtotal * 100) / 100,
+        subtotal: Math.round(discountedTotal * 100) / 100,
         savings: Math.round(savings * 100) / 100,
         couponDiscount: Math.round(couponDiscount * 100) / 100,
         shippingCost: Math.round(shippingCost * 100) / 100,
@@ -210,7 +270,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         grandTotal: roundedGrandTotal,
       };
     } catch (error) {
-      console.log('Error calculating final amount:', error);
+      console.log('❌ Error calculating final amount:', error);
       return {
         subtotal: 0,
         savings: 0,
@@ -281,11 +341,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       const newQty = currentQty + change;
 
       if (newQty < 1) {
-        Toast.show({ type: 'info', text1: 'Minimum quantity is 1' });
+        Toast.show({ type: 'info', text1: minQuantityText });
         return;
       }
       if (newQty > 99) {
-        Toast.show({ type: 'info', text1: 'Maximum quantity is 99' });
+        Toast.show({ type: 'info', text1: maxQuantityText });
         return;
       }
 
@@ -301,18 +361,18 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       if (res?.data?.success === true) {
         Toast.show({
           type: 'success',
-          text1: res.data?.message || 'Cart updated!',
+          text1: res.data?.message || cartUpdatedText,
         });
         await GetCartDetails();
       } else {
         if (res?.data?.message?.toLowerCase().includes('stock')) {
           Toast.show({
             type: 'error',
-            text1: 'Insufficient Stock',
+            text1: insufficientStockText,
             text2: res.data.message,
           });
         } else {
-          Toast.show({ type: 'error', text1: 'Failed to update cart' });
+          Toast.show({ type: 'error', text1: updateCartFailedText });
         }
       }
     } catch (err: any) {
@@ -321,13 +381,13 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       if (errorMessage.toLowerCase().includes('stock')) {
         Toast.show({
           type: 'error',
-          text1: 'Insufficient Stock',
+          text1: insufficientStockText,
           text2: errorMessage,
         });
       } else {
         Toast.show({
           type: 'error',
-          text1: err?.response?.data?.message || 'Something went wrong!',
+          text1: err?.response?.data?.message || updateCartFailedText,
         });
       }
     }
@@ -351,11 +411,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             }
 
             await removeFromCart(productId, variantId);
-            Toast.show({ type: 'success', text1: 'Item removed from cart' });
+            Toast.show({ type: 'success', text1: itemRemovedText });
           } catch (err: any) {
             Toast.show({
               type: 'error',
-              text1: 'Failed to remove item',
+              text1: removeFailedText,
             });
           } finally {
             hideLoader();
@@ -394,20 +454,18 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
           <View style={styles.itemDetailsContainer}>
             <View style={styles.itemHeader}>
-              <TransletText
-                text={item.product_name || item.name}
-                style={styles.shipmentName}
-                numberOfLines={2}
-              />
+              <Text style={styles.shipmentName} numberOfLines={2}>
+                {item.product_name || item.name}
+              </Text>
               {hasStockIssue && (
                 <View style={styles.stockWarningBadge}>
-                  <Text style={styles.stockWarningText}>⚠️ Low Stock</Text>
+                  <TransletText text={lowStockText} style={styles.stockWarningText} />
                 </View>
               )}
             </View>
 
             {item?.unit && (
-              <TransletText text={item.unit} style={styles.shipmentWeight} />
+              <Text style={styles.shipmentWeight}>{item.unit}</Text>
             )}
 
             <View style={styles.priceContainer}>
@@ -424,7 +482,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
             {hasStockIssue && (
               <Text style={styles.stockErrorText}>
-                Only {item.available_quantity} available
+                {onlyAvailableText} {item.available_quantity}
               </Text>
             )}
 
@@ -470,11 +528,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         }
         style={styles.suggestionImage}
       />
-      <TransletText
-        text={item.name}
-        style={styles.suggestionName}
-        numberOfLines={1}
-      />
+      <Text style={styles.suggestionName} numberOfLines={1}>
+        {item.name}
+      </Text>
 
       <View style={styles.ratingContainer}>
         {[1, 2, 3, 4, 5].map(r => {
@@ -509,7 +565,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
   const SetPromo = () => {
     if (!selectedPromoCode?.code) return;
 
-    const total = Number(cartData?.discounted_total) || Number(cartData?.total_amount) || 0;
+    const total =
+      Number(cartData?.discounted_total) || Number(cartData?.total_amount) || 0;
     const discountType = String(selectedPromoCode.type).toLowerCase();
     const discountValue = parseFloat(selectedPromoCode.discount);
     const maxDiscount = parseFloat(selectedPromoCode.max_discount) || Infinity;
@@ -538,7 +595,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
     Toast.show({
       type: 'success',
-      text1: `🎉 Coupon applied! Saved ${displayPrice(calculatedDiscount)}`,
+      text1: `🎉 ${couponAppliedText} ${displayPrice(calculatedDiscount)}`,
     });
     setPromoModalVisible(false);
   };
@@ -552,7 +609,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     });
     setAppliedPromo(null);
     setDiscountAmount(0);
-    Toast.show({ type: 'info', text1: 'Coupon removed' });
+    Toast.show({ type: 'info', text1: couponRemovedText });
   };
 
   const onRefresh = React.useCallback(async () => {
@@ -563,27 +620,70 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      GetCartDetails();
-    }, []),
+      console.log('🔄 CheckoutScreen focused - resetting states and refreshing cart');
+
+      // Reset all payment states when screen comes into focus
+      setPaymentIntentId(null);
+      setOrderId(null);
+      setTrackingNumber(null);
+      setOrderAmount(0);
+      setOrderCurrency('');
+      setBackendResponse(null);
+      setSelectedShippingId(null); // Reset shipping selection
+      setDiscountAmount(0); // Reset coupon discount
+      setAppliedPromo(null); // Reset applied promo
+      setSelectedPromoCode({ code: '', type: '', discount: '', max_discount: '' }); // Reset promo code
+
+      // Force refresh cart data
+      const refreshCartData = async () => {
+        await GetCartDetails();
+      };
+
+      refreshCartData();
+
+      return () => {
+        console.log('🔄 CheckoutScreen unfocused');
+      };
+    }, [cartVersion]), // Add cartVersion dependency
   );
+
+  // 3. Add this useEffect to refresh cart when cartVersion changes (already have this)
+  useEffect(() => {
+    console.log('🔄 cartVersion changed to:', cartVersion, '- refreshing cart data');
+    const refreshCartData = async () => {
+      await GetCartDetails();
+    };
+
+    refreshCartData();
+  }, [cartVersion]);
 
   const GetCartDetails = async () => {
     try {
       setLoadingCart(true);
       const res = await UserService.viewCart();
 
+      console.log('📦 Raw Cart API Response:', JSON.stringify(res.data, null, 2));
+
       const vatPercentage = Number(res?.data?.vat_percentage || 0);
 
-      if (res && res.data && res.data.cart?.items?.length > 0) {
-        const cartDataFromResponse = res.data.cart;
+      let cartDataFromResponse = null;
 
-        const processedItems = (cartDataFromResponse?.items || []).map(item => {
+      if (res?.data?.cart) {
+        cartDataFromResponse = res.data.cart;
+      } else if (res?.data?.data?.cart) {
+        cartDataFromResponse = res.data.data.cart;
+      } else if (Array.isArray(res?.data?.items)) {
+        cartDataFromResponse = { items: res.data.items, id: res.data.id };
+      }
+
+      if (cartDataFromResponse && cartDataFromResponse.items?.length > 0) {
+        const processedItems = (cartDataFromResponse.items || []).map(item => {
           const variant = item.variants?.[0] || {};
 
           return {
             ...item,
-            actual_price: Number(item.actual_price || item.total_price || 0),
-            total_price: Number(item.total_price || 0),
+            actual_price: Number(item.actual_price || item.price || item.total_price || 0),
+            total_price: Number(item.total_price || item.price || 0),
             unit: variant.unit || item.unit,
             variant_id: variant.id || item.variant_id,
             available_quantity: Number(variant.quantity || item.quantity || 0),
@@ -591,27 +691,27 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
           };
         });
 
-        const subtotal = processedItems.reduce((sum, item) => {
-          return sum + (Number(item.actual_price || 0) * Number(item.quantity || 1));
-        }, 0);
-
         const originalTotal = processedItems.reduce((sum, item) => {
           return sum + (Number(item.total_price || 0) * Number(item.quantity || 1));
         }, 0);
 
-        const totalSavings = originalTotal - subtotal;
+        const discountedTotal = processedItems.reduce((sum, item) => {
+          return sum + (Number(item.actual_price || 0) * Number(item.quantity || 1));
+        }, 0);
 
-        console.log('🛒 Cart Totals:', {
-          subtotal: Math.round(subtotal * 100) / 100,
-          originalTotal: Math.round(originalTotal * 100) / 100,
-          savings: Math.round(totalSavings * 100) / 100,
+        const totalSavings = originalTotal - discountedTotal;
+
+        console.log('🛒 Calculated Totals:', {
+          originalTotal,
+          discountedTotal,
+          totalSavings,
+          itemCount: processedItems.length
         });
 
         const processedCartData = {
           items: processedItems,
-          total_amount: Math.round(subtotal * 100) / 100,
-          subtotal_amount: Math.round(originalTotal * 100) / 100,
-          discounted_total: Math.round(subtotal * 100) / 100,
+          original_total: Math.round(originalTotal * 100) / 100,
+          discounted_total: Math.round(discountedTotal * 100) / 100,
           total_savings: Math.round(totalSavings * 100) / 100,
           id: cartDataFromResponse?.id || null,
           vat_percentage: vatPercentage,
@@ -619,19 +719,26 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
         setApiCartData(processedCartData);
         setcartid(processedCartData?.id);
+
+        console.log('✅ Processed Cart Data:', processedCartData);
       } else {
+        console.log('🛒 Cart is empty');
         setApiCartData({
           items: [],
-          total_amount: 0,
+          original_total: 0,
+          discounted_total: 0,
+          total_savings: 0,
           id: null,
           vat_percentage: vatPercentage,
         });
       }
     } catch (err: any) {
-      console.log('GetCartDetails error', err);
+      console.log('❌ GetCartDetails error:', err);
       setApiCartData({
         items: [],
-        total_amount: 0,
+        original_total: 0,
+        discounted_total: 0,
+        total_savings: 0,
         id: null,
         vat_percentage: 0,
       });
@@ -645,7 +752,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     try {
       setIsFetchingPromo(true);
       const res = await UserService.GetPromo_Code();
-      const data = Array.isArray(res?.data) ? res.data : res?.data?.data ?? res?.data;
+      const data = Array.isArray(res?.data)
+        ? res.data
+        : res?.data?.data ?? res?.data;
       setPromoOptions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log('GetPromo error', err);
@@ -655,63 +764,70 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
-  // 🟢 FIXED: Getshiping function - handles all response formats
   const Getshiping = async () => {
     try {
       setIsFetchingShipping(true);
       console.log('📦 Fetching shipping methods...');
 
       const res = await UserService.Shiping();
-      console.log('📦 Shipping API Full Response:', JSON.stringify(res.data, null, 2));
+      console.log(
+        '📦 Shipping API Full Response:',
+        JSON.stringify(res.data, null, 2),
+      );
 
       let options = [];
 
       if (res && (res.status === HttpStatusCode.Ok || res.status === 200)) {
-        // Case 1: Direct array
         if (Array.isArray(res.data)) {
-          console.log('📦 Case 1: Direct array');
           options = res.data;
-        }
-        // Case 2: { data: [...] }
-        else if (res.data?.data && Array.isArray(res.data.data)) {
-          console.log('📦 Case 2: data.data array');
+        } else if (res.data?.data && Array.isArray(res.data.data)) {
           options = res.data.data;
-        }
-        // Case 3: { shipping: [...] }
-        else if (res.data?.shipping && Array.isArray(res.data.shipping)) {
-          console.log('📦 Case 3: data.shipping array');
+        } else if (res.data?.shipping && Array.isArray(res.data.shipping)) {
           options = res.data.shipping;
-        }
-        // Case 4: { result: [...] } or { items: [...] }
-        else if (res.data?.result && Array.isArray(res.data.result)) {
-          console.log('📦 Case 4: data.result array');
+        } else if (res.data?.result && Array.isArray(res.data.result)) {
           options = res.data.result;
-        }
-        else if (res.data?.items && Array.isArray(res.data.items)) {
-          console.log('📦 Case 5: data.items array');
+        } else if (res.data?.items && Array.isArray(res.data.items)) {
           options = res.data.items;
-        }
-        // Case 5: Object with numeric keys
-        else if (typeof res.data === 'object' && res.data !== null) {
-          console.log('📦 Case 6: Checking object for array-like structure');
+        } else if (typeof res.data === 'object' && res.data !== null) {
           for (let key in res.data) {
             if (Array.isArray(res.data[key])) {
-              console.log(`📦 Found array in key: ${key}`);
               options = res.data[key];
               break;
             }
           }
         }
 
-        console.log('📦 Raw options before processing:', options);
-
         if (options.length > 0) {
           const processedOptions = options.map((opt, index) => {
-            const id = Number(opt.id || opt.shipping_id || opt.method_id || opt.ID || index + 1);
-            const type = opt.type || opt.name || opt.method_name || opt.title || opt.shipping_method || `Shipping Method ${id}`;
-            const cost = Number(opt.cost || opt.price || opt.amount || opt.rate || opt.shipping_cost || 0);
-            const estimated_time = opt.estimated_time || opt.delivery_time || opt.time || opt.duration || '3-5 business days';
-            const is_active = opt.is_active === '1' || opt.is_active === 1 || opt.is_active === true || opt.status === 'active';
+            const id = Number(
+              opt.id || opt.shipping_id || opt.method_id || opt.ID || index + 1,
+            );
+            const type =
+              opt.type ||
+              opt.name ||
+              opt.method_name ||
+              opt.title ||
+              opt.shipping_method ||
+              `Shipping Method ${id}`;
+            const cost = Number(
+              opt.cost ||
+              opt.price ||
+              opt.amount ||
+              opt.rate ||
+              opt.shipping_cost ||
+              0,
+            );
+            const estimated_time =
+              opt.estimated_time ||
+              opt.delivery_time ||
+              opt.time ||
+              opt.duration ||
+              '3-5 business days';
+            const is_active =
+              opt.is_active === '1' ||
+              opt.is_active === 1 ||
+              opt.is_active === true ||
+              opt.status === 'active';
 
             return {
               id,
@@ -719,25 +835,23 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               cost,
               estimated_time,
               is_active,
-              original: opt
+              original: opt,
             };
           });
 
-          console.log('📦 Processed shipping options:', processedOptions);
           setShippingOptions(processedOptions);
 
-          const firstActive = processedOptions.find(o => o.is_active) || processedOptions[0];
+          const firstActive =
+            processedOptions.find(o => o.is_active) || processedOptions[0];
           if (firstActive) {
-            console.log('📦 Auto-selecting shipping:', firstActive);
             setSelectedShippingId(firstActive.id);
           }
 
           return processedOptions;
         } else {
-          console.log('📦 No shipping options found in response');
           Toast.show({
             type: 'info',
-            text1: 'No shipping methods available',
+            text1: noShippingMethodsText,
           });
           return [];
         }
@@ -745,10 +859,9 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return [];
     } catch (err: any) {
       console.log('❌ Getshiping error:', err);
-      console.log('❌ Error response:', err?.response?.data);
       Toast.show({
         type: 'error',
-        text1: 'Failed to load shipping methods',
+        text1: failedToLoadShippingText,
         text2: err?.response?.data?.message || err.message,
       });
       return [];
@@ -778,7 +891,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
       Toast.show({
         type: 'success',
-        text1: 'Out of stock items removed',
+        text1: outOfStockItemsRemovedText,
       });
 
       setShowStockErrorModal(false);
@@ -786,14 +899,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     } catch (error) {
       Toast.show({
         type: 'error',
-        text1: 'Failed to remove items',
+        text1: failedToRemoveItemsText,
       });
     } finally {
       hideLoader();
     }
   };
 
-  // 🟢 FIXED: Initialize Payment Sheet with correct amount
+  // Initialize Payment Sheet with proper data saving
   const initializePaymentSheet = async () => {
     try {
       setIsProcessing(true);
@@ -801,21 +914,20 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       const breakdown = calculateFinalAmount();
       const amountToPay = breakdown.grandTotal;
 
-      console.log('========== 💳 STRIPE PAYMENT ==========');
-      console.log('Amount to Pay (Bill Summary):', amountToPay, selectedCurrency);
-      console.log('Amount in cents:', Math.round(amountToPay * 100));
-      console.log('===========================================');
+      // Clean the number
+      const displayString = displayPrice(amountToPay);
+      const noSpaces = displayString.replace(/\s/g, '');
+      const withoutLastChar = noSpaces.slice(0, -1);
+      const cleanNumber = parseFloat(withoutLastChar);
 
       const payload = {
         cart_id: cartid,
         address_id: selectedAddress?.id,
         shipping_id: selectedShippingId,
-        ...(appliedPromo && { promo_code: appliedPromo.code }),
-        amount: Math.round(amountToPay * 100),
         currency: selectedCurrency,
+        grand_total: cleanNumber,
+        ...(appliedPromo && { promo_code: appliedPromo.code }),
       };
-
-      console.log('📦 Payload to backend:', JSON.stringify(payload, null, 2));
 
       const response = await UserService.Placeorder(payload);
       console.log('✅ Backend Response:', response.data);
@@ -824,8 +936,20 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         throw new Error('No client secret received');
       }
 
-      setPaymentIntentId(response.data.payment_intent_id);
-      setOrderId(response.data.order_id);
+      // Save all data
+      setPaymentIntentId(response.data.stripe_order_id);
+      setOrderId(response.data.order_id?.toString());
+      setTrackingNumber(response.data.tracking_number);
+      setOrderAmount(response.data.amount_to_pay);
+      setOrderCurrency(response.data.currency);
+
+      console.log('💰 SAVED DATA:', {
+        orderId: response.data.order_id,
+        paymentIntentId: response.data.stripe_order_id,
+        trackingNumber: response.data.tracking_number,
+        amount: response.data.amount_to_pay,
+        currency: response.data.currency,
+      });
 
       const { error } = await initPaymentSheet({
         merchantDisplayName: 'White Peony',
@@ -843,54 +967,117 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       if (error) throw error;
 
       return { success: true };
+
     } catch (error: any) {
-      console.log('❌ Payment initialization error:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Payment Failed',
-        text2: error?.message,
-      });
+      console.log('❌ Error:', error);
       return { success: false };
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Handle payment with proper navigation for all cases
   const handlePayment = async () => {
     try {
       setIsProcessing(true);
       const { error } = await presentPaymentSheet();
+      const breakdown = calculateFinalAmount();
 
       if (error) {
-        if (error.code === 'Canceled') {
-          Toast.show({ type: 'info', text1: 'Payment cancelled' });
-        } else {
-          Toast.show({ type: 'error', text1: 'Payment Failed', text2: error.message });
-        }
+        // FAILURE CASE
+        console.log('Payment Error:', error);
+
+        const errorMessage = error.code === 'Canceled'
+          ? paymentCancelledText
+          : error.message;
+
+        Toast.show({
+          type: 'error',
+          text1: error.code === 'Canceled' ? paymentCancelledText : paymentFailedText,
+          text2: errorMessage,
+        });
+
+        // Clear states on failure
+        setPaymentIntentId(null);
+        setOrderId(null);
+        setTrackingNumber(null);
+        setOrderAmount(0);
+        setOrderCurrency('');
+
+        navigation.navigate('PaymentSuccess', {
+          status: 'failed',
+          errorMessage: errorMessage,
+          orderId: null,
+          paymentIntentId: null,
+          trackingNumber: null,
+          amount: breakdown.grandTotal,
+          currency: selectedCurrency,
+        });
         return;
       }
+
+      // SUCCESS CASE - Store variables before clearing
+      const successOrderId = orderId;
+      const successPaymentIntentId = paymentIntentId;
+      const successTrackingNumber = trackingNumber;
+      const successAmount = orderAmount || breakdown.grandTotal;
+      const successCurrency = orderCurrency || selectedCurrency;
+
+      console.log('✅ Payment Successful! Navigation Data:', {
+        orderId: successOrderId,
+        paymentIntentId: successPaymentIntentId,
+        trackingNumber: successTrackingNumber,
+        amount: successAmount,
+        currency: successCurrency,
+      });
 
       await clearCart();
       await GetCartDetails();
 
-      const breakdown = calculateFinalAmount();
+      // Clear states after successful navigation preparation
+      setPaymentIntentId(null);
+      setOrderId(null);
+      setTrackingNumber(null);
+      setOrderAmount(0);
+      setOrderCurrency('');
 
       navigation.reset({
         index: 0,
-        routes: [{
-          name: 'PaymentSuccess',
-          params: {
-            orderId,
-            paymentIntentId,
-            amount: breakdown.grandTotal,
-            currency: selectedCurrency,
+        routes: [
+          {
+            name: 'PaymentSuccess',
+            params: {
+              status: 'success',
+              orderId: successOrderId,
+              paymentIntentId: successPaymentIntentId,
+              trackingNumber: successTrackingNumber,
+              amount: successAmount,
+              currency: successCurrency,
+            },
           },
-        }],
+        ],
       });
 
     } catch (error: any) {
-      console.log('Payment error:', error);
-      Toast.show({ type: 'error', text1: 'Payment Failed' });
+      console.log('❌ Payment error:', error);
+      Toast.show({ type: 'error', text1: paymentFailedText });
+
+      // Clear states on error
+      setPaymentIntentId(null);
+      setOrderId(null);
+      setTrackingNumber(null);
+      setOrderAmount(0);
+      setOrderCurrency('');
+
+      navigation.navigate('PaymentSuccess', {
+        status: 'failed',
+        errorMessage: error?.message || unexpectedErrorText,
+        orderId: null,
+        paymentIntentId: null,
+        trackingNumber: null,
+        amount: breakdown?.grandTotal || 0,
+        currency: selectedCurrency,
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -903,7 +1090,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     }
 
     if (!cartid) {
-      Toast.show({ type: 'error', text1: 'Cart is empty' });
+      Toast.show({ type: 'error', text1: cartEmptyText });
       return;
     }
 
@@ -923,20 +1110,39 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
 
+    // Clear all payment states before new payment
+    setPaymentIntentId(null);
+    setOrderId(null);
+    setTrackingNumber(null);
+    setOrderAmount(0);
+    setOrderCurrency('');
+    setBackendResponse(null);
+
     const breakdown = calculateFinalAmount();
     const amountToPay = breakdown.grandTotal;
 
     Alert.alert(
-      'Confirm Payment',
-      `Total amount: ${displayPrice(amountToPay)}`,
+      confirmPaymentText,
+      `${totalAmountText}: ${displayPrice(amountToPay)}`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: cancelText, style: 'cancel' },
         {
-          text: 'Pay Now',
+          text: payNowText,
           onPress: async () => {
             const result = await initializePaymentSheet();
             if (result.success) {
               await handlePayment();
+            } else {
+              // Payment sheet initialization failed
+              navigation.navigate('PaymentSuccess', {
+                status: 'failed',
+                errorMessage: couldNotInitializePaymentText,
+                orderId: null,
+                paymentIntentId: null,
+                trackingNumber: null,
+                amount: breakdown.grandTotal,
+                currency: selectedCurrency,
+              });
             }
           },
         },
@@ -952,22 +1158,18 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
     return (
       <View style={styles.billSection}>
-        <Text style={styles.billTitle}>Bill Details</Text>
+        <TransletText text={billDetailsText} style={styles.billTitle} />
 
         <View style={styles.billRow}>
-          <Text style={styles.billLabel}>
-            Subtotal ({cartData.items.length} items)
-          </Text>
+          <TransletText text={`${subtotalText} (${cartData.items.length} ${cartData.items.length === 1 ? itemText : itemsText})`} style={styles.billLabel} />
           <Text style={styles.billValue}>
-            {displayPrice(cartData.subtotal_amount)}
+            {displayPrice(cartData.discounted_total)}
           </Text>
         </View>
 
         {breakdown.savings > 0 && (
           <View style={styles.billRow}>
-            <Text style={[styles.billLabel, styles.savingsLabel]}>
-              Total Savings
-            </Text>
+            <TransletText text={totalSavingsText} style={[styles.billLabel, styles.savingsLabel]} />
             <Text style={[styles.billValue, styles.savingsValue]}>
               -{displayPrice(breakdown.savings)}
             </Text>
@@ -977,9 +1179,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         {appliedPromo && breakdown.couponDiscount > 0 && (
           <View style={styles.billRow}>
             <View style={styles.couponRow}>
-              <Text style={[styles.billLabel, styles.couponLabel]}>
-                Coupon ({appliedPromo.code})
-              </Text>
+              <TransletText text={`${applyCouponText} (${appliedPromo.code})`} style={[styles.billLabel, styles.couponLabel]} />
               <TouchableOpacity onPress={removeCoupon}>
                 <Text style={styles.removeCouponText}>✕</Text>
               </TouchableOpacity>
@@ -991,17 +1191,17 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         )}
 
         <View style={styles.billRow}>
-          <Text style={styles.billLabel}>Delivery Charges</Text>
+          <TransletText text={deliveryChargesText} style={styles.billLabel} />
           <Text style={[styles.billValue, styles.deliveryValue]}>
             {breakdown.shippingCost > 0
               ? displayPrice(breakdown.shippingCost)
-              : 'Free'}
+              : freeText}
           </Text>
         </View>
 
         {vatPercentage > 0 && (
           <View style={styles.billRow}>
-            <Text style={styles.billLabel}>VAT ({vatPercentage}%)</Text>
+            <TransletText text={`${vatText} (${vatPercentage}%)`} style={styles.billLabel} />
             <Text style={styles.billValue}>
               {displayPrice(breakdown.vatAmount)}
             </Text>
@@ -1011,14 +1211,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         <View style={styles.divider} />
 
         <View style={styles.billRow}>
-          <Text style={styles.grandTotalLabel}>Grand Total</Text>
+          <TransletText text={grandTotalText} style={styles.grandTotalLabel} />
           <Text style={styles.grandTotalValue}>
             {displayPrice(breakdown.grandTotal)}
           </Text>
         </View>
 
         <View style={[styles.billRow, styles.amountToPayRow]}>
-          <Text style={styles.amountToPayLabel}>Amount to Pay</Text>
+          <TransletText text={amountToPayText} style={styles.amountToPayLabel} />
           <Text style={styles.amountToPayValue}>
             {displayPrice(breakdown.grandTotal)} {selectedCurrency}
           </Text>
@@ -1031,14 +1231,19 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Checkout</Text>
+            <TransletText text="Checkout" style={styles.headerTitle} />
             {cartData?.items?.length > 0 && (
               <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{cartData.items.length}</Text>
+                <Text style={styles.cartBadgeText}>
+                  {cartData.items.length}
+                </Text>
               </View>
             )}
           </View>
@@ -1048,23 +1253,27 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         {loadingCart ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#AEB254" />
-            <Text style={styles.loadingText}>Loading your cart...</Text>
+            <TransletText text={loadingYourCartText} style={styles.loadingText} />
           </View>
         ) : cartData?.items?.length > 0 ? (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#AEB254']} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={['#AEB254']}
+              />
             }
           >
             <View style={styles.shipmentSection}>
-              <Text style={styles.sectionTitle}>
-                Shipment ({cartData.items.length} {cartData.items.length === 1 ? 'item' : 'items'})
-              </Text>
+              <TransletText text={`${shipmentText} (${cartData.items.length} ${cartData.items.length === 1 ? itemText : itemsText})`} style={styles.sectionTitle} />
               <FlatList
                 data={cartData.items}
-                keyExtractor={(item, index) => (item.id ?? `${item.product_id}-${index}`).toString()}
+                keyExtractor={(item, index) =>
+                  (item.id ?? `${item.product_id}-${index}`).toString()
+                }
                 renderItem={renderShipmentItem}
                 scrollEnabled={false}
               />
@@ -1072,7 +1281,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
             {items.length > 0 && (
               <View style={styles.suggestionsSection}>
-                <Text style={styles.sectionTitle}>You Might Also Like</Text>
+                <TransletText text={youMightAlsoLikeText} style={styles.sectionTitle} />
                 <FlatList
                   data={items}
                   horizontal
@@ -1083,8 +1292,11 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
                 />
                 {items.length >= 3 && (
-                  <TouchableOpacity onPress={() => navigation.navigate('WishlistScreen')} style={styles.seeAllButton}>
-                    <Text style={styles.seeAllText}>See all products →</Text>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('WishlistScreen')}
+                    style={styles.seeAllButton}
+                  >
+                    <TransletText text={seeAllProductsText} style={styles.seeAllText} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -1094,7 +1306,6 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             <TouchableOpacity
               style={styles.shippingSelectorCard}
               onPress={async () => {
-                console.log('📦 Shipping card pressed');
                 setIsFetchingShipping(true);
                 const opts = await Getshiping();
                 if (opts && opts.length > 0) {
@@ -1106,19 +1317,21 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               <View style={styles.shippingIconContainer}>
                 <Text style={styles.shippingIcon}>🚚</Text>
                 <View style={styles.shippingDetails}>
-                  <Text style={styles.shippingTitle}>Shipping Method</Text>
+                  <TransletText text={shippingMethodText} style={styles.shippingTitle} />
                   {isFetchingShipping ? (
                     <ActivityIndicator size="small" color="#AEB254" />
                   ) : (
                     <Text style={styles.shippingSelected}>
                       {selectedShippingId
-                        ? (shippingOptions.find(s => Number(s.id) === Number(selectedShippingId))?.type || 'Select shipping')
-                        : 'Select shipping method'}
+                        ? shippingOptions.find(
+                          s => Number(s.id) === Number(selectedShippingId),
+                        )?.type || selectShippingMethodText
+                        : selectShippingMethodText}
                     </Text>
                   )}
                 </View>
               </View>
-              <Text style={styles.changeShipping}>Change →</Text>
+              <TransletText text={`${changeText} →`} style={styles.changeShipping} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1131,9 +1344,12 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
             >
               <View style={styles.couponButtonContent}>
                 <Text style={styles.couponButtonIcon}>🏷️</Text>
-                <Text style={styles.couponButtonText}>
-                  {selectedPromoCode?.code?.trim() ? selectedPromoCode.code : 'Apply Coupon'}
-                </Text>
+                <TransletText
+                  text={selectedPromoCode?.code?.trim()
+                    ? selectedPromoCode.code
+                    : applyCouponText}
+                  style={styles.couponButtonText}
+                />
               </View>
               <Text style={styles.couponButtonArrow}>→</Text>
             </TouchableOpacity>
@@ -1145,27 +1361,42 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               <View style={styles.addressIconContainer}>
                 <Text style={styles.addressIcon}>🏠</Text>
                 <View style={styles.addressDetails}>
-                  <Text style={styles.deliveryAddressTitle}>
-                    {selectedAddress?.address_type ? `Deliver to ${selectedAddress.address_type}` : 'Delivery Address'}
-                  </Text>
+                  <TransletText
+                    text={selectedAddress?.address_type
+                      ? `${deliverToText} ${selectedAddress.address_type}`
+                      : deliveryAddressText}
+                    style={styles.deliveryAddressTitle}
+                  />
                   <Text style={styles.deliveryAddress} numberOfLines={2}>
                     {selectedAddress
-                      ? `${selectedAddress.name}, ${selectedAddress.full_address}${selectedAddress.city ? `, ${selectedAddress.city}` : ''
-                      }${selectedAddress.postal_code ? `, ${selectedAddress.postal_code}` : ''}${selectedAddress.phone ? ` • ${selectedAddress.phone}` : ''
+                      ? `${selectedAddress.name}, ${selectedAddress.full_address
+                      }${selectedAddress.city
+                        ? `, ${selectedAddress.city}`
+                        : ''
+                      }${selectedAddress.postal_code
+                        ? `, ${selectedAddress.postal_code}`
+                        : ''
+                      }${selectedAddress.phone
+                        ? ` • ${selectedAddress.phone}`
+                        : ''
                       }`
-                      : 'No address selected'}
+                      : noAddressSelectedText}
                   </Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setModalAddress(true)}>
-                <Text style={styles.changeAddress}>{selectedAddress ? 'Change' : 'Select Address'} →</Text>
+                <TransletText
+                  text={selectedAddress ? `${changeText} →` : `${selectAddressButtonText} →`}
+                  style={styles.changeAddress}
+                />
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               style={[
                 styles.checkoutButton,
-                (!selectedAddress || !selectedShippingId || isProcessing) && styles.checkoutButtonDisabled,
+                (!selectedAddress || !selectedShippingId || isProcessing) &&
+                styles.checkoutButtonDisabled,
               ]}
               activeOpacity={0.8}
               onPress={PlaceOrder}
@@ -1176,9 +1407,10 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               ) : (
                 <>
                   <Text style={styles.checkoutButtonIcon}>💳</Text>
-                  <Text style={styles.checkoutBtnText}>
-                    Pay {displayPrice(calculateFinalAmount().grandTotal)}
-                  </Text>
+                  <TransletText
+                    text={`${payText} ${displayPrice(calculateFinalAmount().grandTotal)}`}
+                    style={styles.checkoutBtnText}
+                  />
                 </>
               )}
             </TouchableOpacity>
@@ -1186,13 +1418,15 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         ) : (
           <View style={styles.emptyCartContainer}>
             <Text style={styles.emptyCartIcon}>🛒</Text>
-            <Text style={styles.emptyCartTitle}>Your cart is empty</Text>
-            <Text style={styles.emptyCartSubtitle}>Looks like you haven't added anything yet</Text>
+            <TransletText text={yourCartIsEmptyText} style={styles.emptyCartTitle} />
+            <TransletText text={looksLikeText} style={styles.emptyCartSubtitle} />
             <TouchableOpacity
-              onPress={() => navigation.navigate('BottomTabScreen', { screen: 'Category' })}
+              onPress={() =>
+                navigation.navigate('BottomTabScreen', { screen: 'Category' })
+              }
               style={styles.shopNowButton}
             >
-              <Text style={styles.shopNowText}>Continue Shopping →</Text>
+              <TransletText text={continueShoppingText} style={styles.shopNowText} />
             </TouchableOpacity>
           </View>
         )}
@@ -1206,35 +1440,43 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         onRequestClose={() => setShippingModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => setShippingModalVisible(false)}>
+          <TouchableWithoutFeedback
+            onPress={() => setShippingModalVisible(false)}
+          >
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Select Shipping Method</Text>
+            <TransletText text={selectShippingMethodModalText} style={styles.modalTitle} />
 
             {isFetchingShipping ? (
-              <ActivityIndicator size="large" color="#AEB254" style={styles.modalLoader} />
+              <ActivityIndicator
+                size="large"
+                color="#AEB254"
+                style={styles.modalLoader}
+              />
             ) : shippingOptions.length === 0 ? (
-              <Text style={styles.noShippingText}>No shipping methods available</Text>
+              <TransletText text={noShippingMethodsText} style={styles.noShippingText} />
             ) : (
               <FlatList
                 data={shippingOptions}
-                keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+                keyExtractor={item =>
+                  item.id?.toString() || Math.random().toString()
+                }
                 renderItem={({ item }) => {
-                  const isSelected = Number(item.id) === Number(selectedShippingId);
+                  const isSelected =
+                    Number(item.id) === Number(selectedShippingId);
                   return (
                     <TouchableOpacity
                       onPress={() => {
-                        console.log('✅ Selected shipping:', item);
                         setSelectedShippingId(Number(item.id));
                         setShippingModalVisible(false);
-                        setApiCartData({ ...cartData });
                         Toast.show({
                           type: 'success',
-                          text1: `${item.type} selected`,
-                          text2: `Delivery: ${item.cost > 0 ? displayPrice(item.cost) : 'Free'}`,
+                          text1: `${item.type} ${shippingMethodSelectedText}`,
+                          text2: `${deliveryText}: ${item.cost > 0 ? displayPrice(item.cost) : freeText
+                            }`,
                         });
                       }}
                       style={[
@@ -1243,14 +1485,18 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                       ]}
                     >
                       <View style={styles.shippingOptionLeft}>
-                        <Text style={styles.shippingOptionType}>{item.type || 'Standard Shipping'}</Text>
+                        <Text style={styles.shippingOptionType}>
+                          {item.type || 'Standard Shipping'}
+                        </Text>
                         {item.estimated_time && (
-                          <Text style={styles.shippingOptionTime}>{item.estimated_time}</Text>
+                          <Text style={styles.shippingOptionTime}>
+                            {item.estimated_time}
+                          </Text>
                         )}
                       </View>
                       <View style={styles.shippingOptionRight}>
                         <Text style={styles.shippingOptionCost}>
-                          {item.cost > 0 ? displayPrice(item.cost) : 'Free'}
+                          {item.cost > 0 ? displayPrice(item.cost) : freeText}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -1264,7 +1510,7 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
               onPress={() => setShippingModalVisible(false)}
               style={styles.modalButton}
             >
-              <Text style={styles.modalButtonText}>Close</Text>
+              <TransletText text={closeText} style={styles.modalButtonText} />
             </TouchableOpacity>
           </View>
         </View>
@@ -1284,23 +1530,31 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
 
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Available Coupons</Text>
+            <TransletText text={availableCouponsText} style={styles.modalTitle} />
 
             {isFetchingPromo ? (
-              <ActivityIndicator size="large" color="#AEB254" style={styles.modalLoader} />
+              <ActivityIndicator
+                size="large"
+                color="#AEB254"
+                style={styles.modalLoader}
+              />
             ) : promoOptions.length === 0 ? (
-              <Text style={styles.noCouponsText}>No coupons available</Text>
+              <TransletText text={noCouponsAvailableText} style={styles.noCouponsText} />
             ) : (
               <FlatList
                 data={promoOptions}
-                keyExtractor={(item, idx) => (item.id ?? item.code ?? idx).toString()}
+                keyExtractor={(item, idx) =>
+                  (item.id ?? item.code ?? idx).toString()
+                }
                 renderItem={({ item }) => {
                   const code = item?.coupon_code || item?.code || '';
                   const isSelected = selectedPromoCode?.code === code;
 
                   let discountText = '';
                   if (item.discount_type === 'percentage') {
-                    discountText = `${item.discount_value}% off${item.max_discount ? ` (max ${displayPrice(item.max_discount)})` : ''
+                    discountText = `${item.discount_value}% off${item.max_discount
+                      ? ` (max ${displayPrice(item.max_discount)})`
+                      : ''
                       }`;
                   } else {
                     discountText = `${displayPrice(item.discount_value)} off`;
@@ -1323,15 +1577,20 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                     >
                       <View style={styles.couponItemLeft}>
                         <Text style={styles.couponCode}>{code}</Text>
-                        <Text style={styles.couponDiscount}>{discountText}</Text>
+                        <Text style={styles.couponDiscount}>
+                          {discountText}
+                        </Text>
                         {item.description && (
-                          <Text style={styles.couponDescription}>{item.description}</Text>
+                          <Text style={styles.couponDescription}>
+                            {item.description}
+                          </Text>
                         )}
                       </View>
                       <View style={styles.couponItemRight}>
                         {item.expiry_date && (
                           <Text style={styles.couponDate}>
-                            Exp: {new Date(item.expiry_date).toLocaleDateString()}
+                            Exp:{' '}
+                            {new Date(item.expiry_date).toLocaleDateString()}
                           </Text>
                         )}
                       </View>
@@ -1347,14 +1606,14 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                 onPress={() => setPromoModalVisible(false)}
                 style={[styles.modalButton, styles.modalButtonSecondary]}
               >
-                <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                <TransletText text={cancelText} style={styles.modalButtonTextSecondary} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={SetPromo}
                 style={[styles.modalButton, styles.modalButtonPrimary]}
               >
-                <Text style={styles.modalButtonTextPrimary}>Apply Coupon</Text>
+                <TransletText text={applyCouponText} style={styles.modalButtonTextPrimary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1371,8 +1630,8 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.stockErrorModalContent}>
             <Text style={styles.stockErrorModalIcon}>⚠️</Text>
-            <Text style={styles.stockErrorModalTitle}>{stockErrorTitle}</Text>
-            <Text style={styles.stockErrorModalMessage}>{stockErrorMessage}</Text>
+            <TransletText text={stockErrorTitle} style={styles.stockErrorModalTitle} />
+            <TransletText text={stockErrorMessage} style={styles.stockErrorModalMessage} />
 
             {stockErrors.map((error, index) => (
               <View key={index} style={styles.stockErrorItem}>
@@ -1380,24 +1639,31 @@ const CheckoutScreen = ({ navigation }: { navigation: any }) => {
                   {error.product_name || 'Product'}
                 </Text>
                 <Text style={styles.stockErrorItemDetail}>
-                  Requested: {error.quantity} | Available: {error.available_quantity || 0}
+                  Requested: {error.quantity} | Available:{' '}
+                  {error.available_quantity || 0}
                 </Text>
               </View>
             ))}
 
             <View style={styles.stockErrorModalButtons}>
               <TouchableOpacity
-                style={[styles.stockErrorButton, styles.stockErrorButtonSecondary]}
+                style={[
+                  styles.stockErrorButton,
+                  styles.stockErrorButtonSecondary,
+                ]}
                 onPress={() => setShowStockErrorModal(false)}
               >
-                <Text style={styles.stockErrorButtonTextSecondary}>{updateCartText}</Text>
+                <TransletText text={updateCartText} style={styles.stockErrorButtonTextSecondary} />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.stockErrorButton, styles.stockErrorButtonPrimary]}
+                style={[
+                  styles.stockErrorButton,
+                  styles.stockErrorButtonPrimary,
+                ]}
                 onPress={removeOutOfStockItems}
               >
-                <Text style={styles.stockErrorButtonTextPrimary}>{removeItemsText}</Text>
+                <TransletText text={removeItemsText} style={styles.stockErrorButtonTextPrimary} />
               </TouchableOpacity>
             </View>
 

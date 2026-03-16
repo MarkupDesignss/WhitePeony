@@ -70,6 +70,7 @@ interface ProductVariant {
   name?: string;
   percentage?: number;
   stock_quantity?: number;
+  stock?: string | number;
 }
 
 interface ProductData {
@@ -86,7 +87,7 @@ interface ProductData {
   variants: ProductVariant[];
   average_rating?: number;
   is_cart?: boolean;
-  stock_quantity?: number;
+  stock_quantity?: number | null;
 }
 
 const ProductDetails = ({ route }: ProductDetailsProps) => {
@@ -125,6 +126,8 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const { translatedText: somethingWrongText } = useAutoTranslate(
     'Something went wrong!',
   );
+  const { translatedText: outOfStockText } = useAutoTranslate('Out of Stock');
+  const { translatedText: variantOutOfStockText } = useAutoTranslate('Variant out of stock');
 
   // Refs
   const flatListRef = useRef<FlatList<any>>(null);
@@ -148,6 +151,55 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   );
 
   const variants = useMemo(() => productData?.variants || [], [productData]);
+
+  // Check if selected variant is in stock
+  const isVariantInStock = useCallback((variant: ProductVariant | null): boolean => {
+    if (!variant) return false;
+    
+    // Check variant stock (could be 'stock', 'stock_quantity', or direct value)
+    const variantStock = variant.stock ?? variant.stock_quantity;
+    
+    // If variant has stock information
+    if (variantStock !== undefined && variantStock !== null) {
+      // Handle both string and number
+      const stockValue = typeof variantStock === 'string' 
+        ? parseInt(variantStock, 10) 
+        : variantStock;
+      
+      // Check if stock is greater than 0
+      return stockValue > 0;
+    }
+    
+    // If no variant stock info, check product level stock
+    if (productData?.stock_quantity !== undefined && productData?.stock_quantity !== null) {
+      return productData.stock_quantity > 0;
+    }
+    
+    // If no stock info at all, assume it's in stock
+    return true;
+  }, [productData]);
+
+  // Check if product has any variant in stock
+  const hasAnyVariantInStock = useMemo(() => {
+    if (!variants.length) {
+      // If no variants, check product level stock
+      if (productData?.stock_quantity !== undefined && productData?.stock_quantity !== null) {
+        return productData.stock_quantity > 0;
+      }
+      return true; // Assume in stock if no info
+    }
+    
+    return variants.some(variant => {
+      const variantStock = variant.stock ?? variant.stock_quantity;
+      if (variantStock !== undefined && variantStock !== null) {
+        const stockValue = typeof variantStock === 'string' 
+          ? parseInt(variantStock, 10) 
+          : variantStock;
+        return stockValue > 0;
+      }
+      return true; // Assume variant in stock if no info
+    });
+  }, [variants, productData]);
 
   // Check if selected variant is in cart - optimized and fixed
   const checkSelectedVariantInCart = useMemo(() => {
@@ -177,6 +229,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         label: v.unit || v.weight || `Option ${i + 1}`,
         value: v.id,
         discount: v.percentage,
+        stock: v.stock || v.stock_quantity,
       })),
     [variants],
   );
@@ -209,10 +262,22 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         .map(img => (img.startsWith('http') ? img : `${resolvedBase}${img}`));
 
       const allVariants = product.variants || [];
-      const firstVariant = allVariants[0] || null;
-      const price = firstVariant?.price || product.main_price || '0';
-      const actual = firstVariant?.actual_price || price || '0';
-      const unit = firstVariant?.unit || '';
+      
+      // Find first in-stock variant
+      const firstInStockVariant = allVariants.find((v: any) => {
+        const variantStock = v.stock ?? v.stock_quantity;
+        if (variantStock !== undefined && variantStock !== null) {
+          const stockValue = typeof variantStock === 'string' 
+            ? parseInt(variantStock, 10) 
+            : variantStock;
+          return stockValue > 0;
+        }
+        return true;
+      }) || allVariants[0] || null;
+      
+      const price = firstInStockVariant?.price || product.main_price || '0';
+      const actual = firstInStockVariant?.actual_price || price || '0';
+      const unit = firstInStockVariant?.unit || '';
 
       // Lazy load extra images
       const extraImages = product.images
@@ -231,8 +296,9 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
           images: allImages,
           price,
           unit,
+          stock_quantity: product.stock_quantity,
         },
-        firstVariant,
+        firstVariant: firstInStockVariant,
         price,
         actual,
         unit,
@@ -339,7 +405,20 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     setActualPrice(actual);
     setDisplayUnit(unit);
     setSelectedVariant(firstVariant);
-    setSelectedIndex(0);
+    
+    // Find index of first in-stock variant or default to 0
+    const initialIndex = allVariants.findIndex((v: any) => {
+      const variantStock = v.stock ?? v.stock_quantity;
+      if (variantStock !== undefined && variantStock !== null) {
+        const stockValue = typeof variantStock === 'string' 
+          ? parseInt(variantStock, 10) 
+          : variantStock;
+        return stockValue > 0;
+      }
+      return true;
+    });
+    
+    setSelectedIndex(initialIndex >= 0 ? initialIndex : 0);
   }, []);
 
   const loadRelatedProducts = useCallback(
@@ -378,7 +457,17 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                 img.startsWith('http') ? img : `${resolvedBase}${img}`,
               );
 
-            const variant = p.variants?.[0] || null;
+            const variant = p.variants?.find((v: any) => {
+              const variantStock = v.stock ?? v.stock_quantity;
+              if (variantStock !== undefined && variantStock !== null) {
+                const stockValue = typeof variantStock === 'string' 
+                  ? parseInt(variantStock, 10) 
+                  : variantStock;
+                return stockValue > 0;
+              }
+              return true;
+            }) || p.variants?.[0] || null;
+            
             const price = variant?.price || p.main_price || p.price || '0';
             const unit = variant?.unit || p.unit || '';
 
@@ -482,6 +571,15 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const handleCartAction = useCallback(async () => {
     if (!productData || !selectedVariant) return;
 
+    // Check if variant is in stock
+    if (!isVariantInStock(selectedVariant)) {
+      Toast.show({
+        type: 'error',
+        text1: variantOutOfStockText || 'This variant is out of stock',
+      });
+      return;
+    }
+
     // If already in cart → go to Cart tab
     if (isInCart) {
       navigation.navigate('BottomTabScreen', {
@@ -515,13 +613,25 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     productData,
     selectedVariant,
     isInCart,
+    isVariantInStock,
     addToCart,
     navigation,
     addedToCartText,
     somethingWrongText,
+    variantOutOfStockText,
   ]);
+
   const checkoutAction = useCallback(async () => {
     if (!productData || !selectedVariant) return;
+
+    // Check if variant is in stock
+    if (!isVariantInStock(selectedVariant)) {
+      Toast.show({
+        type: 'error',
+        text1: variantOutOfStockText || 'This variant is out of stock',
+      });
+      return;
+    }
 
     if (isInCart) {
       navigation.navigate('CheckoutScreen');
@@ -552,10 +662,12 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
     productData,
     isInCart,
     selectedVariant,
+    isVariantInStock,
     addToCart,
     navigation,
     addedToCartText,
     somethingWrongText,
+    variantOutOfStockText,
   ]);
 
   const openZoom = useCallback((index: number) => {
@@ -570,8 +682,37 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const CartButton = useMemo(() => {
     if (!productData) return null;
 
-    if (productData.stock_quantity === 0) {
-      return <TransletText text="Out of Stock" style={styles.outOfStock} />;
+    // Check if selected variant is out of stock
+    const isSelectedVariantOutOfStock = selectedVariant && !isVariantInStock(selectedVariant);
+    
+    // Check if product has any variant in stock
+    if (!hasAnyVariantInStock) {
+      return (
+        <View style={styles.outOfStockContainer}>
+          <Image 
+            source={require('../../assets/Png/out-of-stock.png')} 
+            style={styles.outOfStockIcon}
+            resizeMode="contain"
+          />
+          <TransletText text="Out of Stock" style={styles.outOfStockText} />
+          <TransletText text="This product is currently unavailable" style={styles.outOfStockSubText} />
+        </View>
+      );
+    }
+
+    // If selected variant is out of stock
+    if (isSelectedVariantOutOfStock) {
+      return (
+        <View style={styles.outOfStockContainer}>
+          <Image 
+            source={require('../../assets/Png/out-of-stock.png')} 
+            style={styles.outOfStockIcon}
+            resizeMode="contain"
+          />
+          <TransletText text="Variant Out of Stock" style={styles.outOfStockText} />
+          <TransletText text="Please select another variant" style={styles.outOfStockSubText} />
+        </View>
+      );
     }
 
     return (
@@ -598,7 +739,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
         </TouchableOpacity>
       </View>
     );
-  }, [productData, isInCart, handleCartAction, checkoutAction, isLoggedIn]);
+  }, [productData, selectedVariant, isVariantInStock, hasAnyVariantInStock, isInCart, handleCartAction, checkoutAction, isLoggedIn]);
 
   // Loading state
   if (loading) {
@@ -811,6 +952,21 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
             </Text>
           )}
 
+          {/* Stock Status Indicator */}
+          {!hasAnyVariantInStock ? (
+            <View style={styles.stockStatusBadge}>
+              <TransletText text="Out of Stock" style={styles.stockStatusOutOfStock} />
+            </View>
+          ) : selectedVariant && !isVariantInStock(selectedVariant) ? (
+            <View style={styles.stockStatusBadge}>
+              <TransletText text="Selected Variant Out of Stock" style={styles.stockStatusOutOfStock} />
+            </View>
+          ) : (
+            <View style={styles.stockStatusBadge}>
+              <TransletText text="In Stock" style={styles.stockStatusInStock} />
+            </View>
+          )}
+
           {/* Variant Selection */}
           {variants.length > 0 && (
             <View style={styles.variantSection}>
@@ -820,16 +976,19 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                   const isSelected = selectedIndex === index;
                   const hasDiscount =
                     variant.percentage && variant.percentage > 0;
+                  const isOutOfStock = !isVariantInStock(variant);
 
                   return (
                     <TouchableOpacity
                       key={`variant_${variant.id}`}
                       activeOpacity={0.8}
-                      onPress={() => handleVariantSelect(index, variant)}
+                      onPress={() => !isOutOfStock && handleVariantSelect(index, variant)}
                       style={[
                         styles.variantButton,
                         isSelected && styles.variantButtonSelected,
+                        isOutOfStock && styles.variantButtonOutOfStock,
                       ]}
+                      disabled={isOutOfStock}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       {hasDiscount && (
@@ -845,11 +1004,17 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
                           />
                         </LinearGradient>
                       )}
+                      {isOutOfStock && (
+                        <View style={styles.outOfStockOverlay}>
+                          <TransletText text="Out of Stock" style={styles.outOfStockOverlayText} />
+                        </View>
+                      )}
                       <TransletText
                         text={variant.unit || variant.weight || variant.name}
                         style={[
                           styles.variantText,
                           isSelected && styles.variantTextSelected,
+                          isOutOfStock && styles.variantTextOutOfStock,
                         ]}
                       />
                     </TouchableOpacity>
@@ -1268,6 +1433,23 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 2,
   },
+  stockStatusBadge: {
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  stockStatusInStock: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  stockStatusOutOfStock: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F44336',
+  },
   variantSection: {
     marginTop: hp(2),
   },
@@ -1290,9 +1472,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
   },
   variantButtonSelected: {
     borderColor: '#000',
+    borderWidth: 2,
+  },
+  variantButtonOutOfStock: {
+    opacity: 0.5,
+    borderColor: '#ccc',
+    backgroundColor: '#f5f5f5',
   },
   discountBadge: {
     position: 'absolute',
@@ -1308,6 +1498,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     paddingLeft: 8,
   },
+  outOfStockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  outOfStockOverlayText: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#F44336',
+    transform: [{ rotate: '-15deg' }],
+  },
   variantText: {
     fontSize: 12,
     fontWeight: '700',
@@ -1315,6 +1521,9 @@ const styles = StyleSheet.create({
   },
   variantTextSelected: {
     color: '#000',
+  },
+  variantTextOutOfStock: {
+    color: '#999',
   },
   cartButtonContainer: {
     flexDirection: 'row',
@@ -1351,11 +1560,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  outOfStock: {
-    marginTop: 10,
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'red',
+  outOfStockContainer: {
+    marginTop: hp(3),
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#fff5f5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
+  },
+  outOfStockIcon: {
+    width: 50,
+    height: 50,
+    marginBottom: 10,
+    tintColor: '#F44336',
+  },
+  outOfStockText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#F44336',
+    marginBottom: 5,
+  },
+  outOfStockSubText: {
+    fontSize: 12,
+    color: '#666',
     textAlign: 'center',
   },
   descriptionSection: {
