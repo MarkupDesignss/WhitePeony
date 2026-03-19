@@ -41,22 +41,22 @@ const AddressDetailModal = ({
 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-    const { translatedText: fullNamePH } = useAutoTranslate('Full Name*');
-      const { translatedText: emailPH } = useAutoTranslate('Email ID*');
-      const { translatedText: phonePH } = useAutoTranslate('Contact Number*');
-      const { translatedText: addressPH } = useAutoTranslate('Full Address*');
-      const { translatedText: cityPH } = useAutoTranslate('City*');
-      const { translatedText: zipPH } = useAutoTranslate('ZIP Code*');
+  const { translatedText: fullNamePH } = useAutoTranslate('Full Name*');
+  const { translatedText: emailPH } = useAutoTranslate('Email ID*');
+  const { translatedText: phonePH } = useAutoTranslate('Contact Number*');
+  const { translatedText: addressPH } = useAutoTranslate('Full Address*');
+  const { translatedText: cityPH } = useAutoTranslate('City*');
+  const { translatedText: zipPH } = useAutoTranslate('ZIP Code*');
 
-      const { translatedText: fixValidationText } =
-  useAutoTranslate('Please fix validation errors');
+  const { translatedText: fixValidationText } =
+    useAutoTranslate('Please fix validation errors');
 
-const { translatedText: addressSavedText } =
-  useAutoTranslate('Address saved successfully!');
+  const { translatedText: addressSavedText } =
+    useAutoTranslate('Address saved successfully!');
 
-const { translatedText: somethingWrongText } =
-  useAutoTranslate('Something went wrong! Please try again.');
-      
+  const { translatedText: somethingWrongText } =
+    useAutoTranslate('Something went wrong! Please try again.');
+
 
   const [errors, setErrors] = useState({
     name: '',
@@ -368,7 +368,7 @@ const { translatedText: somethingWrongText } =
                   blurOnSubmit={false}
                 />
                 {errors.email ? (
-                  <TransletText text={errors.name} style={styles.errorText} />
+                  <TransletText text={errors.email} style={styles.errorText} />  // ✅ Now shows email error for email field
                 ) : null}
 
                 <TextInput

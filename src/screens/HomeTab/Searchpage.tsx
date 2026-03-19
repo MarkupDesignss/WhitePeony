@@ -153,7 +153,7 @@ const Searchpage = ({ navigation }: any) => {
   const stopListening = async () => {
     try {
       await Voice.stop();
-    } catch {}
+    } catch { }
 
     setListening(false);
     pulseAnim.stopAnimation();
@@ -401,7 +401,8 @@ const Searchpage = ({ navigation }: any) => {
         source={require('../../assets/Png/search.png')}
         style={styles.trendingTagIcon}
       />
-      <TransletText style={styles.trendingTagText} text={tag} />
+      {/* <TransletText style={styles.trendingTagText} text={tag} /> */}
+      <Text style={styles.trendingTagText}> {tag}</Text>
     </TouchableOpacity>
   );
 
@@ -506,12 +507,20 @@ const Searchpage = ({ navigation }: any) => {
               source={require('../../assets/noproduct.png')}
               style={styles.emptyImage}
             />
-            <Text style={styles.emptyTitle}>No products found</Text>
-            <Text style={styles.emptySubtitle}>
-              Try searching with different keywords
-            </Text>
+            {/* <Text style={styles.emptyTitle}>No products found</Text> */}
+            <TransletText
+              style={styles.emptyTitle}
+              text="No products found"
+            />
+            <TransletText
+              style={styles.emptySubtitle}
+              text="Try searching with different keywords"
+            />
             <View style={styles.suggestionsContainer}>
-              <Text style={styles.suggestionsTitle}>Try these instead:</Text>
+              <TransletText
+                style={styles.suggestionsTitle}
+                text="Try these instead:"
+              />
               <View style={styles.suggestionsList}>
                 {trendingSearches.slice(0, 5).map((tag, index) => (
                   <TouchableOpacity

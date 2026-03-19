@@ -1,6 +1,6 @@
 // components/AddressModal.tsx
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -21,7 +21,6 @@ import AddressDetailModal from './AddressDetailModal';
 import { Images } from '../constant';
 import TransletText from '../components/TransletText';
 import { useAutoTranslate } from '../hooks/useAutoTranslate';
-
 
 type Address = {
   id: string | number;
@@ -53,27 +52,35 @@ const AddressModal: React.FC<AddressModalProps> = ({
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [internalVisible, setInternalVisible] = useState(visible);
-  const { translatedText: failedLoadText } =
-    useAutoTranslate('Failed to load addresses');
+  const { translatedText: failedLoadText } = useAutoTranslate('Failed to load addresses');
 
-  
-  // Ref to track if we're already fetching data
+  // Refs to prevent multiple API calls and track state
   const isFetchingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  const isAddingAddressRef = useRef(false);
+  const isEditingAddressRef = useRef(false);
 
-  // Handle modal visibility changes smoothly
+  // Handle modal visibility changes
   useEffect(() => {
     if (visible) {
       setInternalVisible(true);
-      loadAddresses();
+      // Only load if we haven't loaded before
+      if (!hasLoadedRef.current && !isAddingAddressRef.current && !isEditingAddressRef.current) {
+        loadAddresses();
+      }
     } else {
-      setInternalVisible(false);
+      // Don't immediately hide if we're about to show address detail
+      if (!isAddingAddressRef.current && !isEditingAddressRef.current) {
+        setInternalVisible(false);
+      }
     }
   }, [visible]);
 
-  // Load addresses when modal becomes visible
-  const loadAddresses = async () => {
-    // Prevent duplicate calls
+  // Load addresses
+  const loadAddresses = useCallback(async (forceRefresh = false) => {
+    // Prevent multiple calls
     if (isFetchingRef.current) return;
+    if (hasLoadedRef.current && !forceRefresh) return;
 
     isFetchingRef.current = true;
     setIsLoading(true);
@@ -84,42 +91,73 @@ const AddressModal: React.FC<AddressModalProps> = ({
       if (res?.status === HttpStatusCode.Ok && res?.data) {
         const { addresses } = res.data;
         setAddressList(addresses || []);
+        hasLoadedRef.current = true;
       } else {
         Toast.show({
           type: 'error',
           text1: failedLoadText || 'Failed to load addresses',
         });
-
         setAddressList([]);
       }
     } catch (err: any) {
       console.log('Error in Addresses:', err.message || err);
       Toast.show({
         type: 'error',
-        text1:
-          err?.response?.data?.message ||
-          'Something went wrong! Please try again.',
+        text1: err?.response?.data?.message || 'Something went wrong! Please try again.',
       });
       setAddressList([]);
     } finally {
       setIsLoading(false);
       isFetchingRef.current = false;
     }
+  }, [failedLoadText]);
+
+  const handleAddressSelect = (address: Address) => {
+    // Select address and close
+    onSelect && onSelect(address);
+    handleClose();
   };
 
-  const handleAddressSelect = (address: Address | null) => {
-    if (address) {
-      // Selecting an existing address → return to parent and close
-      onSelect && onSelect(address);
-      handleClose();
-      return;
-    }
-    // Add New flow
-    handleClose();
+  const handleAddNewPress = () => {
+    // Set flag to prevent main modal from closing issues
+    isAddingAddressRef.current = true;
+
+    // Close main modal first
+    setInternalVisible(false);
+
+    // Call onClose prop
+    onClose && onClose();
+
+    // Small delay to ensure smooth transition
     setTimeout(() => {
       setSelectedAddress(null);
       setShowAddressDetail(true);
-    }, 300); // Increased timeout for smoother transition
+      // Reset flag after opening detail modal
+      setTimeout(() => {
+        isAddingAddressRef.current = false;
+      }, 500);
+    }, 300);
+  };
+
+  const handleEditPress = (address: Address) => {
+    // Set flag to prevent main modal from closing issues
+    isEditingAddressRef.current = true;
+
+    // Close main modal first
+    setInternalVisible(false);
+
+    // Call onClose prop
+    onClose && onClose();
+
+    // Small delay to ensure smooth transition
+    setTimeout(() => {
+      setSelectedAddress(address);
+      setShowAddressDetail(true);
+      // Reset flag after opening detail modal
+      setTimeout(() => {
+        isEditingAddressRef.current = false;
+      }, 500);
+    }, 300);
   };
 
   const handleClose = () => {
@@ -155,7 +193,9 @@ const AddressModal: React.FC<AddressModalProps> = ({
           type: 'success',
           text1: res.data?.message || 'Address deleted successfully!',
         });
-        loadAddresses(); // Refresh the list
+        // Reset loaded flag to force refresh
+        hasLoadedRef.current = false;
+        loadAddresses(true);
       } else {
         Toast.show({ type: 'error', text1: 'Failed to delete address' });
       }
@@ -164,18 +204,31 @@ const AddressModal: React.FC<AddressModalProps> = ({
       console.log('Delete address error:', err.message || err);
       Toast.show({
         type: 'error',
-        text1:
-          err?.response?.data?.message ||
-          'Something went wrong! Please try again.',
+        text1: err?.response?.data?.message || 'Something went wrong! Please try again.',
       });
     }
   };
 
-  const handleAddressDetailClose = () => {
+  const handleAddressDetailClose = useCallback(() => {
+    // Hide detail modal
     setShowAddressDetail(false);
-    // Refresh addresses after detail modal closes
-    loadAddresses();
-  };
+    setSelectedAddress(null);
+
+    // Reset loaded flag to refresh data
+    hasLoadedRef.current = false;
+
+    // Show main modal again
+    setTimeout(() => {
+      setInternalVisible(true);
+      // Load fresh data
+      loadAddresses(true);
+    }, 300);
+  }, [loadAddresses]);
+
+  const handleAddressDetailSave = useCallback(() => {
+    // Called when address is saved successfully
+    handleAddressDetailClose();
+  }, [handleAddressDetailClose]);
 
   return (
     <>
@@ -192,7 +245,7 @@ const AddressModal: React.FC<AddressModalProps> = ({
                 <TransletText text="Select Address" style={styles.header} />
                 <TouchableOpacity
                   style={styles.addButton}
-                  onPress={() => handleAddressSelect(null)}
+                  onPress={handleAddNewPress}
                 >
                   <Image
                     source={Images.plus1}
@@ -212,19 +265,13 @@ const AddressModal: React.FC<AddressModalProps> = ({
                     </View>
                   ) : addressList && addressList.length > 0 ? (
                     addressList.map(addr => (
-                      <TouchableOpacity
-                        key={addr.id}
-                        style={styles.addressCard}
-                        onPress={() => handleAddressSelect(addr)}
-                      >
+                      <View key={addr.id} style={styles.addressCard}>
                         <View style={styles.addressCardHeader}>
-                          <View style={{ flexDirection: 'row' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Image
                               source={Images.home}
                               style={{ width: 18, height: 18 }}
                             />
-
-                            {/* Address Type */}
                             <TransletText
                               text={addr.address_type || ''}
                               style={styles.addressLabel}
@@ -232,10 +279,8 @@ const AddressModal: React.FC<AddressModalProps> = ({
                           </View>
 
                           <TouchableOpacity
-                            onPress={() => {
-                              setSelectedAddress(addr);
-                              setShowAddressDetail(true);
-                            }}
+                            onPress={() => handleEditPress(addr)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                           >
                             <Image
                               source={Images.clock}
@@ -244,28 +289,30 @@ const AddressModal: React.FC<AddressModalProps> = ({
                           </TouchableOpacity>
                         </View>
 
-                        <View style={{ marginTop: 10 }}>
-                          <TransletText
-                            text={addr.name || ''}
-                            style={styles.addressName}
-                          />
-
-                          <TransletText
-                            text={addr.full_address || ''}
-                            style={styles.addressLine}
-                          />
-
-                          <TransletText
-                            text={String(addr.phone || '')}
-                            style={styles.addressLine}
-                          />
-
-                          <TransletText
-                            text={String(addr.postal_code || '')}
-                            style={styles.addressLine}
-                          />
-                        </View>
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleAddressSelect(addr)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{ marginTop: 10 }}>
+                            <TransletText
+                              text={addr.name || ''}
+                              style={styles.addressName}
+                            />
+                            <TransletText
+                              text={addr.full_address || ''}
+                              style={styles.addressLine}
+                            />
+                            <TransletText
+                              text={String(addr.phone || '')}
+                              style={styles.addressLine}
+                            />
+                            <TransletText
+                              text={String(addr.postal_code || '')}
+                              style={styles.addressLine}
+                            />
+                          </View>
+                        </TouchableOpacity>
+                      </View>
                     ))
                   ) : (
                     <View style={styles.emptyContainer}>
@@ -273,10 +320,9 @@ const AddressModal: React.FC<AddressModalProps> = ({
                         text="No addresses found"
                         style={styles.emptyText}
                       />
-
                       <TouchableOpacity
                         style={styles.emptyButton}
-                        onPress={() => handleAddressSelect(null)}
+                        onPress={handleAddNewPress}
                       >
                         <TransletText
                           text="Add New Address"
@@ -286,7 +332,6 @@ const AddressModal: React.FC<AddressModalProps> = ({
                     </View>
                   )}
                 </ScrollView>
-
 
                 <TouchableOpacity
                   onPress={handleClose}
@@ -300,12 +345,16 @@ const AddressModal: React.FC<AddressModalProps> = ({
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Address Detail Modal - rendered separately */}
+      {/* Address Detail Modal */}
       <AddressDetailModal
         isVisible={showAddressDetail}
         onClose={handleAddressDetailClose}
+        onSave={handleAddressDetailSave}
         addresses={selectedAddress}
-        onAddressUpdated={loadAddresses}
+        onAddressUpdated={() => {
+          hasLoadedRef.current = false;
+          loadAddresses(true);
+        }}
       />
     </>
   );
@@ -349,6 +398,7 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '600',
     fontSize: 14,
+    marginLeft: 8,
   },
   addressCard: {
     borderWidth: 1,
@@ -369,8 +419,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#AEB254',
-    opacity: 1,
-    left: 10,
+    marginLeft: 10,
   },
   addressName: {
     fontSize: 15,
