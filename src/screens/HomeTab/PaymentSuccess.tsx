@@ -17,20 +17,88 @@ import Toast from 'react-native-toast-message';
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { convertAndFormatPrice } from '../../utils/currencyUtils';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
-import TransletText from '../../components/TransletText'; // Add this import
+import TransletText from '../../components/TransletText';
+
+// ── Theme (matches OrdersScreen) ──────────────────────────────────────────────
+const T = {
+  accent: '#AEB254',
+  accentBg: '#F4F5E8',
+  accentDark: '#8A8C3E',
+  bg: '#F6F6F4',
+  card: '#FFFFFF',
+  border: '#EBEBEB',
+  text: '#1A1A1A',
+  textSub: '#6B6B6B',
+  textHint: '#AAAAAA',
+  success: '#2A6A4A',
+  successBg: '#EAF6EF',
+  danger: '#9B3333',
+  dangerBg: '#FDEAEA',
+  warning: '#8A6D20',
+  warningBg: '#FDF5E6',
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const formatDate = (d: any) => {
+  try {
+    return new Date(d).toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return new Date().toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+};
+
+// ── Status config ─────────────────────────────────────────────────────────────
+const statusConfig = {
+  success: {
+    iconBg: '#EAF6EF',
+    iconColor: T.success,
+    badgeBg: T.successBg,
+    badgeText: T.success,
+    badgeLabel: 'Paid',
+    title: 'Order Confirmed',
+    sub: 'Your order has been placed. Thank you for shopping with us!',
+  },
+  failed: {
+    iconBg: T.dangerBg,
+    iconColor: T.danger,
+    badgeBg: T.dangerBg,
+    badgeText: T.danger,
+    badgeLabel: 'Failed',
+    title: 'Payment Failed',
+    sub: 'Your payment could not be processed. Please try again.',
+  },
+  pending: {
+    iconBg: T.warningBg,
+    iconColor: T.warning,
+    badgeBg: T.warningBg,
+    badgeText: T.warning,
+    badgeLabel: 'Pending',
+    title: 'Payment Processing',
+    sub: 'Your payment is being verified. Please wait a moment.',
+  },
+};
 
 const PaymentSuccess = ({ navigation, route }: any) => {
   const { showLoader, hideLoader } = CommonLoader();
-  // Get params from route - ALL backend fields except client_secret
   const {
     orderId,
-    paymentIntentId,  // stripe_order_id
-    amount,           // amount_to_pay
+    paymentIntentId,
+    amount,
     currency,
     status,
     errorMessage,
-    trackingNumber,   // tracking_number
-    message,          // backend message
+    trackingNumber,
+    message,
   } = route.params || {};
 
   const [orderDetails, setOrderDetails] = useState<any>(null);
@@ -40,81 +108,64 @@ const PaymentSuccess = ({ navigation, route }: any) => {
   >(status || 'success');
   const [verifying, setVerifying] = useState(false);
 
-  const selectedCurrency = useAppSelector(
-    state => state.currency.selectedCurrency,
-  );
+  const selectedCurrency = useAppSelector(s => s.currency.selectedCurrency);
   const { data: rates } = useGetRatesQuery(undefined);
 
-  const displayPrice = (price: any): string => {
-    return convertAndFormatPrice(price, selectedCurrency, rates);
-  };
+  const displayPrice = (price: any): string =>
+    convertAndFormatPrice(price, selectedCurrency, rates);
 
   useEffect(() => {
     fetchOrderDetails();
-
     if (paymentStatus === 'pending') {
-      const interval = setInterval(checkPaymentStatus, 5000);
-      return () => clearInterval(interval);
+      const iv = setInterval(checkPaymentStatus, 5000);
+      return () => clearInterval(iv);
     }
   }, []);
 
   const fetchOrderDetails = async () => {
     try {
       setLoading(true);
+      // ── Same API call as OrdersScreen ──────────────────────────────────────
+      // Response shape: { success, orders: [ { id, stripe_order_id,
+      //   tracking_number, final_total, payment_status, items: [...] } ] }
+      const res = await UserService.order();
 
-      if (orderId) {
-        const response = await UserService.getOrderById(orderId);
-        console.log('📦 Order Details Response:', response.data);
+      if (res?.data?.success && Array.isArray(res.data.orders)) {
+        const match = res.data.orders.find(
+          (o: any) => String(o.id) === String(orderId),
+        );
 
-        if (response?.data?.success) {
-          setOrderDetails(response.data.data);
+        if (match) {
+          // Fields come directly from the orders list API — no renaming needed
+          setOrderDetails(match);
 
-          if (
-            response.data.data.payment_status === 'paid' ||
-            response.data.data.payment_status === 'success'
-          ) {
-            setPaymentStatus('success');
-          } else if (response.data.data.payment_status === 'failed') {
-            setPaymentStatus('failed');
-          } else {
-            setPaymentStatus('pending');
-          }
-        } else {
-          // Fallback to route params
-          setOrderDetails({
-            order_number: orderId,
-            stripe_order_id: paymentIntentId,
-            transaction_id: paymentIntentId,
-            tracking_number: trackingNumber,
-            grand_total: amount,
-            currency: currency,
-            message: message,
-          });
-
-          Toast.show({
-            type: 'warning',
-            text1: 'Order placed but details pending',
-            text2: message || 'Your order is confirmed. Details will update shortly.',
-          });
+          const ps: string = match.payment_status ?? '';
+          if (ps === 'paid' || ps === 'success') setPaymentStatus('success');
+          else if (ps === 'failed') setPaymentStatus('failed');
+          else setPaymentStatus('pending');
+          return;
         }
       }
-    } catch (error) {
-      console.log('Error fetching order details:', error);
 
+      // Fallback: API succeeded but order not found yet (just placed),
+      // build a minimal object from route params so the screen is never blank
       setOrderDetails({
-        order_number: orderId,
+        id: orderId,
         stripe_order_id: paymentIntentId,
-        transaction_id: paymentIntentId,
         tracking_number: trackingNumber,
-        grand_total: amount,
-        currency: currency,
-        message: message,
+        final_total: amount,
+        payment_status: status ?? 'paid',
+        items: [],
       });
-
-      Toast.show({
-        type: 'error',
-        text1: 'Could not load order details',
-        text2: 'But your order is confirmed!',
+    } catch {
+      // Network error fallback
+      setOrderDetails({
+        id: orderId,
+        stripe_order_id: paymentIntentId,
+        tracking_number: trackingNumber,
+        final_total: amount,
+        payment_status: status ?? 'paid',
+        items: [],
       });
     } finally {
       setLoading(false);
@@ -123,552 +174,308 @@ const PaymentSuccess = ({ navigation, route }: any) => {
 
   const checkPaymentStatus = async () => {
     if (verifying) return;
-
     setVerifying(true);
     try {
-      const response = await UserService.getOrderById(orderId);
-      if (response?.data?.success) {
-        const status = response.data.data.payment_status;
-
-        if (status === 'paid' || status === 'success') {
-          setPaymentStatus('success');
-          setOrderDetails(response.data.data);
-          Toast.show({
-            type: 'success',
-            text1: 'Payment Confirmed!',
-            text2: 'Your payment has been successful',
-          });
-        } else if (status === 'failed') {
-          setPaymentStatus('failed');
-          setOrderDetails(response.data.data);
-          Toast.show({
-            type: 'error',
-            text1: 'Payment Failed',
-            text2:
-              response.data.data.error_message ||
-              'Your payment could not be processed',
-          });
+      const res = await UserService.order();
+      if (res?.data?.success && Array.isArray(res.data.orders)) {
+        const match = res.data.orders.find(
+          (o: any) => String(o.id) === String(orderId),
+        );
+        if (match) {
+          const ps: string = match.payment_status ?? '';
+          if (ps === 'paid' || ps === 'success') {
+            setPaymentStatus('success');
+            setOrderDetails(match);
+          } else if (ps === 'failed') {
+            setPaymentStatus('failed');
+            setOrderDetails(match);
+          }
         }
       }
-    } catch (error) {
-      console.log('Error checking payment status:', error);
+    } catch {
     } finally {
       setVerifying(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (error) {
-      return new Date().toLocaleDateString('en-US', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
     }
   };
 
   const onShareReceipt = async () => {
     showLoader();
     try {
-      const message = `
-        🧾 ORDER RECEIPT
-        🏢 White Peony
-        
-        Order #: ${orderDetails?.order_number || orderId}
-        Date: ${formatDate(orderDetails?.created_at || new Date())}
-        Transaction ID: ${orderDetails?.stripe_order_id || orderDetails?.transaction_id || paymentIntentId}
-        Tracking Number: ${orderDetails?.tracking_number || trackingNumber || 'N/A'}
-        
-        📦 Order Summary
-        Items: ${orderDetails?.items?.length || 0}
-        Subtotal: ${displayPrice(orderDetails?.subtotal || 0)}
-        Discount: -${displayPrice(orderDetails?.discount || 0)}
-        Shipping: ${displayPrice(orderDetails?.shipping_cost || 0)}
-        VAT: ${displayPrice(orderDetails?.vat_amount || 0)}
-        Total: ${displayPrice(orderDetails?.grand_total || amount || 0)}
-        
-        💳 Payment Details
-        Payment Status: ${paymentStatus === 'success'
-          ? '✅ Paid'
-          : paymentStatus === 'failed'
-            ? '❌ Failed'
-            : '⏳ Pending'
-        }
-        Order Status: ${orderDetails?.order_status || 'Processing'}
-        Currency: ${currency || selectedCurrency}
-        
-        ${message ? `Note: ${message}` : ''}
-        
-        Thank you for shopping with White Peony!
-        www.whitepoeny.com
-      `;
-
       await Share.share({
-        message: message.trim(),
-        title: `Order Receipt #${orderDetails?.order_number || orderId}`,
+        message: `Order Receipt\nOrder #${
+          orderDetails?.id || orderId
+        }\nTracking: ${
+          orderDetails?.tracking_number || trackingNumber || 'N/A'
+        }\nTransaction: ${
+          orderDetails?.stripe_order_id || paymentIntentId || 'N/A'
+        }\nTotal: ${displayPrice(
+          orderDetails?.final_total || amount || 0,
+        )}\nStatus: ${paymentStatus}\n\nThank you for shopping with White Peony!`,
+        title: `Order Receipt #${orderDetails?.id || orderId}`,
       });
-    } catch (err) {
-      console.warn('share error', err);
+    } catch {
       Alert.alert('Error', 'Could not share receipt');
     } finally {
       hideLoader();
     }
   };
 
-  const onTrackOrder = () => {
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "OrdersScreen" }],
-    });
-  };
-
-  const onContinueShopping = () => {
-    navigation.reset({
-      index: 0,
-      routes: [
-        {
-          name: 'BottomTabScreen',
-          params: { screen: 'Home' },
-        },
-      ],
-    });
-  };
-
-  const onRetryPayment = () => {
-    navigation.navigate('BottomTabScreen', {
-      screen: 'Cart'
-    });
-  };
-
-  const onContactSupport = () => {
-    navigation.navigate('Support', {
-      orderId: orderId,
-      issue: 'payment_failed',
-    });
-  };
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#AEB254" />
-        <TransletText text="Loading order details..." style={styles.loadingText} />
+      <SafeAreaView style={s.loader}>
+        <ActivityIndicator color={T.accent} />
+        <TransletText text="Loading order details…" style={s.loaderText} />
       </SafeAreaView>
     );
   }
 
-  const renderStatusIcon = () => {
-    switch (paymentStatus) {
-      case 'success':
-        return (
-          <View style={[styles.iconContainer, styles.successContainer]}>
-            <View style={[styles.statusCircle, styles.successCircle]}>
-              <Text style={styles.checkmark}>✓</Text>
-            </View>
-          </View>
-        );
-      case 'failed':
-        return (
-          <View style={[styles.iconContainer, styles.failedContainer]}>
-            <View style={[styles.statusCircle, styles.failedCircle]}>
-              <Text style={styles.crossmark}>✕</Text>
-            </View>
-          </View>
-        );
-      case 'pending':
-        return (
-          <View style={[styles.iconContainer, styles.pendingContainer]}>
-            <View style={[styles.statusCircle, styles.pendingCircle]}>
-              <ActivityIndicator size="large" color="#FFA500" />
-            </View>
-          </View>
-        );
-    }
-  };
-
-  const renderStatusText = () => {
-    switch (paymentStatus) {
-      case 'success':
-        return {
-          title: 'Payment Successful! 🎉',
-          sub: message || 'Your order has been placed successfully. Thank you for shopping with us!',
-        };
-      case 'failed':
-        return {
-          title: 'Payment Failed ❌',
-          sub:
-            errorMessage ||
-            message ||
-            'Your payment could not be processed. Please try again or use another payment method.',
-        };
-      case 'pending':
-        return {
-          title: 'Payment Processing ⏳',
-          sub: message || 'Your payment is being processed. This may take a few moments. Please do not close the app.',
-        };
-    }
-  };
-
-  const statusText = renderStatusText();
+  const cfg = statusConfig[paymentStatus];
 
   return (
-    <SafeAreaView style={styles.page}>
+    <SafeAreaView style={s.screen}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.content}>
-          {/* Status Icon */}
-          {renderStatusIcon()}
+        {/* ── Status icon ── */}
+        <View style={[s.iconWrap, { backgroundColor: cfg.iconBg }]}>
+          {paymentStatus === 'pending' ? (
+            <ActivityIndicator color={cfg.iconColor} size="large" />
+          ) : (
+            <Text style={[s.iconChar, { color: cfg.iconColor }]}>
+              {paymentStatus === 'success' ? '✓' : '✕'}
+            </Text>
+          )}
+        </View>
 
-          {/* Status Text */}
-          <TransletText
-            text={statusText.title}
-            style={[
-              styles.heading,
-              paymentStatus === 'failed' && styles.failedHeading,
-              paymentStatus === 'pending' && styles.pendingHeading,
-            ]}
-          />
-          <TransletText text={statusText.sub} style={styles.sub} />
+        {/* ── Title + sub ── */}
+        <Text style={[s.title, { color: cfg.iconColor }]}>{cfg.title}</Text>
+        <Text style={s.sub}>{message || cfg.sub}</Text>
 
-          {/* Order Details Card */}
-          <View style={styles.orderCard}>
-            <View style={styles.orderHeader}>
-              <TransletText
-                text={`Order #${orderDetails?.order_number || orderId}`}
-                style={styles.orderNumber}
-              />
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor:
-                      paymentStatus === 'success'
-                        ? '#4CAF50'
-                        : paymentStatus === 'failed'
-                          ? '#F44336'
-                          : '#FFA500',
-                  },
-                ]}
-              >
-                <TransletText
-                  text={
-                    paymentStatus === 'success'
-                      ? 'Paid'
-                      : paymentStatus === 'failed'
-                        ? 'Failed'
-                        : 'Pending'
-                  }
-                  style={styles.statusText}
-                />
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Backend Response Details (excluding client_secret) */}
-            <View style={styles.detailRow}>
-              <TransletText text="Transaction ID:" style={styles.detailLabel} />
-              <Text style={styles.detailValue} numberOfLines={1}>
-                {orderDetails?.stripe_order_id ||
-                  orderDetails?.transaction_id ||
-                  paymentIntentId ||
-                  'N/A'}
+        {/* ── Summary card ── */}
+        <View style={s.card}>
+          {/* Order row */}
+          <View style={s.cardHead}>
+            <Text style={s.orderNum}>Order #{orderDetails?.id || orderId}</Text>
+            <View style={[s.badge, { backgroundColor: cfg.badgeBg }]}>
+              <Text style={[s.badgeText, { color: cfg.badgeText }]}>
+                {cfg.badgeLabel}
               </Text>
             </View>
+          </View>
 
-            <View style={styles.detailRow}>
-              <TransletText text="Tracking Number:" style={styles.detailLabel} />
-              <Text style={styles.detailValue} numberOfLines={1}>
-                {orderDetails?.tracking_number || trackingNumber || 'N/A'}
+          <View style={s.divider} />
+
+          {/* Key details */}
+          <View style={s.rows}>
+            {/* Order ID */}
+            {/* <View style={s.row}>
+              <Text style={s.rowLabel}>Order ID</Text>
+              <Text style={s.rowValue}>#{orderDetails?.id || orderId}</Text>
+            </View> */}
+
+            {/* Transaction ID = stripe_order_id from API */}
+            {/* <View style={s.row}>
+              <Text style={s.rowLabel}>Transaction ID</Text>
+              <Text style={s.rowValue} numberOfLines={1} ellipsizeMode="middle">
+                {orderDetails?.stripe_order_id || paymentIntentId || '—'}
               </Text>
-            </View>
+            </View> */}
 
-            <View style={styles.detailRow}>
-              <TransletText text="Date & Time:" style={styles.detailLabel} />
-              <Text style={styles.detailValue}>
+            {/* Tracking No = tracking_number from API */}
+            {/* <View style={s.row}>
+              <Text style={s.rowLabel}>Tracking No.</Text>
+              <Text style={[s.rowValue, { color: T.accent }]} numberOfLines={1}>
+                {orderDetails?.tracking_number || trackingNumber || '—'}
+              </Text>
+            </View> */}
+
+            {/* Date */}
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Date</Text>
+              <Text style={s.rowValue}>
                 {formatDate(orderDetails?.created_at || new Date())}
               </Text>
             </View>
 
-            <View style={styles.detailRow}>
-              <TransletText text="Payment Method:" style={styles.detailLabel} />
-              <TransletText
-                text={orderDetails?.payment_method || 'Credit Card (Stripe)'}
-                style={styles.detailValue}
-              />
-            </View>
-
-            <View style={styles.detailRow}>
-              <TransletText text="Order Status:" style={styles.detailLabel} />
-              <TransletText
-                text={
-                  orderDetails?.order_status ||
-                  (paymentStatus === 'success'
-                    ? 'Confirmed'
-                    : paymentStatus === 'failed'
-                      ? 'Cancelled'
-                      : 'Processing')
-                }
-                style={styles.detailValue}
-              />
-            </View>
-
-            {/* Show backend message if available */}
-            {(message || orderDetails?.message) && (
-              <View style={styles.messageContainer}>
-                <TransletText
-                  text={message || orderDetails?.message}
-                  style={styles.messageText}
-                />
-              </View>
-            )}
-
-            {/* Show error message if payment failed */}
-            {paymentStatus === 'failed' &&
-              (errorMessage || orderDetails?.error_message) && (
-                <View style={styles.errorContainer}>
-                  <TransletText
-                    text={errorMessage || orderDetails?.error_message}
-                    style={styles.errorText}
-                  />
-                </View>
-              )}
-
-            {/* Show pending message with retry option */}
-            {paymentStatus === 'pending' && (
-              <View style={styles.pendingContainer}>
-                <ActivityIndicator size="small" color="#FFA500" />
-                <TransletText
-                  text={verifying ? 'Verifying payment...' : 'Waiting for confirmation...'}
-                  style={styles.pendingStatusText}
-                />
-                <TouchableOpacity
-                  style={styles.refreshButton}
-                  onPress={checkPaymentStatus}
-                  disabled={verifying}
-                >
-                  <TransletText
-                    text={verifying ? 'Checking...' : 'Refresh Status'}
-                    style={styles.refreshButtonText}
-                  />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <View style={styles.divider} />
-
-            {/* Order Items Summary */}
-            {orderDetails?.items && orderDetails.items.length > 0 && (
-              <>
-                <TransletText
-                  text={`Items (${orderDetails?.items?.length})`}
-                  style={styles.itemsTitle}
-                />
-
-                {orderDetails?.items
-                  ?.slice(0, 3)
-                  .map((item: any, index: number) => (
-                    <View key={index} style={styles.itemRow}>
-                      <Image
-                        source={{
-                          uri: Image_url + (item.image || item.product_image),
-                        }}
-                        style={styles.itemImage}
-                        defaultSource={require('../../assets/Png/product.png')}
-                      />
-                      <View style={styles.itemInfo}>
-                        <Text style={styles.itemName} numberOfLines={1}>
-                          {item.product_name || item.name}
-                        </Text>
-                        <TransletText
-                          text={`Qty: ${item.quantity}`}
-                          style={styles.itemQuantity}
-                        />
-                      </View>
-                      <Text style={styles.itemPrice}>
-                        {displayPrice(item.total_price || item.price)}
-                      </Text>
-                    </View>
-                  ))}
-
-                {orderDetails?.items?.length > 3 && (
-                  <TransletText
-                    text={`+${orderDetails.items.length - 3} more items`}
-                    style={styles.moreItems}
-                  />
-                )}
-
-                <View style={styles.divider} />
-              </>
-            )}
-
-            {/* Price Breakdown */}
-            <View style={styles.priceRow}>
-              <TransletText text="Subtotal" style={styles.priceLabel} />
-              <Text style={styles.priceValue}>
-                {displayPrice(orderDetails?.subtotal || 0)}
+            {/* Payment method */}
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Payment</Text>
+              <Text style={s.rowValue}>
+                {orderDetails?.payment_method || 'Credit Card'}
               </Text>
             </View>
-
-            {orderDetails?.discount > 0 && (
-              <View style={styles.priceRow}>
-                <TransletText text="Discount" style={[styles.priceLabel, styles.discountLabel]} />
-                <Text style={[styles.priceValue, styles.discountValue]}>
-                  -{displayPrice(orderDetails?.discount)}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.priceRow}>
-              <TransletText text="Shipping" style={styles.priceLabel} />
-              <TransletText
-                text={orderDetails?.shipping_cost && orderDetails?.shipping_cost > 0
-                  ? displayPrice(orderDetails?.shipping_cost)
-                  : 'Free'}
-                style={styles.priceValue}
-              />
-            </View>
-
-            {orderDetails?.vat_amount > 0 && (
-              <View style={styles.priceRow}>
-                <TransletText text="VAT" style={styles.priceLabel} />
-                <Text style={styles.priceValue}>
-                  {displayPrice(orderDetails?.vat_amount)}
-                </Text>
-              </View>
-            )}
-
-            <View style={[styles.priceRow, styles.totalRow]}>
-              <TransletText text="Total Paid" style={styles.totalLabel} />
-              <Text
-                style={[
-                  styles.totalValue,
-                  paymentStatus === 'failed' && styles.failedTotalValue,
-                ]}
-              >
-                {displayPrice(orderDetails?.grand_total || amount || 0)}
-              </Text>
-            </View>
-
-            {/* Shipping Address */}
-            {orderDetails?.shipping_address && (
-              <>
-                <View style={styles.divider} />
-                <TransletText text="Shipping Address" style={styles.addressTitle} />
-                <TransletText
-                  text={orderDetails.shipping_address.name}
-                  style={styles.addressText}
-                />
-                <TransletText
-                  text={orderDetails.shipping_address.full_address ||
-                    `${orderDetails.shipping_address.address_line1}, ${orderDetails.shipping_address.address_line2 || ''
-                    }`}
-                  style={styles.addressText}
-                />
-                <TransletText
-                  text={`${orderDetails.shipping_address.city}, ${orderDetails.shipping_address.postal_code}`}
-                  style={styles.addressText}
-                />
-                <TransletText
-                  text={`Phone: ${orderDetails.shipping_address.phone}`}
-                  style={styles.addressText}
-                />
-              </>
-            )}
           </View>
 
-          {/* Action Buttons */}
-          {paymentStatus === 'success' && (
-            <>
-              <TouchableOpacity
-                style={styles.trackButton}
-                onPress={onTrackOrder}
-                activeOpacity={0.8}
-              >
-                <TransletText text="Track Order" style={styles.trackButtonText} />
-              </TouchableOpacity>
+          {/* Error banner */}
+          {paymentStatus === 'failed' &&
+            (errorMessage || orderDetails?.error_message) && (
+              <View style={s.errorBanner}>
+                <Text style={s.errorBannerText}>
+                  {errorMessage || orderDetails?.error_message}
+                </Text>
+              </View>
+            )}
 
+          {/* Pending banner */}
+          {paymentStatus === 'pending' && (
+            <View style={s.pendingBanner}>
+              <ActivityIndicator size="small" color={T.warning} />
+              <Text style={s.pendingBannerText}>
+                {verifying ? 'Verifying…' : 'Awaiting confirmation'}
+              </Text>
               <TouchableOpacity
-                style={styles.shareButton}
-                onPress={onShareReceipt}
-                activeOpacity={0.8}
-              >
-                <TransletText text="Share Receipt" style={styles.shareButtonText} />
-              </TouchableOpacity>
-            </>
-          )}
-
-          {paymentStatus === 'failed' && (
-            <>
-              <TouchableOpacity
-                style={styles.retryButton}
-                onPress={onRetryPayment}
-                activeOpacity={0.8}
-              >
-                <TransletText text="Try Again" style={styles.retryButtonText} />
-              </TouchableOpacity>
-
-              {/* <TouchableOpacity
-                style={styles.supportButton}
-                onPress={onContactSupport}
-                activeOpacity={0.8}
-              >
-                <TransletText text="Contact Support" style={styles.supportButtonText} />
-              </TouchableOpacity> */}
-            </>
-          )}
-
-          {paymentStatus === 'pending' && !verifying && (
-            <>
-              <TouchableOpacity
-                style={styles.checkStatusButton}
                 onPress={checkPaymentStatus}
-                activeOpacity={0.8}
+                disabled={verifying}
+                style={s.refreshBtn}
               >
-                <TransletText
-                  text="Check Payment Status"
-                  style={styles.checkStatusButtonText}
-                />
+                <Text style={s.refreshBtnText}>Refresh</Text>
               </TouchableOpacity>
+            </View>
+          )}
 
-              <TouchableOpacity
-                style={styles.homeButton}
-                onPress={onContinueShopping}
-                activeOpacity={0.8}
-              >
-                <TransletText
-                  text="Continue Shopping →"
-                  style={styles.homeButtonText}
-                />
-              </TouchableOpacity>
+          <View style={s.divider} />
+
+          {/* Items preview — up to 2 */}
+          {orderDetails?.items?.length > 0 && (
+            <>
+              {orderDetails.items.slice(0, 2).map((item: any, i: number) => {
+                // Support both orders-list shape (item.product.front_image)
+                // and getOrderById shape (item.image / item.product_image)
+                const product = item.product || {};
+                const imgPath =
+                  product.front_image || item.image || item.product_image;
+                const name =
+                  product.name || item.product_name || item.name || 'Product';
+                const price =
+                  item.subtotal ||
+                  item.total_price ||
+                  item.unit_price ||
+                  item.price ||
+                  0;
+                return (
+                  <View
+                    key={i}
+                    style={[
+                      s.itemRow,
+                      i > 0 && {
+                        borderTopWidth: 0.5,
+                        borderTopColor: T.border,
+                      },
+                    ]}
+                  >
+                    <Image
+                      source={
+                        imgPath
+                          ? { uri: Image_url + imgPath }
+                          : require('../../assets/Png/product.png')
+                      }
+                      style={s.itemImg}
+                      defaultSource={require('../../assets/Png/product.png')}
+                    />
+                    <View style={s.itemInfo}>
+                      <Text style={s.itemName} numberOfLines={1}>
+                        {name}
+                      </Text>
+                      <Text style={s.itemQty}>Qty: {item.quantity}</Text>
+                    </View>
+                    <Text style={s.itemPrice}>{displayPrice(price)}</Text>
+                  </View>
+                );
+              })}
+              {orderDetails.items.length > 2 && (
+                <Text style={s.moreItems}>
+                  +{orderDetails.items.length - 2} more items
+                </Text>
+              )}
+              <View style={s.divider} />
             </>
           )}
 
-          {paymentStatus !== 'pending' && (
-            <TouchableOpacity
-              style={styles.homeButton}
-              onPress={onContinueShopping}
-              activeOpacity={0.8}
-            >
-              <TransletText
-                text="← Continue Shopping"
-                style={styles.homeButtonText}
-              />
-            </TouchableOpacity>
+          {/* Price summary — uses exact orders API field names */}
+          {Number(orderDetails?.discount_amount) > 0 && (
+            <View style={s.priceRow}>
+              <Text style={s.priceLabel}>Subtotal</Text>
+              <Text style={s.priceVal}>
+                {displayPrice(orderDetails?.total_amount || 0)}
+              </Text>
+            </View>
           )}
+          {Number(orderDetails?.discount_amount) > 0 && (
+            <View style={s.priceRow}>
+              <Text style={s.priceLabel}>Discount</Text>
+              <Text style={[s.priceVal, { color: T.success }]}>
+                −{displayPrice(orderDetails?.discount_amount)}
+              </Text>
+            </View>
+          )}
+
+          <View style={[s.priceRow, s.totalRow]}>
+            <Text style={s.totalLabel}>Total</Text>
+            <Text
+              style={[
+                s.totalVal,
+                paymentStatus === 'failed' && { color: T.danger },
+              ]}
+            >
+              {displayPrice(orderDetails?.final_total || amount || 0)}
+            </Text>
+          </View>
         </View>
+
+        {/* ── Actions ── */}
+        {paymentStatus === 'success' && (
+          <>
+            <TouchableOpacity
+              style={s.btnPrimary}
+              onPress={() => navigation.navigate('OrdersScreen')}
+              activeOpacity={0.85}
+            >
+              <TransletText text="Track Order" style={s.btnPrimaryText} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.btnOutline}
+              onPress={onShareReceipt}
+              activeOpacity={0.85}
+            >
+              <TransletText text="Share Receipt" style={s.btnOutlineText} />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {paymentStatus === 'failed' && (
+          <TouchableOpacity
+            style={[s.btnPrimary, { backgroundColor: T.danger }]}
+            onPress={() =>
+              navigation.navigate('BottomTabScreen', { screen: 'Cart' })
+            }
+            activeOpacity={0.85}
+          >
+            <TransletText text="Try Again" style={s.btnPrimaryText} />
+          </TouchableOpacity>
+        )}
+
+        {paymentStatus === 'pending' && !verifying && (
+          <TouchableOpacity
+            style={[s.btnPrimary, { backgroundColor: T.warning }]}
+            onPress={checkPaymentStatus}
+            activeOpacity={0.85}
+          >
+            <TransletText text="Check Status" style={s.btnPrimaryText} />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          onPress={() =>
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'BottomTabScreen', params: { screen: 'Home' } }],
+            })
+          }
+          style={s.linkBtn}
+        >
+          <Text style={s.linkBtnText}>← Continue Shopping</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -676,393 +483,177 @@ const PaymentSuccess = ({ navigation, route }: any) => {
 
 export default PaymentSuccess;
 
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 30,
-  },
-  loadingContainer: {
+// ── Styles ────────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: T.bg },
+  scroll: { padding: 18, paddingBottom: 36, alignItems: 'center' },
+  loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: T.bg,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'Poppins-Regular',
-  },
-  content: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  iconContainer: {
-    marginBottom: 16,
-    marginTop: 20,
-  },
-  successContainer: {},
-  failedContainer: {},
-  pendingContainer: {
-    width: '100%',
-    alignItems: 'center',
-    padding: 16,
-  },
-  statusCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  loaderText: { marginTop: 12, fontSize: 13, color: T.textHint },
+
+  // Status icon
+  iconWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    marginTop: 16,
+    marginBottom: 14,
   },
-  successCircle: {
-    backgroundColor: '#4CAF50',
-    shadowColor: '#4CAF50',
-  },
-  failedCircle: {
-    backgroundColor: '#F44336',
-    shadowColor: '#F44336',
-  },
-  pendingCircle: {
-    backgroundColor: '#FFF3E0',
-    shadowColor: '#FFA500',
-    borderWidth: 2,
-    borderColor: '#FFA500',
-  },
-  checkmark: {
-    fontSize: 40,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  crossmark: {
-    fontSize: 40,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  heading: {
-    fontSize: 24,
+  iconChar: { fontSize: 30, fontWeight: '700', lineHeight: 34 },
+
+  // Title / sub
+  title: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 8,
+    color: T.text,
+    marginBottom: 6,
     textAlign: 'center',
-    fontFamily: 'Poppins-Bold',
-  },
-  failedHeading: {
-    color: '#F44336',
-  },
-  pendingHeading: {
-    color: '#FFA500',
   },
   sub: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: T.textHint,
     textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 20,
-    fontFamily: 'Poppins-Regular',
-    lineHeight: 20,
+    lineHeight: 19,
+    marginBottom: 22,
+    paddingHorizontal: 16,
   },
-  orderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+
+  // Card
+  card: {
     width: '100%',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: T.card,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: T.border,
+    overflow: 'hidden',
+    marginBottom: 20,
   },
-  orderHeader: {
+  cardHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 14,
   },
-  orderNumber: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F0F0F0',
-    marginVertical: 12,
-  },
-  detailRow: {
+  orderNum: { fontSize: 14, fontWeight: '700', color: T.text },
+  badge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20 },
+  badgeText: { fontSize: 11, fontWeight: '600' },
+  divider: { height: 0.5, backgroundColor: T.border },
+
+  // Detail rows
+  rows: { paddingHorizontal: 14, paddingVertical: 10, gap: 7 },
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
   },
-  detailLabel: {
-    fontSize: 13,
-    color: '#666',
-    flex: 0.4,
-    fontFamily: 'Poppins-Regular',
-  },
-  detailValue: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#1A1A1A',
-    flex: 0.6,
-    textAlign: 'right',
-    fontFamily: 'Poppins-Medium',
-  },
-  messageContainer: {
-    backgroundColor: '#E8F5E9',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  messageText: {
-    color: '#2E7D32',
-    fontSize: 13,
-    textAlign: 'center',
-    fontFamily: 'Poppins-Medium',
-  },
-  errorContainer: {
-    backgroundColor: '#FFEBEE',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  errorText: {
-    color: '#F44336',
-    fontSize: 13,
-    textAlign: 'center',
-    fontFamily: 'Poppins-Regular',
-  },
-  pendingStatusText: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#FFA500',
-    fontFamily: 'Poppins-Medium',
-  },
-  refreshButton: {
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFA500',
-    borderRadius: 20,
-  },
-  refreshButtonText: {
-    color: '#FFFFFF',
+  rowLabel: { fontSize: 12, color: T.textHint },
+  rowValue: {
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
+    color: T.textSub,
+    maxWidth: '65%',
+    textAlign: 'right',
+    flexShrink: 1,
   },
-  itemsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 12,
-    fontFamily: 'Poppins-SemiBold',
+
+  // Banners
+  errorBanner: {
+    backgroundColor: T.dangerBg,
+    marginHorizontal: 14,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 8,
   },
+  errorBannerText: { fontSize: 12, color: T.danger, textAlign: 'center' },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: T.warningBg,
+    marginHorizontal: 14,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 8,
+  },
+  pendingBannerText: { flex: 1, fontSize: 12, color: T.warning },
+  refreshBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: T.warningBg,
+    borderWidth: 0.5,
+    borderColor: T.warning,
+    borderRadius: 6,
+  },
+  refreshBtnText: { fontSize: 11, color: T.warning, fontWeight: '600' },
+
+  // Items
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
   },
-  itemImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 12,
-    backgroundColor: '#F5F5F5',
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1A1A1A',
-    marginBottom: 2,
-    fontFamily: 'Poppins-Medium',
-  },
-  itemQuantity: {
-    fontSize: 12,
-    color: '#666',
-    fontFamily: 'Poppins-Regular',
-  },
-  itemPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#AEB254',
-    fontFamily: 'Poppins-SemiBold',
-  },
+  itemImg: { width: 44, height: 44, borderRadius: 8, backgroundColor: T.bg },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 13, fontWeight: '600', color: T.text, marginBottom: 2 },
+  itemQty: { fontSize: 11, color: T.textHint },
+  itemPrice: { fontSize: 13, fontWeight: '700', color: T.accent },
   moreItems: {
     fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-    marginTop: 4,
-    fontFamily: 'Poppins-Regular',
+    color: T.textHint,
+    textAlign: 'center',
+    paddingVertical: 8,
   },
+
+  // Price rows
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    paddingHorizontal: 14,
+    marginBottom: 6,
   },
-  priceLabel: {
-    fontSize: 13,
-    color: '#666',
-    fontFamily: 'Poppins-Regular',
-  },
-  priceValue: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#1A1A1A',
-    fontFamily: 'Poppins-Medium',
-  },
-  discountLabel: {
-    color: '#4CAF50',
-  },
-  discountValue: {
-    color: '#4CAF50',
-  },
+  priceLabel: { fontSize: 12, color: T.textHint },
+  priceVal: { fontSize: 12, fontWeight: '600', color: T.textSub },
   totalRow: {
-    marginTop: 8,
     paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    marginTop: 2,
+    paddingBottom: 14,
+    borderTopWidth: 0.5,
+    borderTopColor: T.border,
   },
-  totalLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#AEB254',
-    fontFamily: 'Poppins-Bold',
-  },
-  failedTotalValue: {
-    color: '#F44336',
-  },
-  addressTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  addressText: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 2,
-    fontFamily: 'Poppins-Regular',
-  },
-  trackButton: {
-    backgroundColor: '#AEB254',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 24,
+  totalLabel: { fontSize: 14, fontWeight: '700', color: T.text },
+  totalVal: { fontSize: 16, fontWeight: '800', color: T.accent },
+
+  // Buttons
+  btnPrimary: {
     width: '100%',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  trackButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  shareButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
+    height: 48,
     borderRadius: 24,
-    width: '100%',
+    backgroundColor: T.accent,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnPrimaryText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  btnOutline: {
+    width: '100%',
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: T.card,
     borderWidth: 1,
-    borderColor: '#AEB254',
-    marginBottom: 12,
-  },
-  shareButtonText: {
-    color: '#AEB254',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  retryButton: {
-    backgroundColor: '#F44336',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 24,
-    width: '100%',
+    borderColor: T.accent,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  supportButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 24,
-    width: '100%',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#666',
-    marginBottom: 12,
-  },
-  supportButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  checkStatusButton: {
-    backgroundColor: '#FFA500',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 24,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  checkStatusButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-  },
-  homeButton: {
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  homeButtonText: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'Poppins-Medium',
-  },
+  btnOutlineText: { fontSize: 15, fontWeight: '700', color: T.accentDark },
+  linkBtn: { marginTop: 8, paddingVertical: 8 },
+  linkBtnText: { fontSize: 13, color: T.textHint },
 });

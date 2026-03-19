@@ -1138,7 +1138,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                               height: 12,
                               resizeMode: 'cover',
                               tintColor: isWishlisted(item.id)
-                                ? '#FF3E6C'
+                                ? '#839705'
                                 : '#666666',
                             }}
                           />
@@ -2090,7 +2090,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             height: 14,
                             resizeMode: 'cover',
                             tintColor: isWishlisted(item.id)
-                              ? '#FF3E6C'
+                              ? '#839705'
                               : '#666666',
                           }}
                         />
@@ -2615,7 +2615,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             width: 14,
                             height: 14,
                             resizeMode: 'cover',
-                            tintColor: wished ? '#FF3E6C' : '#666666',
+                            tintColor: wished ? '#839705' : '#666666',
                           }}
                         />
                       </TouchableOpacity>

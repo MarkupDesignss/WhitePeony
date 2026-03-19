@@ -24,10 +24,7 @@ import React, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image_url, UserService } from '../../service/ApiService';
 import { Colors } from '../../constant';
-import {
-  heightPercentageToDP,
-  widthPercentageToDP,
-} from '../../constant/dimentions';
+
 import { useAppSelector } from '../../hooks/useAppSelector';
 import { useGetRatesQuery } from '../../api/endpoints/currencyEndpoints';
 import { convertAndFormatPrice } from '../../utils/currencyUtils';
@@ -36,6 +33,7 @@ import Toast from 'react-native-toast-message';
 import { WishlistContext } from '../../context';
 import TransletText from '../../components/TransletText';
 import { useAutoTranslate } from '../../hooks/useAutoTranslate';
+import { UserData, UserDataContext } from '../../context/userDataContext';
 const { width } = Dimensions.get('window');
 
 const Searchpage = ({ navigation }: any) => {
@@ -43,7 +41,7 @@ const Searchpage = ({ navigation }: any) => {
     'Search for products, brands and more',
   );
   const [query, setQuery] = useState('');
-
+  const { isLoggedIn, userType } = useContext<UserData>(UserDataContext);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [listening, setListening] = useState(false);
@@ -59,6 +57,42 @@ const Searchpage = ({ navigation }: any) => {
     refetchOnMountOrArgChange: false,
     refetchOnReconnect: true,
   });
+
+
+  // Add these helper functions after your useState declarations
+  const getCurrentProductType = useCallback(() => {
+    if (userType === null || userType === undefined) {
+      return 'b2c'; // Default to b2c when userType is null
+    }
+    return userType;
+  }, [userType]);
+
+  const filterProductsByType = useCallback(
+    (products: any[]) => {
+      if (!Array.isArray(products)) return [];
+
+      const currentType = getCurrentProductType();
+
+      console.log('Search - Filtering products for user type:', currentType);
+
+      return products.filter(item => {
+        // Check product_type directly on the item
+        if (item?.product_type) {
+          return item.product_type === currentType;
+        }
+
+        // Check nested product object
+        if (item?.product?.product_type) {
+          return item.product.product_type === currentType;
+        }
+
+        // If no product_type found, you can decide to include or exclude
+        // For now, including products without type
+        return true;
+      });
+    },
+    [getCurrentProductType],
+  );
 
   // Price display helper
   const displayPrice = (priceEUR: any): string => {
@@ -162,6 +196,7 @@ const Searchpage = ({ navigation }: any) => {
     if (silenceTimer.current) clearTimeout(silenceTimer.current);
   };
 
+
   /* ---------------- SEARCH API ---------------- */
   const GetSearch = useCallback(
     async (word: string) => {
@@ -173,10 +208,17 @@ const Searchpage = ({ navigation }: any) => {
       try {
         setIsSearching(true);
         const res = await UserService.search(word);
-        console.log('effe', res);
+        console.log('Search response:', res);
+
         if (res?.data?.status) {
-          const products = Array.isArray(res.data.data) ? res.data.data : [];
-          const mapped = products.map((p: any) => {
+          let products = Array.isArray(res.data.data) ? res.data.data : [];
+
+          // FILTER PRODUCTS BY USER TYPE - ADD THIS LINE
+          const filteredProducts = filterProductsByType(products);
+
+          console.log(`Search - Original: ${products.length}, Filtered: ${filteredProducts.length}`);
+
+          const mapped = filteredProducts.map((p: any) => {  // Use filteredProducts instead of products
             const images = [p.front_image, p.back_image, p.side_image]
               .filter(Boolean)
               .map(img =>
@@ -199,7 +241,8 @@ const Searchpage = ({ navigation }: any) => {
               brand: p.brand || 'Brand',
               discount: variant?.discount || 0,
               is_wishlist: isWishlistedItem,
-              productData: p, // Store original product data for navigation
+              productData: p,
+              product_type: p.product_type || p?.product?.product_type, // Add for debugging
             };
           });
           setSearchResults(mapped);
@@ -218,7 +261,7 @@ const Searchpage = ({ navigation }: any) => {
         setIsSearching(false);
       }
     },
-    [isWishlisted],
+    [isWishlisted, filterProductsByType], // Add filterProductsByType to dependencies
   );
 
   /* ---------------- DEBOUNCE INPUT CHANGE ---------------- */
