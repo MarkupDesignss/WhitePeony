@@ -24,7 +24,8 @@ import {
 } from 'react-native';
 import { CommonLoader } from './CommonLoader/commonLoader';
 import { UserService } from '../service/ApiService';
-
+import { Page } from '../types/pageTypes';
+import AppBrowser from './AppBrowser';
 import Toast from 'react-native-toast-message';
 import { UserData, UserDataContext } from '../context/userDataContext';
 import { useCart } from '../context/CartContext';
@@ -32,6 +33,7 @@ import { LocalStorage } from '../helpers/localstorage';
 import TransletText from '../components/TransletText';
 import { useAutoTranslate } from '../hooks/useAutoTranslate';
 import FCMService from '../service/FCMService';
+import { useGetPagesQuery } from '../api/api';
 
 interface AuthModalProps {
   visible: boolean;
@@ -64,7 +66,11 @@ const LoginModal: React.FC<AuthModalProps> = ({
   const [step, setStep] = useState<'login' | 'otp'>('login');
   const [loading, setLoading] = useState(false);
   const [isSyncingCart, setIsSyncingCart] = useState(false);
-
+  const [selectedPage, setSelectedPage] = useState<Page | null>(null);
+  const [isBrowserVisible, setIsBrowserVisible] = useState(false);
+  const { data, error: myerr, isLoading } = useGetPagesQuery();
+  const privacyPage = data?.find(p => p.slug === 'privacy-policy');
+  const termsPage = data?.find(p => p.slug === 'terms-policy');
   const { translatedText: invalidInputText } = useAutoTranslate(
     'Please enter a valid email or 10-digit phone number',
   );
@@ -258,7 +264,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
         fcm_token: fcmToken || '',
       });
 
-      console.log('📱 VERIFY OTP FULL RESPONSE:', JSON.stringify(res.data, null, 2));
+      console.log(
+        '📱 VERIFY OTP FULL RESPONSE:',
+        JSON.stringify(res.data, null, 2),
+      );
       hideLoader();
 
       if (!res || !res.data) {
@@ -282,7 +291,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
           await LocalStorage.removeItem('@login');
 
           // Save new data
-          console.log('📝 Saving token:', access_token ? 'received' : 'missing');
+          console.log(
+            '📝 Saving token:',
+            access_token ? 'received' : 'missing',
+          );
 
           // Save each item individually
           await LocalStorage.save('@login', 'true');
@@ -294,7 +306,10 @@ const LoginModal: React.FC<AuthModalProps> = ({
           // Verify token was saved
           const savedToken = await LocalStorage.read('@token');
           const savedUser = await LocalStorage.read('@user');
-          console.log('✅ Token saved successfully:', savedToken ? 'yes' : 'no');
+          console.log(
+            '✅ Token saved successfully:',
+            savedToken ? 'yes' : 'no',
+          );
           console.log('✅ User saved successfully:', savedUser ? 'yes' : 'no');
 
           // Update context with boolean value (not string)
@@ -351,7 +366,6 @@ const LoginModal: React.FC<AuthModalProps> = ({
           }
 
           handlePostLoginNavigation();
-
         } catch (storageError: any) {
           console.error('❌ Storage error:', {
             message: storageError.message,
@@ -505,86 +519,205 @@ const LoginModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  /* ================= OPEN PAGE BROWSER ================= */
+  const openPageBrowser = (page: Page | undefined) => {
+    if (page) {
+      setSelectedPage(page);
+      setIsBrowserVisible(true);
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: 'Page not found',
+        text2: 'Please try again later',
+      });
+    }
+  };
+
   const logo = require('../../src/assets/Png/splashlogo.png');
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={handleBackPress}
-    >
-      <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={handleClose} />
+    <>
+      <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={handleBackPress}
+      >
+        <View style={styles.overlay}>
+          <Pressable style={styles.backdrop} onPress={handleClose} />
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardView}
           >
-            <View style={styles.modalContainer}>
-              {/* Header with Logo and Close Button */}
-              <View style={styles.header}>
-                <View style={styles.handleBar} />
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={handleClose}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </TouchableOpacity>
-                <Image source={logo} style={styles.logo} resizeMode="contain" />
-              </View>
-
-              {/* Cart Syncing Indicator */}
-              {isSyncingCart && (
-                <View style={styles.syncIndicator}>
-                  <ActivityIndicator size="small" color="#AEB254" />
-                  <TransletText
-                    text="Syncing your cart..."
-                    style={styles.syncText}
-                  />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
+              <View style={styles.modalContainer}>
+                {/* Header with Logo and Close Button */}
+                <View style={styles.header}>
+                  <View style={styles.handleBar} />
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={handleClose}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text style={styles.closeButtonText}>✕</Text>
+                  </TouchableOpacity>
+                  <Image source={logo} style={styles.logo} resizeMode="contain" />
                 </View>
-              )}
 
-              {step === 'login' ? (
-                <>
-                  <View style={styles.welcomeSection}>
-                    <TransletText text="Welcome Back!" style={styles.title} />
+                {/* Cart Syncing Indicator */}
+                {isSyncingCart && (
+                  <View style={styles.syncIndicator}>
+                    <ActivityIndicator size="small" color="#AEB254" />
                     <TransletText
-                      text="Sign in to continue your tea journey"
-                      style={styles.subtitle}
+                      text="Syncing your cart..."
+                      style={styles.syncText}
                     />
                   </View>
+                )}
 
-                  <View style={styles.form}>
-                    <View style={styles.inputGroup}>
+                {step === 'login' ? (
+                  <>
+                    <View style={styles.welcomeSection}>
+                      <TransletText text="Welcome Back!" style={styles.title} />
                       <TransletText
-                        text="Email or Phone"
-                        style={styles.label}
+                        text="Sign in to continue your tea journey"
+                        style={styles.subtitle}
                       />
-                      <View
-                        style={[
-                          styles.inputWrapper,
-                          error && styles.inputError,
-                        ]}
-                      >
-                        <TextInput
-                          autoCapitalize="none"
-                          keyboardType="email-address"
-                          style={styles.input}
-                          value={emailOrPhone}
-                          onChangeText={setEmailOrPhone}
-                          placeholder={phonePlaceholder || "Enter email or phone"}
-                          placeholderTextColor="#999"
-                          editable={!loading && !isSyncingCart}
+                    </View>
+
+                    <View style={styles.form}>
+                      <View style={styles.inputGroup}>
+                        <TransletText
+                          text="Email or Phone"
+                          style={styles.label}
                         />
+                        <View
+                          style={[
+                            styles.inputWrapper,
+                            error && styles.inputError,
+                          ]}
+                        >
+                          <TextInput
+                            autoCapitalize="none"
+                            keyboardType="email-address"
+                            style={styles.input}
+                            value={emailOrPhone}
+                            onChangeText={setEmailOrPhone}
+                            placeholder={
+                              phonePlaceholder || 'Enter email or phone'
+                            }
+                            placeholderTextColor="#999"
+                            editable={!loading && !isSyncingCart}
+                          />
+                        </View>
                       </View>
+
+                      {!!error && (
+                        <View style={styles.errorContainer}>
+                          <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                      )}
+
+                      <TouchableOpacity
+                        style={[
+                          styles.loginButton,
+                          (loading || isSyncingCart) && styles.buttonDisabled,
+                        ]}
+                        onPress={requestOTP}
+                        disabled={loading || isSyncingCart}
+                        activeOpacity={0.8}
+                      >
+                        {loading ? (
+                          <ActivityIndicator color="#000" />
+                        ) : (
+                          <TransletText
+                            text="Continue"
+                            style={styles.loginText}
+                          />
+                        )}
+                      </TouchableOpacity>
+
+                      <View style={styles.divider}>
+                        <View style={styles.dividerLine} />
+                        <TransletText text="Or" style={styles.orText} />
+                        <View style={styles.dividerLine} />
+                      </View>
+
+                      <View style={styles.socialRow}>
+                        <TouchableOpacity
+                          style={styles.socialButton}
+                          onPress={handleGoogleLogin}
+                          disabled={loading || isSyncingCart}
+                          activeOpacity={0.7}
+                        >
+                          <Image
+                            source={require('../assets/Png/google.png')}
+                            style={styles.socialIcon}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.socialButton}
+                          onPress={handleFacebookLogin}
+                          disabled={loading || isSyncingCart}
+                          activeOpacity={0.7}
+                        >
+                          <Image
+                            source={require('../assets/Png/facebook.png')}
+                            style={styles.socialIcon}
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.termsContainer}>
+                        <TransletText
+                          text="By continuing, you agree to our"
+                          style={styles.termsText}
+                        />
+                        <View style={styles.termsLinks}>
+                          <TouchableOpacity onPress={() => openPageBrowser(termsPage)}>
+                            <Text style={styles.termsLink}>Terms of Service</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.termsSeparator}> and </Text>
+                          <TouchableOpacity onPress={() => openPageBrowser(privacyPage)}>
+                            <Text style={styles.termsLink}>Privacy Policy</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.otpHeader}>
+                      <TransletText text="Enter Code" style={styles.title} />
+                      <View style={styles.otpMessage}>
+                        <TransletText
+                          text="We've sent a 6-digit code to"
+                          style={styles.subtitle}
+                        />
+                        <Text style={styles.otpDestination}>{emailOrPhone}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.otpRow}>
+                      {otp.map((digit, index) => (
+                        <TextInput
+                          key={index}
+                          ref={ref => (inputRefs.current[index] = ref)}
+                          style={[styles.otpInput, error && styles.otpInputError]}
+                          keyboardType="number-pad"
+                          maxLength={1}
+                          value={digit}
+                          onChangeText={text => handleChangeOtp(text, index)}
+                          editable={!loading && !isSyncingCart}
+                          selectTextOnFocus
+                        />
+                      ))}
                     </View>
 
                     {!!error && (
@@ -594,173 +727,94 @@ const LoginModal: React.FC<AuthModalProps> = ({
                     )}
 
                     <TouchableOpacity
+                      style={styles.changeEmailButton}
+                      onPress={() => {
+                        resetOtpState();
+                        setStep('login');
+                      }}
+                      disabled={loading || isSyncingCart}
+                      activeOpacity={0.7}
+                    >
+                      <TransletText
+                        text="Change email/phone"
+                        style={styles.changeEmailText}
+                      />
+                    </TouchableOpacity>
+
+                    <View style={styles.resendContainer}>
+                      <TransletText
+                        text="Didn't receive code?"
+                        style={styles.resendText}
+                      />
+                      {timer > 0 ? (
+                        <TransletText
+                          text={`Resend in ${timer}s`}
+                          style={styles.disabled}
+                        />
+                      ) : (
+                        <TouchableOpacity
+                          onPress={requestOTP}
+                          disabled={loading || isSyncingCart}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.resendLink}>Resend</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <TouchableOpacity
                       style={[
                         styles.loginButton,
                         (loading || isSyncingCart) && styles.buttonDisabled,
                       ]}
-                      onPress={requestOTP}
+                      onPress={verifyOtp}
                       disabled={loading || isSyncingCart}
                       activeOpacity={0.8}
                     >
                       {loading ? (
                         <ActivityIndicator color="#000" />
                       ) : (
-                        <TransletText
-                          text="Continue"
-                          style={styles.loginText}
-                        />
+                        <TransletText text="Verify" style={styles.loginText} />
                       )}
                     </TouchableOpacity>
 
-                    <View style={styles.divider}>
-                      <View style={styles.dividerLine} />
-                      <TransletText text="Or" style={styles.orText} />
-                      <View style={styles.dividerLine} />
-                    </View>
-
-                    <View style={styles.socialRow}>
-                      <TouchableOpacity
-                        style={styles.socialButton}
-                        onPress={handleGoogleLogin}
-                        disabled={loading || isSyncingCart}
-                        activeOpacity={0.7}
-                      >
-                        <Image
-                          source={require('../assets/Png/google.png')}
-                          style={styles.socialIcon}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.socialButton}
-                        onPress={handleFacebookLogin}
-                        disabled={loading || isSyncingCart}
-                        activeOpacity={0.7}
-                      >
-                        <Image
-                          source={require('../assets/Png/facebook.png')}
-                          style={styles.socialIcon}
-                        />
-                      </TouchableOpacity>
-                    </View>
-
                     <View style={styles.termsContainer}>
                       <TransletText
-                        text="By continuing, you agree to our"
+                        text="By verifying, you agree to our"
                         style={styles.termsText}
                       />
                       <View style={styles.termsLinks}>
-                        <Text style={styles.termsLink}>Terms of Service</Text>
+                        <TouchableOpacity onPress={() => openPageBrowser(termsPage)}>
+                          <Text style={styles.termsLink}>Terms of Service</Text>
+                        </TouchableOpacity>
                         <Text style={styles.termsSeparator}> and </Text>
-                        <Text style={styles.termsLink}>Privacy Policy</Text>
+                        <TouchableOpacity onPress={() => openPageBrowser(privacyPage)}>
+                          <Text style={styles.termsLink}>Privacy Policy</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <View style={styles.otpHeader}>
-                    <TransletText text="Enter Code" style={styles.title} />
-                    <View style={styles.otpMessage}>
-                      <TransletText
-                        text="We've sent a 6-digit code to"
-                        style={styles.subtitle}
-                      />
-                      <Text style={styles.otpDestination}>{emailOrPhone}</Text>
-                    </View>
-                  </View>
+                  </>
+                )}
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
-                  <View style={styles.otpRow}>
-                    {otp.map((digit, index) => (
-                      <TextInput
-                        key={index}
-                        ref={ref => (inputRefs.current[index] = ref)}
-                        style={[styles.otpInput, error && styles.otpInputError]}
-                        keyboardType="number-pad"
-                        maxLength={1}
-                        value={digit}
-                        onChangeText={text => handleChangeOtp(text, index)}
-                        editable={!loading && !isSyncingCart}
-                        selectTextOnFocus
-                      />
-                    ))}
-                  </View>
-
-                  {!!error && (
-                    <View style={styles.errorContainer}>
-                      <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    style={styles.changeEmailButton}
-                    onPress={() => {
-                      resetOtpState();
-                      setStep('login');
-                    }}
-                    disabled={loading || isSyncingCart}
-                    activeOpacity={0.7}
-                  >
-                    <TransletText
-                      text="Change email/phone"
-                      style={styles.changeEmailText}
-                    />
-                  </TouchableOpacity>
-
-                  <View style={styles.resendContainer}>
-                    <TransletText
-                      text="Didn't receive code?"
-                      style={styles.resendText}
-                    />
-                    {timer > 0 ? (
-                      <TransletText
-                        text={`Resend in ${timer}s`}
-                        style={styles.disabled}
-                      />
-                    ) : (
-                      <TouchableOpacity
-                        onPress={requestOTP}
-                        disabled={loading || isSyncingCart}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.resendLink}>Resend</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.loginButton,
-                      (loading || isSyncingCart) && styles.buttonDisabled,
-                    ]}
-                    onPress={verifyOtp}
-                    disabled={loading || isSyncingCart}
-                    activeOpacity={0.8}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#000" />
-                    ) : (
-                      <TransletText text="Verify" style={styles.loginText} />
-                    )}
-                  </TouchableOpacity>
-
-                  <View style={styles.termsContainer}>
-                    <TransletText
-                      text="By verifying, you agree to our"
-                      style={styles.termsText}
-                    />
-                    <View style={styles.termsLinks}>
-                      <Text style={styles.termsLink}>Terms of Service</Text>
-                      <Text style={styles.termsSeparator}> and </Text>
-                      <Text style={styles.termsLink}>Privacy Policy</Text>
-                    </View>
-                  </View>
-                </>
-              )}
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+      {/* AppBrowser Modal for Terms and Privacy Policy */}
+      {selectedPage && (
+        <AppBrowser
+          visible={isBrowserVisible}
+          onClose={() => {
+            setIsBrowserVisible(false);
+            setSelectedPage(null);
+          }}
+          title={selectedPage.title}
+          content={selectedPage.content}
+          image={selectedPage.image}
+        />
+      )}
+    </>
   );
 };
 

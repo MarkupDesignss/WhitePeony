@@ -1,7 +1,9 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+// services/baseApi.ts
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { baseQuery } from '../service/baseQuery';
 
 export const baseApi = createApi({
-    reducerPath: 'baseApi',
-    baseQuery: fetchBaseQuery({ baseUrl: '' }), // baseUrl can be overridden per endpoint
-    endpoints: () => ({}),
+  reducerPath: 'baseApi',
+  baseQuery: baseQuery,
+  endpoints: () => ({}), // empty (we inject later)
 });
