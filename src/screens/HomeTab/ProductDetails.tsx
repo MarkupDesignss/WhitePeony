@@ -101,7 +101,7 @@ const ProductDetails = ({ route }: ProductDetailsProps) => {
   const [productData, setProductData] = useState<ProductData | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [baseUrl, setBaseUrl] = useState(
-    'https://www.markupdesigns.net/whitepeony/storage/',
+    'https://app.whitepeony.eu/storage/',
   );
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [displayPrice, setDisplayPrice] = useState('0');

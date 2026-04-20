@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { LocalStorage } from '../helpers/localstorage';
 // const STAGING_API_URL = "https://www.markupdesigns.net/def-dwarg/api/";
-export const Image_url = 'https://www.markupdesigns.net/whitepeony/storage/';
-const STAGING_API_URL = 'https://www.markupdesigns.net/whitepeony/api/';
+export const Image_url = 'https://app.whitepeony.eu/storage/';
+const STAGING_API_URL = 'https://app.whitepeony.eu/api/';
 export const API_URL = STAGING_API_URL;
 let APIKit = axios.create({
   baseURL: STAGING_API_URL,

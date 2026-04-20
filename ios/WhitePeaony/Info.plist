@@ -55,7 +55,7 @@
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app requires Bluetooth access for device communication.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>This app requires camera access to scan QR codes and upload photos.</string>
+	<string>This app needs camera access to take photos for your profile picture.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to provide location-based services.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
@@ -65,7 +65,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires microphone access for recording audio.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app requires photo library access to upload images.</string>
+	<string>This app needs photo library access to select a profile picture.</string>
 	<key>NSProvisionalUserNotification</key>
 	<true/>
 	<key>NSSpeechRecognitionUsageDescription</key>

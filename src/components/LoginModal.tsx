@@ -356,11 +356,11 @@ const LoginModal: React.FC<AuthModalProps> = ({
             }
           } catch (syncError) {
             console.log('Cart sync error:', syncError);
-            Toast.show({
-              type: 'info',
-              text1: 'Cart sync delayed',
-              text2: 'Your items will sync shortly',
-            });
+            // Toast.show({
+            //   type: 'info',
+            //   text1: 'Cart sync delayed',
+            //   text2: 'Your items will sync shortly',
+            // });
           } finally {
             setIsSyncingCart(false);
           }

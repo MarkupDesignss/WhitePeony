@@ -32,7 +32,7 @@ import Toast from 'react-native-toast-message';
 import { LocalStorage } from '../../helpers/localstorage';
 import { UserData, UserDataContext } from '../../context/userDataContext';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { check, request, PERMISSIONS, RESULTS, openSettings } from 'react-native-permissions';
 import { widthPercentageToDP } from '../../constant/dimentions';
 import { Colors } from '../../constant';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
   avatarContainer: {
     alignItems: 'center',
     marginBottom: 20,
-    marginTop:10,
+    marginTop: 10,
     position: 'relative',
   },
   avatar: {

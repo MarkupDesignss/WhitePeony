@@ -187,7 +187,7 @@ export const WishlistProvider: React.FC<Props> = ({ children }) => {
       : imagePath;
 
     // Construct full URL
-    return `https://www.markupdesigns.net/whitepeony/storage/${cleanPath}`;
+    return `https://app.whitepeony.eu/storage/${cleanPath}`;
   };
 
   // Helper function to extract correct price from product
