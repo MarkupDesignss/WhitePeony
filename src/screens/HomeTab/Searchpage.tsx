@@ -35,7 +35,23 @@ import TransletText from '../../components/TransletText';
 import { useAutoTranslate } from '../../hooks/useAutoTranslate';
 import { UserData, UserDataContext } from '../../context/userDataContext';
 const { width } = Dimensions.get('window');
-
+const COLORS = {
+  primary: '#2A2A2A',
+  secondary: '#5A5A5A',
+  accent: '#D4AF37',
+  background: '#FAF9F7',
+  cardBg: '#FFFFFF',
+  text: '#1C1C1C',
+  textLight: '#767676',
+  border: '#EFEFEF',
+  success: '#2E7D32',
+  successLight: '#E8F5E9',
+  warning: '#C62828',
+  error: '#DC2626',
+  errorLight: '#FFEBEE',
+  goldLight: '#F5E7C8',
+  shadow: '#000000',
+};
 const Searchpage = ({ navigation }: any) => {
   const { translatedText: searchPlace } = useAutoTranslate(
     'Search for products, brands and more',
@@ -418,9 +434,10 @@ const Searchpage = ({ navigation }: any) => {
             onPress={e => {
               e.stopPropagation(); // Prevent card press
               navigateToProductDetails(item);
+
             }}
           >
-            <Text style={styles.addToCartText}>GET DETAILS</Text>
+            <Text style={styles.addToCartText}>GO TO DETAILS</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -865,11 +882,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addToCartButton: {
-    backgroundColor: Colors.button[100],
-    paddingVertical: 8,
-    borderRadius: 6,
+
+    backgroundColor: COLORS.accent,
+    borderRadius: 25,
+    paddingVertical: 10,
     alignItems: 'center',
     marginTop: 4,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+
   },
   addToCartText: {
     color: '#000',

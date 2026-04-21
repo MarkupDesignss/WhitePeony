@@ -54,9 +54,13 @@ const SMALL_HEIGHT = 120;
 const BIG_HEIGHT = SMALL_HEIGHT * 2 + GAP;
 
 // Create a separate PriceDisplay component that subscribes to currency changes
-const PriceDisplay = ({ price }: { price: number | string | null | undefined }) => {
+const PriceDisplay = ({
+  price,
+}: {
+  price: number | string | null | undefined;
+}) => {
   const selectedCurrency = useAppSelector(
-    state => state.currency.selectedCurrency
+    state => state.currency.selectedCurrency,
   );
 
   const { data: rates } = useGetRatesQuery();
@@ -80,9 +84,7 @@ const HomeScreen1 = ({ navigation }: any) => {
     refetchOnMountOrArgChange: false,
     refetchOnReconnect: true,
   });
-
-  const { setUserData, isLoggedIn, userType } =
-    useContext<UserData>(UserDataContext);
+  const { setUserData, isLoggedIn, userType, userData } = useContext(UserDataContext);
 
   const {
     wishlistItems,
@@ -687,7 +689,9 @@ const HomeScreen1 = ({ navigation }: any) => {
       </View>
     );
   };
-
+  const profileImageSource = userData?.profile_image
+    ? { uri: Image_url + userData.profile_image }
+    : require('../../assets/userx.png');
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFF0' }}>
       <StatusBar barStyle={'dark-content'} />
@@ -772,7 +776,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         >
           <View
             style={{
-              borderWidth: 1,
+
               borderColor: '#888888',
               borderRadius: 20,
               padding: 8,
@@ -780,12 +784,12 @@ const HomeScreen1 = ({ navigation }: any) => {
             }}
           >
             <Image
-              source={require('../../assets/userx.png')}
+              source={profileImageSource}
               style={{
-                width: 16,
-                height: 16,
+                width: 34,
+                height: 34,
+                borderRadius: 17,
                 resizeMode: 'cover',
-                tintColor: '#666666',
               }}
             />
           </View>
@@ -1138,7 +1142,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                               height: 12,
                               resizeMode: 'cover',
                               tintColor: isWishlisted(item.id)
-                                ? '#839705'
+                                ? '#AEB254'
                                 : '#666666',
                             }}
                           />
@@ -2090,7 +2094,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             height: 14,
                             resizeMode: 'cover',
                             tintColor: isWishlisted(item.id)
-                              ? '#839705'
+                              ? '#AEB254'
                               : '#666666',
                           }}
                         />
@@ -2372,9 +2376,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                             position: 'absolute',
                             top: 8,
                             right: 8,
-                            backgroundColor: Colors.button[100],
+                            backgroundColor: '#fff',
                             padding: 6,
-                            borderRadius: 12,
+                            borderRadius: 14,
                             width: 28,
                             height: 28,
                             justifyContent: 'center',
@@ -2392,6 +2396,9 @@ const HomeScreen1 = ({ navigation }: any) => {
                               width: 14,
                               height: 14,
                               resizeMode: 'cover',
+                              tintColor: isWishlisted(item.id)
+                                ? '#AEB254'
+                                : '#666666',
                             }}
                           />
                         </TouchableOpacity>
@@ -2615,7 +2622,7 @@ const HomeScreen1 = ({ navigation }: any) => {
                             width: 14,
                             height: 14,
                             resizeMode: 'cover',
-                            tintColor: wished ? '#839705' : '#666666',
+                            tintColor: wished ? '#AEB254' : '#666666',
                           }}
                         />
                       </TouchableOpacity>

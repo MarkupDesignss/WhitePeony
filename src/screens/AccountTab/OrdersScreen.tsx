@@ -102,7 +102,7 @@ type UiOrder = {
   items: OrderItem[];
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helper functions ─────────────────────────────────────────────────────────
 const statusLabel: Record<string, string> = {
   placed: 'Placed',
   confirmed: 'Confirmed',
@@ -119,10 +119,299 @@ const paymentLabel: Record<string, string> = {
 const imgUri = (path?: string | null) =>
   path ? { uri: Image_url + path } : require('../../assets/Png/product.png');
 
-// ── Items Modal ───────────────────────────────────────────────────────────────
-// KEY FIX: The sheet is given a fixed maxHeight and the ScrollView fills the
-// remaining space via `flex: 1`. The backdrop tap-to-close uses a separate
-// absolute-positioned Pressable so it never intercepts scroll touches.
+// ===================== REVIEW MODAL (Professional & Independent) =====================
+const ReviewModal = ({
+  visible,
+  onClose,
+  product,
+  customerId,
+  onReviewSubmitted,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  product: OrderProduct | null;
+  customerId: string | null;
+  onReviewSubmitted?: () => void;
+}) => {
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [existingReviewId, setExistingReviewId] = useState<number | null>(null);
+  const [fetching, setFetching] = useState(false);
+
+  // Reset and load existing review when product changes and modal opens
+  useEffect(() => {
+    if (visible && product && customerId) {
+      loadExistingReview();
+    } else {
+      setRating(0);
+      setReviewText('');
+      setExistingReviewId(null);
+    }
+  }, [visible, product, customerId]);
+
+  const loadExistingReview = async () => {
+    if (!product) return;
+    setFetching(true);
+    try {
+      const res = await UserService.Reviewlist(product.id);
+      if (res?.data?.data && Array.isArray(res.data.data)) {
+        const myReview = res.data.data.find(
+          (rev: any) => String(rev.customer_id) === String(customerId),
+        );
+        if (myReview) {
+          setRating(myReview.rating);
+          setReviewText(myReview.review);
+          setExistingReviewId(myReview.id);
+        } else {
+          setRating(0);
+          setReviewText('');
+          setExistingReviewId(null);
+        }
+      }
+    } catch (error) {
+      console.log('Error loading review:', error);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!product) return;
+    if (rating === 0) {
+      Toast.show({ type: 'error', text1: 'Please select a rating' });
+      return;
+    }
+    if (!reviewText.trim()) {
+      Toast.show({ type: 'error', text1: 'Please write a review' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        rating: rating,
+        review: reviewText.trim(),
+      };
+      await UserService.Review(payload, product.id);
+      Toast.show({
+        type: 'success',
+        text1: existingReviewId ? 'Review updated' : 'Review submitted',
+      });
+      onReviewSubmitted?.();
+      onClose();
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Failed to save review' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderStars = () => (
+    <View style={reviewStyles.starsRow}>
+      {[1, 2, 3, 4, 5].map(star => (
+        <TouchableOpacity
+          key={star}
+          onPress={() => setRating(star)}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              reviewStyles.star,
+              star <= rating ? reviewStyles.starFilled : reviewStyles.starEmpty,
+            ]}
+          >
+            ★
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  if (!product) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={reviewStyles.backdrop} onPress={onClose} />
+      <View style={reviewStyles.modalContainer}>
+        <View style={reviewStyles.modalCard}>
+          {/* Product Image & Name */}
+          <View style={reviewStyles.productHeader}>
+            <Image
+              source={imgUri(product.front_image)}
+              style={reviewStyles.productImage}
+            />
+            <Text style={reviewStyles.productName} numberOfLines={2}>
+              {product.name}
+            </Text>
+          </View>
+
+          <Text style={reviewStyles.title}>
+            {existingReviewId ? 'Update Your Review' : 'Write a Review'}
+          </Text>
+
+          {fetching ? (
+            <ActivityIndicator
+              color={T.accent}
+              style={{ marginVertical: 20 }}
+            />
+          ) : (
+            <>
+              {renderStars()}
+              <TextInput
+                style={reviewStyles.input}
+                placeholder="Share your experience with this product..."
+                placeholderTextColor={T.textHint}
+                multiline
+                numberOfLines={4}
+                value={reviewText}
+                onChangeText={setReviewText}
+              />
+              <View style={reviewStyles.buttonsRow}>
+                <TouchableOpacity
+                  style={[reviewStyles.btn, reviewStyles.cancelBtn]}
+                  onPress={onClose}
+                >
+                  <Text style={reviewStyles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    reviewStyles.btn,
+                    reviewStyles.submitBtn,
+                    loading && { opacity: 0.6 },
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={reviewStyles.submitText}>
+                      {existingReviewId ? 'Update Review' : 'Submit Review'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const reviewStyles = StyleSheet.create({
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: T.overlay,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: T.card,
+    borderRadius: 24,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  productHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  productImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: T.bg,
+  },
+  productName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: T.text,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: T.text,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  star: {
+    fontSize: 32,
+    marginHorizontal: 4,
+  },
+  starFilled: {
+    color: '#FFB800',
+  },
+  starEmpty: {
+    color: '#D3D3D3',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 16,
+    padding: 14,
+    fontSize: 14,
+    color: T.text,
+    textAlignVertical: 'top',
+    minHeight: 100,
+    marginBottom: 20,
+  },
+  buttonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  btn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 30,
+    alignItems: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: T.bg,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  submitBtn: {
+    backgroundColor: T.accent,
+  },
+  cancelText: {
+    color: T.textSub,
+    fontWeight: '600',
+  },
+  submitText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+});
+
+// ===================== ITEMS MODAL (No review modal inside, just callback) =====================
 const SHEET_MAX_H = SCREEN_H * 0.88;
 
 const ItemsModal = ({
@@ -130,11 +419,13 @@ const ItemsModal = ({
   visible,
   onClose,
   displayPrice,
+  onWriteReview,
 }: {
   order: UiOrder | null;
   visible: boolean;
   onClose: () => void;
   displayPrice: (v: any) => string;
+  onWriteReview: (product: OrderProduct) => void;
 }) => {
   if (!order) return null;
 
@@ -146,37 +437,28 @@ const ItemsModal = ({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      {/* Backdrop — separate layer, never overlaps sheet */}
-      <Pressable style={ms.backdrop} onPress={onClose} />
-
-      {/* Sheet — NOT inside the backdrop Pressable */}
-      <View style={ms.sheet}>
-        {/* Drag handle */}
-        <View style={ms.handle} />
-
-        {/* Header — fixed, does not scroll */}
-        <View style={ms.modalHeader}>
+      <Pressable style={itemsStyles.backdrop} onPress={onClose} />
+      <View style={itemsStyles.sheet}>
+        <View style={itemsStyles.handle} />
+        <View style={itemsStyles.modalHeader}>
           <View>
-            <Text style={ms.modalTitle}>Order #{order.id}</Text>
-            <Text style={ms.modalSub}>
+            <Text style={itemsStyles.modalTitle}>Order #{order.id}</Text>
+            <Text style={itemsStyles.modalSub}>
               {order.items.length} item{order.items.length > 1 ? 's' : ''}
             </Text>
           </View>
           <TouchableOpacity
             onPress={onClose}
-            style={ms.closeBtn}
+            style={itemsStyles.closeBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={ms.closeX}>×</Text>
+            <Text style={itemsStyles.closeX}>×</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={ms.divider} />
-
-        {/* Scrollable content — flex:1 means it takes all remaining height */}
+        <View style={itemsStyles.divider} />
         <ScrollView
-          style={ms.scroll}
-          contentContainerStyle={ms.scrollContent}
+          style={itemsStyles.scroll}
+          contentContainerStyle={itemsStyles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={true}
           keyboardShouldPersistTaps="handled"
@@ -186,80 +468,84 @@ const ItemsModal = ({
             return (
               <View
                 key={orderItem.id}
-                style={[ms.itemCard, idx > 0 && { marginTop: 12 }]}
+                style={[itemsStyles.itemCard, idx > 0 && { marginTop: 12 }]}
               >
-                {/* Images */}
-                <View style={ms.imagesRow}>
+                <View style={itemsStyles.imagesRow}>
                   <Image
                     source={imgUri(p?.front_image)}
-                    style={ms.imgMain}
+                    style={itemsStyles.imgMain}
                     resizeMode="cover"
                   />
                   {p?.back_image ? (
                     <Image
                       source={imgUri(p.back_image)}
-                      style={ms.imgSecond}
+                      style={itemsStyles.imgSecond}
                       resizeMode="cover"
                     />
                   ) : null}
                 </View>
-
-                {/* Body */}
-                <View style={ms.itemBody}>
-                  <Text style={ms.itemName} numberOfLines={2}>
+                <View style={itemsStyles.itemBody}>
+                  <Text style={itemsStyles.itemName} numberOfLines={2}>
                     {p?.name || 'Product'}
                   </Text>
-
-                  {/* Variant chips */}
                   {p?.variants && p.variants.length > 0 && (
-                    <View style={ms.variantsRow}>
+                    <View style={itemsStyles.variantsRow}>
                       {p.variants.map(v => (
-                        <View key={v.id} style={ms.variantChip}>
-                          <Text style={ms.variantText}>{v.unit}</Text>
-                          <Text style={ms.variantPrice}>
+                        <View key={v.id} style={itemsStyles.variantChip}>
+                          <Text style={itemsStyles.variantText}>{v.unit}</Text>
+                          <Text style={itemsStyles.variantPrice}>
                             {displayPrice(v.price)}
                           </Text>
                         </View>
                       ))}
                     </View>
                   )}
-
-                  {/* Qty + subtotal */}
-                  <View style={ms.itemFooter}>
-                    <Text style={ms.itemQtyLabel}>
+                  <View style={itemsStyles.itemFooter}>
+                    <Text style={itemsStyles.itemQtyLabel}>
                       Qty:{' '}
-                      <Text style={ms.itemQtyVal}>{orderItem.quantity}</Text>
+                      <Text style={itemsStyles.itemQtyVal}>
+                        {orderItem.quantity}
+                      </Text>
                     </Text>
-                    <Text style={ms.itemSubtotal}>
+                    <Text style={itemsStyles.itemSubtotal}>
                       {displayPrice(orderItem.subtotal)}
                     </Text>
                   </View>
+                  {/* Review Button */}
+                  <TouchableOpacity
+                    style={itemsStyles.reviewBtn}
+                    onPress={() => p && onWriteReview(p)}
+                  >
+                    <Text style={itemsStyles.reviewBtnText}>
+                      Write a Review
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             );
           })}
-
-          {/* Order total summary */}
-          <View style={ms.totalCard}>
+          <View style={itemsStyles.totalCard}>
             {Number(order.discount_amount) > 0 && (
               <>
-                <View style={ms.totalRow}>
-                  <Text style={ms.totalLbl}>Subtotal</Text>
-                  <Text style={ms.totalVal}>
+                <View style={itemsStyles.totalRow}>
+                  <Text style={itemsStyles.totalLbl}>Subtotal</Text>
+                  <Text style={itemsStyles.totalVal}>
                     {displayPrice(order.total_amount)}
                   </Text>
                 </View>
-                <View style={ms.totalRow}>
-                  <Text style={ms.totalLbl}>Discount</Text>
-                  <Text style={[ms.totalVal, { color: '#2A6A4A' }]}>
+                <View style={itemsStyles.totalRow}>
+                  <Text style={itemsStyles.totalLbl}>Discount</Text>
+                  <Text style={[itemsStyles.totalVal, { color: '#2A6A4A' }]}>
                     −{displayPrice(order.discount_amount)}
                   </Text>
                 </View>
               </>
             )}
-            <View style={[ms.totalRow, ms.grandRow]}>
-              <Text style={ms.grandLbl}>Total</Text>
-              <Text style={ms.grandVal}>{displayPrice(order.final_total)}</Text>
+            <View style={[itemsStyles.totalRow, itemsStyles.grandRow]}>
+              <Text style={itemsStyles.grandLbl}>Total</Text>
+              <Text style={itemsStyles.grandVal}>
+                {displayPrice(order.final_total)}
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -268,8 +554,7 @@ const ItemsModal = ({
   );
 };
 
-const ms = StyleSheet.create({
-  // Full-screen backdrop sits behind the sheet
+const itemsStyles = StyleSheet.create({
   backdrop: {
     position: 'absolute',
     top: 0,
@@ -278,7 +563,6 @@ const ms = StyleSheet.create({
     bottom: 0,
     backgroundColor: T.overlay,
   },
-  // Sheet anchored to the bottom, fixed max height, flex column
   sheet: {
     position: 'absolute',
     left: 0,
@@ -288,7 +572,6 @@ const ms = StyleSheet.create({
     backgroundColor: T.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    // flex column so header is fixed and ScrollView stretches
     display: 'flex',
     flexDirection: 'column',
     paddingBottom: Platform.OS === 'ios' ? 32 : 20,
@@ -309,7 +592,7 @@ const ms = StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: 18,
     paddingVertical: 12,
-    flexShrink: 0, // header never shrinks
+    flexShrink: 0,
   },
   modalTitle: { fontSize: 16, fontWeight: '700', color: T.text },
   modalSub: { fontSize: 12, color: T.textHint, marginTop: 2 },
@@ -328,11 +611,8 @@ const ms = StyleSheet.create({
     textAlign: 'center',
   },
   divider: { height: 0.5, backgroundColor: T.border, flexShrink: 0 },
-
-  // ScrollView fills remaining space
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 8 },
-
   itemCard: {
     backgroundColor: T.bg,
     borderRadius: 12,
@@ -380,7 +660,6 @@ const ms = StyleSheet.create({
   itemQtyLabel: { fontSize: 12, color: T.textHint },
   itemQtyVal: { color: T.textSub, fontWeight: '600' },
   itemSubtotal: { fontSize: 14, fontWeight: '700', color: T.accent },
-
   totalCard: {
     marginTop: 14,
     backgroundColor: T.bg,
@@ -405,9 +684,17 @@ const ms = StyleSheet.create({
   },
   grandLbl: { fontSize: 14, fontWeight: '700', color: T.text },
   grandVal: { fontSize: 16, fontWeight: '800', color: T.accent },
+  reviewBtn: {
+    marginTop: 12,
+    backgroundColor: T.accentBg,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  reviewBtnText: { fontSize: 12, fontWeight: '600', color: T.accentDark },
 });
 
-// ── Order Card ────────────────────────────────────────────────────────────────
+// ===================== ORDER CARD =====================
 const OrderCard = ({
   item,
   onViewItems,
@@ -430,65 +717,65 @@ const OrderCard = ({
   const firstProduct = item.items?.[0]?.product;
 
   return (
-    <View style={cs.card}>
-      <View style={cs.cardTop}>
+    <View style={cardStyles.card}>
+      <View style={cardStyles.cardTop}>
         <Image
           source={imgUri(firstProduct?.front_image)}
-          style={cs.thumb}
+          style={cardStyles.thumb}
           resizeMode="cover"
         />
-        <View style={cs.cardMid}>
-          <Text style={cs.orderId}>Order #{item.id}</Text>
+        <View style={cardStyles.cardMid}>
+          <Text style={cardStyles.orderId}>Order #{item.id}</Text>
           {firstProduct?.name ? (
-            <Text style={cs.productName} numberOfLines={1}>
+            <Text style={cardStyles.productName} numberOfLines={1}>
               {firstProduct.name}
             </Text>
           ) : null}
-          <Text style={cs.orderDate}>{formatDate(item.created_at)}</Text>
+          <Text style={cardStyles.orderDate}>
+            {formatDate(item.created_at)}
+          </Text>
         </View>
-        <View style={cs.cardRight}>
-          <Text style={cs.amount}>{total}</Text>
-          <View style={[cs.badge, { backgroundColor: statusStyle.bg }]}>
-            <Text style={[cs.badgeText, { color: statusStyle.text }]}>
+        <View style={cardStyles.cardRight}>
+          <Text style={cardStyles.amount}>{total}</Text>
+          <View style={[cardStyles.badge, { backgroundColor: statusStyle.bg }]}>
+            <Text style={[cardStyles.badgeText, { color: statusStyle.text }]}>
               {label}
             </Text>
           </View>
         </View>
       </View>
-
-      <View style={cs.divider} />
-      <View style={cs.detailStrip}>
+      <View style={cardStyles.divider} />
+      <View style={cardStyles.detailStrip}>
         {item.tracking_number ? (
-          <View style={cs.stripItem}>
-            <Text style={cs.stripLabel}>Tracking</Text>
+          <View style={cardStyles.stripItem}>
+            <Text style={cardStyles.stripLabel}>Tracking</Text>
             <Text
-              style={[cs.stripValue, { color: T.accent }]}
+              style={[cardStyles.stripValue, { color: T.accent }]}
               numberOfLines={1}
             >
               {item.tracking_number}
             </Text>
           </View>
         ) : null}
-        <View style={cs.stripItem}>
-          <Text style={cs.stripLabel}>Payment</Text>
-          <Text style={cs.stripValue}>{payText}</Text>
+        <View style={cardStyles.stripItem}>
+          <Text style={cardStyles.stripLabel}>Payment</Text>
+          <Text style={cardStyles.stripValue}>{payText}</Text>
         </View>
-        <View style={cs.stripItem}>
-          <Text style={cs.stripLabel}>Items</Text>
-          <Text style={cs.stripValue}>{itemCount}</Text>
+        <View style={cardStyles.stripItem}>
+          <Text style={cardStyles.stripLabel}>Items</Text>
+          <Text style={cardStyles.stripValue}>{itemCount}</Text>
         </View>
       </View>
-
       {itemCount > 0 && (
         <>
-          <View style={cs.divider} />
+          <View style={cardStyles.divider} />
           <TouchableOpacity
-            style={cs.viewBtn}
+            style={cardStyles.viewBtn}
             onPress={onViewItems}
             activeOpacity={0.8}
           >
-            <Text style={cs.viewBtnText}>View Items</Text>
-            <Text style={cs.viewBtnArrow}>›</Text>
+            <Text style={cardStyles.viewBtnText}>View Items</Text>
+            <Text style={cardStyles.viewBtnArrow}>›</Text>
           </TouchableOpacity>
         </>
       )}
@@ -496,7 +783,7 @@ const OrderCard = ({
   );
 };
 
-const cs = StyleSheet.create({
+const cardStyles = StyleSheet.create({
   card: {
     backgroundColor: T.card,
     borderRadius: 12,
@@ -536,18 +823,18 @@ const cs = StyleSheet.create({
   viewBtnArrow: { fontSize: 16, color: T.accentDark, lineHeight: 18 },
 });
 
-// ── Main Screen ───────────────────────────────────────────────────────────────
+// ===================== MAIN SCREEN =====================
 const OrdersScreen = ({ navigation }: { navigation: any }) => {
   const { translatedText: searchPlaceholder } =
     useAutoTranslate('Search orders…');
   const { userData } = useContext(UserDataContext);
+  const customerId = userData?.id ? String(userData.id) : null;
 
   const selectedCurrency = useAppSelector(s => s.currency.selectedCurrency);
   const { data: rates } = useGetRatesQuery(undefined, {
     refetchOnMountOrArgChange: false,
     refetchOnReconnect: true,
   });
-
   const displayPrice = useCallback(
     (v: any) => convertAndFormatPrice(v, selectedCurrency, rates),
     [selectedCurrency, rates],
@@ -559,6 +846,8 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [modalOrder, setModalOrder] = useState<UiOrder | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [reviewProduct, setReviewProduct] = useState<OrderProduct | null>(null);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -587,12 +876,29 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
     setRefreshing(true);
     fetchOrders();
   }, []);
+
   const openModal = useCallback((order: UiOrder) => {
     setModalOrder(order);
     setModalVisible(true);
   }, []);
+
   const closeModal = useCallback(() => {
     setModalVisible(false);
+  }, []);
+
+  const handleWriteReview = useCallback((product: OrderProduct) => {
+    // Close items modal first, then open review modal
+    setModalVisible(false);
+    // Small delay to allow modal close animation to finish (optional but smoother)
+    setTimeout(() => {
+      setReviewProduct(product);
+      setReviewModalVisible(true);
+    }, 200);
+  }, []);
+
+  const closeReviewModal = useCallback(() => {
+    setReviewModalVisible(false);
+    setReviewProduct(null);
   }, []);
 
   const filtered = useMemo(() => {
@@ -608,7 +914,6 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
   return (
     <SafeAreaView style={s.screen}>
       <StatusBar barStyle="dark-content" backgroundColor={T.card} />
-
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Image
@@ -619,7 +924,6 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
         <TransletText text="My Orders" style={s.headerTitle} />
         <View style={{ width: 36 }} />
       </View>
-
       <View style={s.searchWrap}>
         <Image
           source={require('../../assets/Png/search.png')}
@@ -641,7 +945,6 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
           </TouchableOpacity>
         )}
       </View>
-
       {isLoading && !refreshing ? (
         <View style={s.loader}>
           <ActivityIndicator color={T.accent} />
@@ -681,12 +984,21 @@ const OrdersScreen = ({ navigation }: { navigation: any }) => {
           }
         />
       )}
-
       <ItemsModal
         order={modalOrder}
         visible={modalVisible}
         onClose={closeModal}
         displayPrice={displayPrice}
+        onWriteReview={handleWriteReview}
+      />
+      <ReviewModal
+        visible={reviewModalVisible}
+        onClose={closeReviewModal}
+        product={reviewProduct}
+        customerId={customerId}
+        onReviewSubmitted={() => {
+          // Optional: refresh orders or show a toast
+        }}
       />
     </SafeAreaView>
   );

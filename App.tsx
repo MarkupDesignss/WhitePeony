@@ -33,7 +33,7 @@ const Stack = createNativeStackNavigator();
 
 const linking = {
   prefixes: [
-    'https://www.markupdesigns.net/whitepeony',
+    'https://app.whitepeony.eu/',
     'whitepeony://',
   ],
   config: {
@@ -74,11 +74,7 @@ function App() {
                 <WishlistProvider>
                   <CartProvider>
                     <StripeProvider
-                      publishableKey={"pk_test_51TAz0xAM0QPX8rok2dpqfDKnm1sNqwDnHkvJPLE0l0A9R4EaEOV8vBtkpTkcoYslz4QSSFWW5LAjk2pPMg1dTVaK00jEfxp6ZC"}
-                    // For Payment Sheet, you only need publishableKey
-                    // These are optional and only needed for specific features:
-                    // merchantIdentifier - Only for Apple Pay
-                    // urlScheme - Only for custom return URLs (not needed for Payment Sheet)
+                      publishableKey={"pk_test_51Sp1zf2ZPqr3eppA39D484PCmIupfCL62bEZjQz2oNqSoyS2LT4DNvqbovBfxJ2lfcb9YKzWnauP8Wh9TwqGPEyj00C7llha3E"}
                     >
                       <NetworkStatus />
                       <GestureHandlerRootView style={{ flex: 1 }}>

@@ -26,18 +26,22 @@ export const convertFromCZK = (
     return priceCZK;
   }
 
-  // No conversion needed
   if (selectedCurrency === 'CZK') {
     return priceCZK;
   }
 
-  const rate = rates[selectedCurrency];
+  const czkRate = rates['CZK'];
+  const targetRate = rates[selectedCurrency];
 
-  if (!rate) {
+  if (!czkRate || !targetRate) {
     return priceCZK;
   }
 
-  return priceCZK * rate;
+  // Step 1: CZK → USD
+  const usd = priceCZK / czkRate;
+
+  // Step 2: USD → target
+  return usd * targetRate;
 };
 
 // Format price with symbol after number
