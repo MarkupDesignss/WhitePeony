@@ -120,6 +120,13 @@ const imgUri = (path?: string | null) =>
   path ? { uri: Image_url + path } : require('../../assets/Png/product.png');
 
 // ===================== REVIEW MODAL (Professional & Independent) =====================
+// ===================== REVIEW MODAL (Keyboard‑friendly) =====================
+import {
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
+} from 'react-native';
+
 const ReviewModal = ({
   visible,
   onClose,
@@ -138,8 +145,9 @@ const ReviewModal = ({
   const [loading, setLoading] = useState(false);
   const [existingReviewId, setExistingReviewId] = useState<number | null>(null);
   const [fetching, setFetching] = useState(false);
+  // Inline error state
+  const [errorMsg, setErrorMsg] = useState('');
 
-  // Reset and load existing review when product changes and modal opens
   useEffect(() => {
     if (visible && product && customerId) {
       loadExistingReview();
@@ -147,6 +155,7 @@ const ReviewModal = ({
       setRating(0);
       setReviewText('');
       setExistingReviewId(null);
+      setErrorMsg('');
     }
   }, [visible, product, customerId]);
 
@@ -178,14 +187,16 @@ const ReviewModal = ({
 
   const handleSubmit = async () => {
     if (!product) return;
+    // Inline validation – no Toast
     if (rating === 0) {
-      Toast.show({ type: 'error', text1: 'Please select a rating' });
+      setErrorMsg('Please select a rating');
       return;
     }
     if (!reviewText.trim()) {
-      Toast.show({ type: 'error', text1: 'Please write a review' });
+      setErrorMsg('Please write a review');
       return;
     }
+    setErrorMsg(''); // clear any previous error
 
     setLoading(true);
     try {
@@ -212,7 +223,10 @@ const ReviewModal = ({
       {[1, 2, 3, 4, 5].map(star => (
         <TouchableOpacity
           key={star}
-          onPress={() => setRating(star)}
+          onPress={() => {
+            setRating(star);
+            setErrorMsg(''); // clear error when user interacts
+          }}
           activeOpacity={0.7}
         >
           <Text
@@ -238,74 +252,107 @@ const ReviewModal = ({
       onRequestClose={onClose}
     >
       <Pressable style={reviewStyles.backdrop} onPress={onClose} />
-      <View style={reviewStyles.modalContainer}>
-        <View style={reviewStyles.modalCard}>
-          {/* Product Image & Name */}
-          <View style={reviewStyles.productHeader}>
-            <Image
-              source={imgUri(product.front_image)}
-              style={reviewStyles.productImage}
-            />
-            <Text style={reviewStyles.productName} numberOfLines={2}>
-              {product.name}
-            </Text>
-          </View>
-
-          <Text style={reviewStyles.title}>
-            {existingReviewId ? 'Update Your Review' : 'Write a Review'}
-          </Text>
-
-          {fetching ? (
-            <ActivityIndicator
-              color={T.accent}
-              style={{ marginVertical: 20 }}
-            />
-          ) : (
-            <>
-              {renderStars()}
-              <TextInput
-                style={reviewStyles.input}
-                placeholder="Share your experience with this product..."
-                placeholderTextColor={T.textHint}
-                multiline
-                numberOfLines={4}
-                value={reviewText}
-                onChangeText={setReviewText}
-              />
-              <View style={reviewStyles.buttonsRow}>
-                <TouchableOpacity
-                  style={[reviewStyles.btn, reviewStyles.cancelBtn]}
-                  onPress={onClose}
-                >
-                  <Text style={reviewStyles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    reviewStyles.btn,
-                    reviewStyles.submitBtn,
-                    loading && { opacity: 0.6 },
-                  ]}
-                  onPress={handleSubmit}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={reviewStyles.submitText}>
-                      {existingReviewId ? 'Update Review' : 'Submit Review'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={reviewStyles.modalContainer}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={reviewStyles.modalCard}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              contentContainerStyle={{ paddingBottom: 12 }}
+            >
+              <View style={reviewStyles.productHeader}>
+                <Image
+                  source={imgUri(product.front_image)}
+                  style={reviewStyles.productImage}
+                />
+                <Text style={reviewStyles.productName} numberOfLines={2}>
+                  {product.name}
+                </Text>
               </View>
-            </>
-          )}
-        </View>
-      </View>
+
+              <Text style={reviewStyles.title}>
+                {existingReviewId ? 'Update Your Review' : 'Write a Review'}
+              </Text>
+
+              {fetching ? (
+                <ActivityIndicator
+                  color={T.accent}
+                  style={{ marginVertical: 20 }}
+                />
+              ) : (
+                <>
+                  {renderStars()}
+                  <TextInput
+                    style={[
+                      reviewStyles.input,
+                      errorMsg ? reviewStyles.inputError : null,
+                    ]}
+                    placeholder="Share your experience with this product..."
+                    placeholderTextColor={T.textHint}
+                    multiline
+                    numberOfLines={4}
+                    value={reviewText}
+                    onChangeText={text => {
+                      setReviewText(text);
+                      if (errorMsg) setErrorMsg('');
+                    }}
+                    returnKeyType="done"
+                    onSubmitEditing={Keyboard.dismiss}
+                    blurOnSubmit={true}
+                  />
+                  {errorMsg ? (
+                    <Text style={reviewStyles.errorText}>{errorMsg}</Text>
+                  ) : null}
+                  <View style={reviewStyles.buttonsRow}>
+                    <TouchableOpacity
+                      style={[reviewStyles.btn, reviewStyles.cancelBtn]}
+                      onPress={onClose}
+                    >
+                      <Text style={reviewStyles.cancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        reviewStyles.btn,
+                        reviewStyles.submitBtn,
+                        loading && { opacity: 0.6 },
+                      ]}
+                      onPress={handleSubmit}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={reviewStyles.submitText}>
+                          {existingReviewId ? 'Update Review' : 'Submit Review'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const reviewStyles = StyleSheet.create({
+  inputError: {
+    borderColor: '#E53935',
+  },
+  errorText: {
+    color: '#E53935',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 12,
+    marginLeft: 4,
+  },
   backdrop: {
     position: 'absolute',
     top: 0,
@@ -322,6 +369,7 @@ const reviewStyles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
+    maxHeight: SCREEN_H * 0.85, // limit height, enables scrolling
     backgroundColor: T.card,
     borderRadius: 24,
     padding: 20,
