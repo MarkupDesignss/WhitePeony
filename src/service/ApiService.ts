@@ -1,12 +1,15 @@
 import axios from 'axios';
 import { LocalStorage } from '../helpers/localstorage';
-// const STAGING_API_URL = "https://www.markupdesigns.net/def-dwarg/api/";
-export const Image_url = 'https://app.whitepeony.eu/storage/';
-const STAGING_API_URL = 'https://app.whitepeony.eu/api/';
+import Config from 'react-native-config';
+
+export const Image_url = Config.IMAGE_URL;
+const STAGING_API_URL = Config.API_URL;
 export const API_URL = STAGING_API_URL;
+console.log('ENV =>', Config);
+console.log('API =>', Config.API_URL);
 let APIKit = axios.create({
   baseURL: STAGING_API_URL,
-  timeout: 60000,
+  timeout: 15000,
 });
 
 APIKit.interceptors.request.use(
@@ -25,7 +28,7 @@ APIKit.interceptors.request.use(
     return config;
   },
   error => {
-    console.log('Request error:', error);
+    console.error('Request error:', error);
     return Promise.reject(error);
   },
 );
@@ -33,9 +36,6 @@ APIKit.interceptors.request.use(
 export const getAppVersion = async () => {
   try {
     const response = await APIKit.get('getVersion');
-
-    console.log('FULL RESPONSE', response);
-    console.log('RESPONSE DATA', response.data);
 
     return response.data;
   } catch (error) {
@@ -51,9 +51,9 @@ export const UserService = {
         Accept: 'application/json',
       },
     };
-    console.log('REQUEST OTP PAYLOAD:', payload);
+
     const res = await APIKit.post('login/request-otp', payload, apiHeaders);
-    console.log('REQUEST OTP RESPONSE:', res.data);
+
     return res;
   },
 
@@ -64,9 +64,9 @@ export const UserService = {
         Accept: 'application/json',
       },
     };
-    console.log('VERIFY OTP PAYLOAD:', payload);
+
     const res = await APIKit.post('login/verify-otp', payload, apiHeaders);
-    console.log('VERIFY OTP RESPONSE:', res.data);
+
     return res;
   },
 
@@ -78,7 +78,7 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", payload);
+
     return APIKit.post('update/profile', payload, apiHeaders);
   },
 
@@ -221,7 +221,6 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", token)
 
     return APIKit.get('order', apiHeaders);
   },
@@ -411,7 +410,6 @@ export const UserService = {
         );
     }
     const query = parts.length ? `?${parts.join('&')}` : '';
-    console.log('FilterProducts params:', params, query);
 
     return APIKit.get(`products/filter${query}`, apiHeaders);
   },
@@ -448,13 +446,13 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", payload)
+
     return APIKit.post('addtocart', payload, apiHeaders);
   },
 
   viewCart: async () => {
     const token = await LocalStorage.read('@token');
-    // console.log("token", token);
+
     const apiHeaders = {
       headers: {
         'Content-Type': 'application/json',
@@ -515,7 +513,7 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    //console.log("payload", payload, apiHeaders);
+
     return APIKit.post('updatecart', payload, apiHeaders);
   },
 
@@ -540,7 +538,7 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    // console.log("payload", payload)
+
     return APIKit.post('placeorder', payload, apiHeaders);
   },
 
@@ -651,9 +649,7 @@ export const UserService = {
 
   search: async (word: string) => {
     try {
-      console.log('--- UserService.search called with:', word);
       const token = await LocalStorage.read('@token');
-      console.log('--- Token:', token);
 
       const apiHeaders = {
         headers: {
@@ -667,7 +663,7 @@ export const UserService = {
         `search-product?search=${encodeURIComponent(word)}`,
         apiHeaders,
       );
-      console.log('--- Search API response:', res.data);
+
       return res;
     } catch (error) {
       console.error('--- Search API ERROR:', error);
@@ -688,7 +684,7 @@ export const UserService = {
     const numericPayload = {
       product_id: Number(payload.product_id),
     };
-    console.log('Wishlist add payload:', numericPayload);
+
     return APIKit.post(`wishlist/add`, numericPayload, apiHeaders);
   },
 
@@ -701,11 +697,9 @@ export const UserService = {
         Authorization: `Bearer ${token}`,
       },
     };
-    console.log('Fetching wishlist from:', STAGING_API_URL + 'wishlist');
 
     try {
       const response = await APIKit.get('wishlist', apiHeaders);
-      console.log('Wishlist API Response:', response.data);
 
       // Return the data part of the response
       return response.data;
@@ -724,7 +718,7 @@ export const UserService = {
       },
     };
     const numericProductId = Number(productId);
-    console.log('Wishlist delete for product:', numericProductId);
+
     return APIKit.delete(`wishlist/product/${numericProductId}`, apiHeaders);
   },
 

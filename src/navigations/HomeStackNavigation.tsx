@@ -54,17 +54,17 @@ const HomeStackNavigator: FC = () => {
         const comparison = VersionCheckService.compareVersions(currentVersion, info.latestVersion);
 
         // Check if force update is needed
-        if (comparison < 0 && info.forceUpdate) {
-          setNeedsForceUpdate(false);
+        if (comparison < 0 && !info.forceUpdate) {
+          setNeedsForceUpdate(true);
           setShowSplash(false);
           return; // Stop execution if force update is needed
         }
       } catch (error) {
         console.error('Version check failed:', error);
-        // Continue with normal flow if version check fails
+     
       }
 
-      // Normal flow if no force update needed
+      
       const first = await checkFirstLaunch();
       setIsFirstLaunch(first);
 
