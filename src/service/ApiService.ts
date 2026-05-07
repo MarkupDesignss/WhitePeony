@@ -30,6 +30,19 @@ APIKit.interceptors.request.use(
   },
 );
 
+export const getAppVersion = async () => {
+  try {
+    const response = await APIKit.get('getVersion');
+
+    console.log('FULL RESPONSE', response);
+    console.log('RESPONSE DATA', response.data);
+
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching app version:', error);
+    throw error;
+  }
+};
 export const UserService = {
   requestOtp: async (payload: object) => {
     const apiHeaders = {
@@ -714,9 +727,6 @@ export const UserService = {
     console.log('Wishlist delete for product:', numericProductId);
     return APIKit.delete(`wishlist/product/${numericProductId}`, apiHeaders);
   },
-
-
-
 
   getProductById: async (id: string | number) => {
     const apiHeaders = {

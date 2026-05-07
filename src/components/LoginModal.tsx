@@ -643,7 +643,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                         )}
                       </TouchableOpacity>
 
-                      <View style={styles.divider}>
+                      {/* <View style={styles.divider}>
                         <View style={styles.dividerLine} />
                         <TransletText text="Or" style={styles.orText} />
                         <View style={styles.dividerLine} />
@@ -672,7 +672,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
                             style={styles.socialIcon}
                           />
                         </TouchableOpacity>
-                      </View>
+                      </View> */}
 
                       <View style={styles.termsContainer}>
                         <TransletText
@@ -681,11 +681,11 @@ const LoginModal: React.FC<AuthModalProps> = ({
                         />
                         <View style={styles.termsLinks}>
                           <TouchableOpacity onPress={() => openPageBrowser(termsPage)}>
-                            <Text style={styles.termsLink}>Terms of Service</Text>
+                            <TransletText style={styles.termsLink} text='Terms of Service' />
                           </TouchableOpacity>
                           <Text style={styles.termsSeparator}> and </Text>
                           <TouchableOpacity onPress={() => openPageBrowser(privacyPage)}>
-                            <Text style={styles.termsLink}>Privacy Policy</Text>
+                            <TransletText style={styles.termsLink} text="Privacy Policy" />
                           </TouchableOpacity>
                         </View>
                       </View>

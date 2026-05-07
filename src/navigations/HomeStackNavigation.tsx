@@ -30,16 +30,41 @@ import CurrencyScreen from '../screens/currency/CurrencyScreen';
 import PermissionService from '../service/PermissionService';
 import FCMService from '../service/FCMService';
 import PushNotificationService from '../service/PushNotificationService';
-
+import { VersionCheckService, VersionInfo } from "../navigations/VersionCheckService";
+import { getAppVersion } from '../service/ApiService';
+import ForceUpdateScreen from './ForceUpdateScreen';
+import DeviceInfo from 'react-native-device-info';
 const HomeStackNavigator: FC = () => {
   const Stack = createNativeStackNavigator();
 
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
   const [showSplash, setShowSplash] = useState(true);
+  const [needsForceUpdate, setNeedsForceUpdate] = useState(false);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
 
   // First launch + splash logic
   useEffect(() => {
     const init = async () => {
+      try {
+
+        const info: VersionInfo = await getAppVersion();
+        setVersionInfo(info);
+
+        const currentVersion = DeviceInfo.getVersion();
+        const comparison = VersionCheckService.compareVersions(currentVersion, info.latestVersion);
+
+        // Check if force update is needed
+        if (comparison < 0 && info.forceUpdate) {
+          setNeedsForceUpdate(false);
+          setShowSplash(false);
+          return; // Stop execution if force update is needed
+        }
+      } catch (error) {
+        console.error('Version check failed:', error);
+        // Continue with normal flow if version check fails
+      }
+
+      // Normal flow if no force update needed
       const first = await checkFirstLaunch();
       setIsFirstLaunch(first);
 
@@ -58,7 +83,8 @@ const HomeStackNavigator: FC = () => {
 
     const requestNotificationPermission = async () => {
       try {
-        if (!showSplash && isFirstLaunch !== null) {
+        // Only request permissions if not in force update mode
+        if (!showSplash && isFirstLaunch !== null && !needsForceUpdate) {
           const alreadyGranted = await PermissionService.checkPermissions();
 
           if (!alreadyGranted) {
@@ -66,13 +92,11 @@ const HomeStackNavigator: FC = () => {
 
             if (mounted && granted) {
               console.log('✅ Notification permission granted');
-
               await PushNotificationService.createDefaultChannel();
               await FCMService.init();
             }
           } else {
             console.log('ℹ️ Notification permission already granted');
-
             await PushNotificationService.createDefaultChannel();
             await FCMService.init();
           }
@@ -87,8 +111,12 @@ const HomeStackNavigator: FC = () => {
     return () => {
       mounted = false;
     };
-  }, [showSplash, isFirstLaunch]);
+  }, [showSplash, isFirstLaunch, needsForceUpdate]);
 
+  // Show force update screen if needed
+  if (needsForceUpdate && versionInfo) {
+    return <ForceUpdateScreen versionInfo={versionInfo} />;
+  }
   // UI decision AFTER hooks
   if (showSplash || isFirstLaunch === null) {
     return <SplashScreens />;

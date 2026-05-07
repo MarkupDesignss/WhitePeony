@@ -433,13 +433,13 @@ const PaymentSuccess = ({ navigation, route }: any) => {
             >
               <TransletText text="Track Order" style={s.btnPrimaryText} />
             </TouchableOpacity>
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={s.btnOutline}
               onPress={onShareReceipt}
               activeOpacity={0.85}
             >
               <TransletText text="Share Receipt" style={s.btnOutlineText} />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </>
         )}
 

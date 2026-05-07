@@ -74,7 +74,7 @@ function App() {
                 <WishlistProvider>
                   <CartProvider>
                     <StripeProvider
-                      publishableKey={"pk_test_51SeyX4CGAeLKXXB9QAKufTjtd6zF9f9CdXhak5t0Kkz5dhxYMUkq37QNq6ZMUR2DSZPx3kb5i3aQheKynSwurDDx00cmP6qwmn"}
+                      publishableKey={"pk_live_51SeyWtFzRA1NpbvnRcVtPb2UU0v5wsCfxo7t5QcYkqeo4N9IXcVFcLx9jieGVlWgDVpIxQAfPywlRQD7osNZrB5p00n8RJlMuN"}
                     >
                       <NetworkStatus />
                       <GestureHandlerRootView style={{ flex: 1 }}>
