@@ -288,6 +288,7 @@
 			baseConfigurationReference = 268E760FB71FBB8EC1E4A079 /* Pods-WhitePeaony.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = WhitePeaony/WhitePeaony.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -430,6 +431,8 @@
 					"$(SRCROOT)/../node_modules/react-native/ReactCommon/callinvoker/ReactCommon",
 				);
 				INFOPLIST_FILE = WhitePeaony/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "WhitePeony Premium Tea";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -455,6 +458,7 @@
 			baseConfigurationReference = 340FF5430BE84D227A73E60E /* Pods-WhitePeaony.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = WhitePeaony/WhitePeaony.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -596,6 +600,8 @@
 					"$(SRCROOT)/../node_modules/react-native/ReactCommon/callinvoker/ReactCommon",
 				);
 				INFOPLIST_FILE = WhitePeaony/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "WhitePeony Premium Tea";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

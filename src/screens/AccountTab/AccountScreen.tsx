@@ -576,7 +576,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
         <Text style={styles.sectionTitle}>{policiesText || 'Policies'}</Text>
         <View style={styles.policiesCard}>
           <TouchableOpacity
-            onPress={() => handlePolicyLink('terms')}
+           onPress={() => navigation.navigate('Terms')}
             style={styles.menuItem}
           >
             <View style={styles.menuItemLeft}>
@@ -624,7 +624,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => handlePolicyLink('privacy')}
+            onPress={() => navigation.navigate('Policy')}
             style={[
               styles.menuItem,
               styles.lastMenuItem,
@@ -649,7 +649,7 @@ const AccountScreen = ({ navigation }: AccountScreenProps) => {
           >
             <View style={styles.menuItemLeft}>
               <Image
-                source={require('../../assets/Png/shieldpro.png')}
+                source={require('../../assets/Png/currency.png')}
                 style={styles.menuIcon}
               />
               <Text style={styles.menuItemText}>

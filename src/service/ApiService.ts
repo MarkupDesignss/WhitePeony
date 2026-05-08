@@ -721,7 +721,26 @@ export const UserService = {
 
     return APIKit.delete(`wishlist/product/${numericProductId}`, apiHeaders);
   },
-
+  termsConditions: async () => {
+    const apiHeaders = {
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Skip-Auth': 'true',
+      },
+    };
+    return APIKit.get('pages/terms-and-conditions', apiHeaders);
+  },
+  privacyPolicy: async () => {
+    const apiHeaders = {
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Skip-Auth': 'true',
+      },
+    };
+    return APIKit.get('pages/privacy-policy', apiHeaders);
+  },
   getProductById: async (id: string | number) => {
     const apiHeaders = {
       headers: {

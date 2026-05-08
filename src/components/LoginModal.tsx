@@ -34,7 +34,7 @@ import TransletText from '../components/TransletText';
 import { useAutoTranslate } from '../hooks/useAutoTranslate';
 import FCMService from '../service/FCMService';
 import { useGetPagesQuery } from '../api/api';
-
+import { useNavigation } from '@react-navigation/native';
 interface AuthModalProps {
   visible: boolean;
   onClose: () => void;
@@ -86,7 +86,7 @@ const LoginModal: React.FC<AuthModalProps> = ({
   const { setUserData, setIsLoggedIn, setUserType } =
     useContext<UserData>(UserDataContext);
   const { syncCartAfterLogin } = useCart();
-
+  const navigationHook = useNavigation();
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
   /* ================= RESET STATE WHEN MODAL OPENS ================= */
@@ -680,12 +680,31 @@ const LoginModal: React.FC<AuthModalProps> = ({
                           style={styles.termsText}
                         />
                         <View style={styles.termsLinks}>
-                          <TouchableOpacity onPress={() => openPageBrowser(termsPage)}>
-                            <TransletText style={styles.termsLink} text='Terms of Service' />
+                          // Delete or comment out the openPageBrowser usage for Terms
+                          <TouchableOpacity onPress={() => {
+                            onClose(); // close modal first
+                            setTimeout(() => {
+                              navigationHook.navigate('Terms');   // 👈 use your Terms screen
+                            }, 200);
+                          }}>
+                            <TransletText style={styles.termsLink} text="Terms of Service" />
                           </TouchableOpacity>
                           <Text style={styles.termsSeparator}> and </Text>
-                          <TouchableOpacity onPress={() => openPageBrowser(privacyPage)}>
-                            <TransletText style={styles.termsLink} text="Privacy Policy" />
+                          <TouchableOpacity
+                            onPress={() => {
+                              onClose(); // close modal first
+
+                              setTimeout(() => {
+                                navigationHook.navigate('Policy', {
+                                  page: privacyPage,
+                                });
+                              }, 200);
+                            }}
+                          >
+                            <TransletText
+                              style={styles.termsLink}
+                              text="Privacy Policy"
+                            />
                           </TouchableOpacity>
                         </View>
                       </View>

@@ -34,6 +34,8 @@ import { VersionCheckService, VersionInfo } from "../navigations/VersionCheckSer
 import { getAppVersion } from '../service/ApiService';
 import ForceUpdateScreen from './ForceUpdateScreen';
 import DeviceInfo from 'react-native-device-info';
+import Policy from '../screens/Policy';
+import Terms from '../screens/Terms';
 const HomeStackNavigator: FC = () => {
   const Stack = createNativeStackNavigator();
 
@@ -153,6 +155,8 @@ const HomeStackNavigator: FC = () => {
       <Stack.Screen name="Searchpage" component={Searchpage} />
       <Stack.Screen name="Slugs" component={Slugs} />
       <Stack.Screen name="CurrencyScreen" component={CurrencyScreen} />
+      <Stack.Screen name="Policy" component={Policy} />
+      <Stack.Screen name="Terms" component={Terms} />
       <Stack.Screen
         name="SelectLanguageScreen"
         component={SelectLanguageScreen}

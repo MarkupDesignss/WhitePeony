@@ -2744,8 +2744,7 @@ const HomeScreen1 = ({ navigation }: any) => {
         <LoginModal
           visible={modalVisible}
           onClose={() => setModalVisible(false)}
-          onGoogleLogin={() => Alert.alert('Google Login')}
-          onFacebookLogin={() => Alert.alert('Facebook Login')}
+     
           phoneNumber="email or phone number"
         />
       </ScrollView>

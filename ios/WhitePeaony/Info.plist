@@ -74,8 +74,7 @@
 	<string>This app needs permission to send critical alerts for emergency notifications.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>This app needs permission to send you notifications for important updates.</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>This app collects usage data to improve your experience.</string>
+
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIBackgroundModes</key>
